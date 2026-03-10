@@ -9,6 +9,13 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Added
 
+- **Nexus CLI commands** via `System.CommandLine 2.0.3`:
+  - `nexus start [--url]` — start the Nexus service
+  - `nexus status [--url]` — query a running Nexus instance health
+  - `nexus winapp start [--nexus-url] [--test-mode]` — launch the desktop app
+- `/health` endpoint on Nexus — returns status, session count, model count, and timestamp
+- `NexusHostBuilder` — extracted web host configuration for reuse by CLI and test factory
+- 11 new tests for health endpoint (4) and CLI command routing (7)
 - **Nexus SignalR client** — Avalonia app now connects to Nexus backend via `NexusSessionManager`
 - `NexusSessionProxy` — `ICopilotSessionWrapper` implementation for Nexus-backed sessions (sends via SignalR, receives output callbacks)
 - `--nexus-url` startup argument to configure Nexus backend URL (default: `http://localhost:5280`)

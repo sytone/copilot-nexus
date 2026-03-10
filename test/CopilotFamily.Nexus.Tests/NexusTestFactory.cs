@@ -1,7 +1,6 @@
 namespace CopilotFamily.Nexus.Tests;
 
 using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Models;
 using CopilotFamily.Core.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -9,8 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// WebApplicationFactory that swaps the real CopilotClientService for MockCopilotClientService.
-/// Tests run against an in-memory TestServer — no real SDK or CLI needed.
+/// WebApplicationFactory that swaps the real SDK for mock services.
+/// The Program entry point creates a WebApplication directly (no-args path),
+/// which WebApplicationFactory intercepts via HostFactoryResolver.
 /// </summary>
 public class NexusTestFactory : WebApplicationFactory<Program>
 {
