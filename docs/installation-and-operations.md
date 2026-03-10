@@ -128,12 +128,22 @@ All examples below use the `nexus` alias. If you haven't set it up, substitute
 ## 4. Start the Nexus Service
 
 ```powershell
-# Start on default port (http://localhost:5280)
+# Start as a background process (default — returns immediately)
 nexus start
 
 # Start on a custom port
 nexus start --url http://localhost:6000
+
+# Start in the current process (foreground — blocks until stopped)
+nexus start --interactive
 ```
+
+By default, `nexus start` launches Nexus as a **background process** and returns
+immediately. It prints the PID and URL so you can verify it's running. If Nexus is
+already running (detected via the lock file), it tells you instead of starting a second
+instance.
+
+Use `--interactive` when you want to see log output in the terminal or when debugging.
 
 When Nexus starts, it:
 
@@ -194,24 +204,21 @@ nexus winapp start --nexus-url http://localhost:6000
 ## 8. Typical Workflow (Start Everything)
 
 ```powershell
-# 1. Start Nexus in background
-Start-Process nexus -ArgumentList "start"
+# 1. Start Nexus (backgrounds automatically)
+nexus start
 
-# 2. Wait a moment for Nexus to be ready
-Start-Sleep -Seconds 3
-
-# 3. Check Nexus is running
+# 2. Check Nexus is running
 nexus status
 
-# 4. Launch the desktop app
+# 3. Launch the desktop app
 nexus winapp start
 ```
 
-Or during development (two terminals):
+Or during development (foreground mode in one terminal):
 
 ```powershell
-# Terminal 1: Start Nexus
-dotnet run --project src/CopilotFamily.Nexus -- start
+# Terminal 1: Start Nexus interactively (see logs)
+dotnet run --project src/CopilotFamily.Nexus -- start --interactive
 
 # Terminal 2: Launch app
 dotnet run --project src/CopilotFamily.App
@@ -281,7 +288,7 @@ The `update` command:
 
 | Command | Description |
 |---|---|
-| `nexus start [--url URL]` | Start the Nexus service (default: `http://localhost:5280`) |
+| `nexus start [--url URL] [--interactive]` | Start Nexus (background by default; `--interactive` for foreground) |
 | `nexus stop` | Stop the running Nexus process |
 | `nexus status [--url URL]` | Check if Nexus is running and show info |
 | `nexus install` | Build and install both Nexus and App |

@@ -21,13 +21,23 @@ if (args.Length == 0 || !Program.IsCliCommand(args))
 
 // CLI command routing
 var urlOption = new Option<string>("--url") { Description = "URL to listen on", DefaultValueFactory = _ => "http://localhost:5280" };
+var interactiveOption = new Option<bool>("--interactive") { Description = "Run in the current process instead of as a background service" };
 
 // --- nexus start ---
-var startCommand = new Command("start", "Start the Nexus service") { urlOption };
+var startCommand = new Command("start", "Start the Nexus service (background by default)") { urlOption, interactiveOption };
 startCommand.SetAction(async (parseResult, ct) =>
 {
     var url = parseResult.GetValue(urlOption)!;
-    await Program.RunServerAsync(url, ct);
+    var interactive = parseResult.GetValue(interactiveOption);
+
+    if (interactive)
+    {
+        await Program.RunServerAsync(url, ct);
+    }
+    else
+    {
+        Program.RunStartBackground(url);
+    }
 });
 
 // --- nexus stop ---
@@ -108,7 +118,63 @@ public partial class Program
         return commands.Contains(args[0], StringComparer.OrdinalIgnoreCase);
     }
 
-    // --- start ---
+    // --- start (background) ---
+    internal static void RunStartBackground(string url)
+    {
+        // Check if already running
+        var lockFile = CopilotFamilyPaths.NexusLockFile;
+        if (File.Exists(lockFile))
+        {
+            var pidText = File.ReadAllText(lockFile).Trim();
+            if (int.TryParse(pidText, out var existingPid))
+            {
+                try
+                {
+                    Process.GetProcessById(existingPid);
+                    Console.WriteLine($"Nexus is already running (PID {existingPid}).");
+                    Console.WriteLine("Use 'nexus stop' first, or 'nexus start --interactive' to run in foreground.");
+                    return;
+                }
+                catch (ArgumentException)
+                {
+                    // Process not running — stale lock file, continue
+                }
+            }
+        }
+
+        // Find the current executable to relaunch with --interactive
+        var exePath = Environment.ProcessPath;
+        if (exePath == null)
+        {
+            Console.Error.WriteLine("Cannot determine executable path. Use 'nexus start --interactive' instead.");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = exePath,
+            Arguments = $"start --interactive --url {url}",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = false,
+            RedirectStandardError = false,
+        };
+
+        var proc = Process.Start(psi);
+        if (proc == null)
+        {
+            Console.Error.WriteLine("Failed to start Nexus background process.");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        Console.WriteLine($"Nexus started in background (PID {proc.Id}).");
+        Console.WriteLine($"  URL: {url}");
+        Console.WriteLine("Use 'nexus status' to check or 'nexus stop' to stop.");
+    }
+
+    // --- start (interactive/foreground) ---
     internal static async Task RunServerAsync(string url, CancellationToken ct)
     {
         CopilotFamilyPaths.EnsureDirectories();
