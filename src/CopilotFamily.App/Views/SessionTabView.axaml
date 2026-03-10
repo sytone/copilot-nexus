@@ -9,10 +9,10 @@
         <converters:MessageRoleToLabelConverter x:Key="RoleToLabelConverter"/>
     </UserControl.Resources>
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <DockPanel LastChildFill="True">
 
         <!-- Session status bar -->
-        <Border Grid.Row="0"
+        <Border DockPanel.Dock="Top"
                 Background="{StaticResource SurfaceBrush}"
                 Padding="8,4"
                 BorderBrush="{StaticResource BorderBrush}"
@@ -64,9 +64,40 @@
             </DockPanel>
         </Border>
 
-        <!-- Messages area -->
-        <ListBox Grid.Row="1"
-                 ItemsSource="{Binding Messages}"
+        <!-- Input area (docked to bottom so it stays pinned) -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="8">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBox Grid.Column="0"
+                         Text="{Binding InputText}"
+                         Name="InputTextBox"
+                         Background="{StaticResource InputBackgroundBrush}"
+                         Foreground="{StaticResource ForegroundBrush}"
+                         CaretBrush="{StaticResource ForegroundBrush}"
+                         BorderBrush="{StaticResource BorderBrush}"
+                         FontFamily="Cascadia Code, Consolas, Courier New"
+                         FontSize="13"
+                         Padding="8,6"
+                         VerticalContentAlignment="Center"
+                         KeyDown="InputTextBox_KeyDown"/>
+                <Button Grid.Column="1"
+                        Content="Send"
+                        Command="{Binding SendCommand}"
+                        Name="SendButton"
+                        Margin="8,0,0,0"
+                        Padding="16,6"
+                        Background="{StaticResource AccentBrush}"
+                        Foreground="White"
+                        BorderThickness="0"
+                        Cursor="Hand"/>
+            </Grid>
+        </Border>
+
+        <!-- Messages area (fills remaining space, scrolls internally) -->
+        <ListBox ItemsSource="{Binding Messages}"
                  Name="MessagesList"
                  Background="{StaticResource BackgroundBrush}"
                  BorderThickness="0"
@@ -111,36 +142,5 @@
             </ListBox.ItemTemplate>
         </ListBox>
 
-        <!-- Input area -->
-        <Border Grid.Row="2"
-                Background="{StaticResource SurfaceBrush}"
-                BorderBrush="{StaticResource BorderBrush}"
-                BorderThickness="0,1,0,0"
-                Padding="8">
-            <Grid ColumnDefinitions="*,Auto">
-                <TextBox Grid.Column="0"
-                         Text="{Binding InputText}"
-                         Name="InputTextBox"
-                         Background="{StaticResource InputBackgroundBrush}"
-                         Foreground="{StaticResource ForegroundBrush}"
-                         CaretBrush="{StaticResource ForegroundBrush}"
-                         BorderBrush="{StaticResource BorderBrush}"
-                         FontFamily="Cascadia Code, Consolas, Courier New"
-                         FontSize="13"
-                         Padding="8,6"
-                         VerticalContentAlignment="Center"
-                         KeyDown="InputTextBox_KeyDown"/>
-                <Button Grid.Column="1"
-                        Content="Send"
-                        Command="{Binding SendCommand}"
-                        Name="SendButton"
-                        Margin="8,0,0,0"
-                        Padding="16,6"
-                        Background="{StaticResource AccentBrush}"
-                        Foreground="White"
-                        BorderThickness="0"
-                        Cursor="Hand"/>
-            </Grid>
-        </Border>
-    </Grid>
+    </DockPanel>
 </UserControl>
