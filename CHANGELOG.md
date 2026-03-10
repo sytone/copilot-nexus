@@ -9,6 +9,7 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Added
 
+- **Model selector ComboBox** in session tab status bar — change models on a live session via dropdown
 - **Avalonia UI migration** — replaced WPF with Avalonia 11.3.12 for cross-platform support
 - Headless UI testing via `Avalonia.Headless.XUnit` (MIT licensed, no visible windows needed)
 - 17 headless UI tests replacing FlaUI-based process tests
