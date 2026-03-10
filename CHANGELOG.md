@@ -9,6 +9,12 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Added
 
+- **CopilotFamily.Nexus** — standalone ASP.NET Core backend service for Copilot session management
+  - **SignalR Hub** (`/hubs/session`) — real-time streaming of session output to connected clients
+  - **REST API** (`/api/sessions`, `/api/models`) — CRUD for sessions, model listing, input sending, reconfiguration
+  - **Webhook API** (`/api/webhooks/sessions`) — automation endpoints for scripts/CI to create sessions and send messages with optional callback URLs
+- Shared DTOs and `ISessionHubClient` contract in `CopilotFamily.Core.Contracts`
+- 20 Nexus integration tests (REST API + Webhooks) using `WebApplicationFactory` with mock SDK
 - **Model selector ComboBox** in session tab status bar — change models on a live session via dropdown
 - **Avalonia UI migration** — replaced WPF with Avalonia 11.3.12 for cross-platform support
 - Headless UI testing via `Avalonia.Headless.XUnit` (MIT licensed, no visible windows needed)
@@ -55,10 +61,11 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - User input handler — `UserInputHandler` for surfacing `ask_user` tool calls in interactive mode
 - `ReconfigureSessionAsync` — disconnect + resume pattern for changing model/workdir on live sessions
 - BDD specs for model selection, working directory, and autopilot mode (`docs/bdd/`)
-- 129 tests across Core (65), App (47), and UI (17) test projects
+- 149 tests across Core (65), App (47), Nexus (20), and UI (17) test projects
 
 ### Fixed
 
+- **Input box pushed off screen** — messages list was not constrained within its Grid row; switched to DockPanel layout with input area docked to bottom so it stays pinned regardless of message count
 - App crash when creating a new session — added `OnPermissionRequest = PermissionHandler.ApproveAll` to `SessionConfig`
 - Duplicate Copilot responses — SDK fires both streaming deltas and a final `AssistantMessageEvent`; now skips the duplicate full message when deltas were already received
 - Tab selection bug after closing a tab — now correctly checks `SelectedTab == tab`

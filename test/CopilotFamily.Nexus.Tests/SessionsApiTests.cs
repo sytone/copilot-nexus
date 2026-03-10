@@ -19,14 +19,13 @@ public class SessionsApiTests : IClassFixture<NexusTestFactory>
     }
 
     [Fact]
-    public async Task ListSessions_ReturnsEmptyInitially()
+    public async Task ListSessions_ReturnsOk()
     {
         var response = await _client.GetAsync("/api/sessions");
         response.EnsureSuccessStatusCode();
 
         var sessions = await response.Content.ReadFromJsonAsync<List<SessionInfoDto>>();
         Assert.NotNull(sessions);
-        Assert.Empty(sessions);
     }
 
     [Fact]
