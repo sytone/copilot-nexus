@@ -59,30 +59,32 @@ public class HealthAndCliTests : IClassFixture<NexusTestFactory>
         Assert.True(DateTime.TryParse(body.Uptime, out _));
     }
 
-    [Fact]
-    public void IsCliCommand_RecognizesStartCommand()
+    [Theory]
+    [InlineData("start")]
+    [InlineData("stop")]
+    [InlineData("status")]
+    [InlineData("install")]
+    [InlineData("update")]
+    [InlineData("publish")]
+    [InlineData("winapp")]
+    [InlineData("--help")]
+    [InlineData("-h")]
+    [InlineData("-?")]
+    public void IsCliCommand_RecognizesValidCommands(string command)
     {
-        Assert.True(Program.IsCliCommand(["start"]));
+        Assert.True(Program.IsCliCommand([command]));
     }
 
-    [Fact]
-    public void IsCliCommand_RecognizesStatusCommand()
+    [Theory]
+    [InlineData("START")]
+    [InlineData("Status")]
+    [InlineData("STOP")]
+    [InlineData("Install")]
+    [InlineData("UPDATE")]
+    [InlineData("Publish")]
+    public void IsCliCommand_IsCaseInsensitive(string command)
     {
-        Assert.True(Program.IsCliCommand(["status"]));
-    }
-
-    [Fact]
-    public void IsCliCommand_RecognizesWinappCommand()
-    {
-        Assert.True(Program.IsCliCommand(["winapp"]));
-    }
-
-    [Fact]
-    public void IsCliCommand_RecognizesHelpFlag()
-    {
-        Assert.True(Program.IsCliCommand(["--help"]));
-        Assert.True(Program.IsCliCommand(["-h"]));
-        Assert.True(Program.IsCliCommand(["-?"]));
+        Assert.True(Program.IsCliCommand([command]));
     }
 
     [Fact]
@@ -95,13 +97,6 @@ public class HealthAndCliTests : IClassFixture<NexusTestFactory>
     public void IsCliCommand_ReturnsFalse_ForUnknownArgs()
     {
         Assert.False(Program.IsCliCommand(["--urls", "http://localhost:5280"]));
-    }
-
-    [Fact]
-    public void IsCliCommand_IsCaseInsensitive()
-    {
-        Assert.True(Program.IsCliCommand(["START"]));
-        Assert.True(Program.IsCliCommand(["Status"]));
     }
 
     private record HealthPayload(string? Status, int Sessions, int Models, string? Uptime);

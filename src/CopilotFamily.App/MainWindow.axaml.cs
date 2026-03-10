@@ -104,11 +104,7 @@ public partial class MainWindow : Window
 
     private void StartUpdateDetection()
     {
-        var exePath = Environment.ProcessPath;
-        if (exePath == null) return;
-
-        var distDir = Path.GetDirectoryName(exePath)!;
-        var stagingDir = Path.Combine(distDir, "staging");
+        var stagingDir = CopilotFamily.Core.CopilotFamilyPaths.AppStaging;
 
         _updateService = new StagingUpdateDetectionService(stagingDir, _logger);
         _updateService.UpdateAvailable += (_, _) =>
@@ -128,17 +124,17 @@ public partial class MainWindow : Window
             await _stateService.SaveAsync(state);
 
             var updaterPath = ExtractUpdaterScript();
-            var exePath = Environment.ProcessPath!;
-            var distDir = Path.GetDirectoryName(exePath)!;
-            var stagingDir = Path.Combine(distDir, "staging");
+            var appExePath = Environment.ProcessPath!;
+            var installDir = CopilotFamily.Core.CopilotFamilyPaths.AppInstall;
+            var stagingDir = CopilotFamily.Core.CopilotFamilyPaths.AppStaging;
             var pid = Environment.ProcessId;
 
-            _logger.LogInformation("Launching updater: PID={Pid}, Dist={Dist}", pid, distDir);
+            _logger.LogInformation("Launching updater: PID={Pid}, Install={Install}, Staging={Staging}", pid, installDir, stagingDir);
 
             var psi = new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = $"-ExecutionPolicy Bypass -File \"{updaterPath}\" -AppPid {pid} -DistPath \"{distDir}\" -StagingPath \"{stagingDir}\" -AppExe \"{exePath}\"",
+                Arguments = $"-ExecutionPolicy Bypass -File \"{updaterPath}\" -AppPid {pid} -InstallPath \"{installDir}\" -StagingPath \"{stagingDir}\" -AppExe \"{appExePath}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };

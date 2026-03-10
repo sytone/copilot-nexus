@@ -1,6 +1,6 @@
 # Copilot Family
 
-A Windows desktop application (WPF / .NET 8) that provides a tabbed interface for
+A Windows desktop application (Avalonia 11 / .NET 8) with a backend service for
 managing multiple GitHub Copilot SDK sessions simultaneously.
 
 ## Why?
@@ -10,66 +10,88 @@ Copilot Family gives you a single window with tabs — each tab is an independen
 Copilot SDK session with real-time streaming output, powered by the
 [GitHub Copilot SDK](https://github.com/github/copilot-sdk).
 
+## Architecture
+
+The application is split into two processes:
+
+- **Nexus** — ASP.NET Core backend service that owns all Copilot SDK sessions,
+  exposed via SignalR (real-time streaming) and REST API
+- **App** — Avalonia desktop application (thin SignalR client) that renders session
+  output in a tabbed interface
+
+```
+┌─────────────────────────┐     ┌────────────────────────────────┐
+│  Desktop App (Avalonia)  │◄──►│  Nexus (ASP.NET Core)          │
+│  SignalR client          │    │  SignalR hub + REST API         │
+│  Renders session tabs    │    │  Manages SDK sessions           │
+└─────────────────────────┘     │  Webhook support               │
+                                └────────────────────────────────┘
+```
+
 ## Features
 
 - **Tabbed interface** — Create, switch between, and close Copilot sessions
-- **Direct SDK integration** — Uses `GitHub.Copilot.SDK` via JSON-RPC, not process wrapping
+- **Direct SDK integration** — Uses `GitHub.Copilot.SDK` via JSON-RPC
 - **Real-time streaming** — Responses stream word-by-word as they're generated
+- **Model selection** — Change AI model per session from the UI
 - **Dark terminal theme** — Comfortable for extended use
-- **Session lifecycle** — Active sessions with abort support per tab
-- **Status indicators** — Green dot for running sessions, grey for stopped
-- **Keyboard shortcuts** — `Ctrl+T` new tab, `Ctrl+W` close tab, `Enter` send input
-- **Auto-scroll** — Output auto-scrolls to the latest message
+- **Session persistence** — Resume sessions after restart
+- **Auto-update detection** — Staged updates with in-app notification
+- **CLI management** — Install, start, stop, update via `nexus` commands
 
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
-- Windows (WPF)
+- Windows 10/11
 - [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli) installed and authenticated
 
 ## Quick Start
 
-```bash
+```powershell
 # Build
 dotnet build CopilotFamily.slnx
 
-# Run
+# Install to %LOCALAPPDATA%\CopilotFamily\
+dotnet run --project src/CopilotFamily.Nexus -- install
+
+# Start the Nexus service
+dotnet run --project src/CopilotFamily.Nexus -- start
+
+# In a second terminal — launch the desktop app
 dotnet run --project src/CopilotFamily.App
 
-# Test
+# Or use the Nexus CLI to launch it
+dotnet run --project src/CopilotFamily.Nexus -- winapp start
+```
+
+See [Installation & Operations Guide](docs/installation-and-operations.md) for full
+setup, update, and troubleshooting instructions.
+
+## Testing
+
+```powershell
 dotnet test CopilotFamily.slnx
 ```
 
-## Architecture
-
-The app uses the **MVVM pattern** with the GitHub Copilot SDK for direct API integration.
-A single `CopilotClient` (JSON-RPC connection to the CLI) is shared across tabs, while
-each tab owns an independent `CopilotSession` with its own conversation and streaming events.
+## Solution Structure
 
 ```
 src/
-├── CopilotFamily.Core/           # Business logic (SDK abstractions, no UI deps)
-│   ├── Interfaces/                # ICopilotClientService, ICopilotSessionWrapper,
-│   │                              # ISessionManager, IUiDispatcher
-│   ├── Models/                    # SessionMessage, SessionInfo, SessionState, OutputKind
-│   ├── Services/                  # CopilotClientService, CopilotSessionWrapper,
-│   │                              # SessionManager
-│   └── Events/                    # SessionOutputEventArgs
-├── CopilotFamily.App/             # WPF application (MVVM)
-│   ├── ViewModels/                # MainWindowViewModel, SessionTabViewModel
-│   ├── Views/                     # SessionTabView
-│   ├── Converters/                # Value converters for XAML bindings
-│   └── Services/                  # WpfUiDispatcher
-test/
-├── CopilotFamily.Core.Tests/     # Core unit tests (xUnit + Moq)
-└── CopilotFamily.App.Tests/      # ViewModel + converter tests (xUnit + Moq)
-docs/                              # Project documentation
-```
+├── CopilotFamily.Core/       Core business logic, SDK abstractions, shared contracts
+├── CopilotFamily.App/        Avalonia desktop application (MVVM, thin SignalR client)
+└── CopilotFamily.Nexus/      ASP.NET Core backend — SignalR hub, REST API, CLI commands
 
-See [docs/architecture-overview.md](docs/architecture-overview.md) for detailed design.
+test/
+├── CopilotFamily.Core.Tests/    Unit tests for Core (xUnit + Moq)
+├── CopilotFamily.App.Tests/     ViewModel and converter tests (xUnit + Moq)
+├── CopilotFamily.Nexus.Tests/   Integration tests for Nexus (WebApplicationFactory)
+└── CopilotFamily.UI.Tests/      Headless UI tests (Avalonia.Headless.XUnit)
+
+docs/                             Project documentation
+```
 
 ## Documentation
 
-All documentation lives in the [`docs/`](docs/) folder using lowercase kebab-case file names.
-
-- [Architecture overview](docs/architecture-overview.md)
+- [Installation & Operations Guide](docs/installation-and-operations.md) — Install, run, update, troubleshoot
+- [Architecture Overview](docs/architecture-overview.md) — Detailed design and patterns
+- [Testing Guide](docs/testing-guide.md) — Test structure and conventions

@@ -177,7 +177,7 @@ public class DistStagingUpdateTests : IDisposable
         {
             FileName = "powershell.exe",
             Arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" " +
-                        $"-AppPid {pid} -DistPath \"{_distDir}\" " +
+                        $"-AppPid {pid} -InstallPath \"{_distDir}\" " +
                         $"-StagingPath \"{_stagingDir}\" " +
                         $"-AppExe \"powershell.exe\"",
             UseShellExecute = false,
@@ -253,7 +253,7 @@ public class DistStagingUpdateTests : IDisposable
             {
                 FileName = "powershell.exe",
                 Arguments = $"-ExecutionPolicy Bypass -File \"{fastScriptPath}\" " +
-                            $"-AppPid {pid} -DistPath \"{_distDir}\" " +
+                            $"-AppPid {pid} -InstallPath \"{_distDir}\" " +
                             $"-StagingPath \"{_stagingDir}\" " +
                             $"-AppExe \"powershell.exe\"",
                 UseShellExecute = false,

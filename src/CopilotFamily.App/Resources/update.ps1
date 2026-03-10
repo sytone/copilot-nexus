@@ -1,17 +1,17 @@
 # Copilot Family — Updater Script
-# Launched by the app before exit. Waits for the app to close, copies
-# staged files to the dist root, clears staging, and relaunches the app.
+# Launched by the app before exit. Waits for the process to close, copies
+# staged files to the install directory, clears staging, and relaunches.
 #
-# Usage: update.ps1 -AppPid <PID> -DistPath <path> -StagingPath <path> -AppExe <path>
+# Usage: update.ps1 -AppPid <PID> -InstallPath <path> -StagingPath <path> -AppExe <path>
 
 param(
     [Parameter(Mandatory)][int]$AppPid,
-    [Parameter(Mandatory)][string]$DistPath,
+    [Parameter(Mandatory)][string]$InstallPath,
     [Parameter(Mandatory)][string]$StagingPath,
     [Parameter(Mandatory)][string]$AppExe
 )
 
-$LogFile = Join-Path $DistPath "update.log"
+$LogFile = Join-Path (Split-Path $InstallPath -Parent) "logs" "update.log"
 
 function Write-Log($msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss.fff"
@@ -60,7 +60,7 @@ if ($null -eq $stagingFiles -or $stagingFiles.Count -eq 0) {
 
     for ($attempt = 1; $attempt -le $maxRetries; $attempt++) {
         try {
-            Copy-Item -Path (Join-Path $StagingPath "*") -Destination $DistPath -Recurse -Force -ErrorAction Stop
+            Copy-Item -Path (Join-Path $StagingPath "*") -Destination $InstallPath -Recurse -Force -ErrorAction Stop
             $success = $true
             Write-Log "Copy succeeded on attempt $attempt."
             break

@@ -9,6 +9,25 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Added
 
+- `CopilotFamilyPaths` static class in Core — centralized path constants for the install layout (`%LOCALAPPDATA%\CopilotFamily\`)
+- Nexus CLI commands: `stop`, `install`, `update [--component]`, `publish [--component]`
+- PID lock file (`nexus.lock`) — written on `start`, read by `stop`/`status`, cleaned on exit
+- `nexus status` now reports lock file PID and staged update status
+- `nexus publish` — builds and publishes Nexus and/or App to install directory
+- `nexus update` — applies staged updates with stop/copy/restart cycle
+- Installation & Operations Guide (`docs/installation-and-operations.md`)
+- 18 new tests for `CopilotFamilyPaths` (path correctness, case insensitivity, staging isolation)
+
+### Changed
+
+- App staging detection now uses `CopilotFamilyPaths.AppStaging` instead of `dist/staging/`
+- `update.ps1` parameter renamed from `-DistPath` to `-InstallPath`; log file now writes to shared `logs/` dir
+- `README.md` rewritten to reflect Nexus + Avalonia architecture
+- CLI `IsCliCommand` recognizes all new commands (`stop`, `install`, `update`, `publish`)
+- `nexus winapp start` searches `CopilotFamilyPaths.AppInstall` first
+
+### Added (prior)
+
 - **Nexus CLI commands** via `System.CommandLine 2.0.3`:
   - `nexus start [--url]` — start the Nexus service
   - `nexus status [--url]` — query a running Nexus instance health
