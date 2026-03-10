@@ -9,6 +9,10 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Added
 
+- **Nexus SignalR client** — Avalonia app now connects to Nexus backend via `NexusSessionManager`
+- `NexusSessionProxy` — `ICopilotSessionWrapper` implementation for Nexus-backed sessions (sends via SignalR, receives output callbacks)
+- `--nexus-url` startup argument to configure Nexus backend URL (default: `http://localhost:5280`)
+- `SessionInfo.FromRemote()` factory method for reconstructing session info from Nexus DTOs
 - **CopilotFamily.Nexus** — standalone ASP.NET Core backend service for Copilot session management
   - **SignalR Hub** (`/hubs/session`) — real-time streaming of session output to connected clients
   - **REST API** (`/api/sessions`, `/api/models`) — CRUD for sessions, model listing, input sending, reconfiguration
