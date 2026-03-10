@@ -249,6 +249,22 @@ Build:     0 errors, 0 warnings
 - Use `git diff --stat HEAD~1` and `git diff --shortstat HEAD~1` for file/line metrics
 - If code coverage tooling is not yet configured, report "not configured" rather than omitting
 
+### Step 9 — Publish & Stage
+
+After committing, **always publish to the staging folder** so the running application can detect the update and offer a restart.
+
+```bash
+# Publish a self-contained build to the staging folder inside dist
+dotnet publish src/CopilotFamily.App/CopilotFamily.App.csproj -c Release -o dist/staging --self-contained false --nologo -v q
+```
+
+- The running application monitors `dist/staging/` via `StagingUpdateDetectionService`
+- When staging files land, the app shows an "Update Available — Restart Now / Later" bar
+- On restart, the updater script copies staging → dist root and relaunches
+- **This step is mandatory** — the user expects to see the update notification after every dev cycle
+
+**Exit gate:** `dist/staging/` contains the freshly published build. User sees the update notification in the running app.
+
 ## Git Workflow
 
 This project uses git for version control. Follow these rules:
