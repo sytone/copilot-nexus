@@ -15,11 +15,14 @@ using Microsoft.Extensions.Logging;
 public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel _viewModel;
-    private readonly ICopilotClientService _clientService;
+    private readonly ISessionManager _sessionManager;
     private readonly IStatePersistenceService _stateService;
     private readonly ILogger _logger;
     private StagingUpdateDetectionService? _updateService;
     private DispatcherTimer? _redisplayTimer;
+
+    /// <summary>Default Nexus URL — can be overridden via --nexus-url argument.</summary>
+    private const string DefaultNexusUrl = "http://localhost:5280";
 
     public MainWindow()
     {
@@ -38,21 +41,34 @@ public partial class MainWindow : Window
         if (App.IsTestMode)
         {
             _logger.LogInformation("Running in TEST MODE with mock services");
-            _clientService = new MockCopilotClientService(factory.CreateLogger<MockCopilotClientService>());
+            var mockClient = new MockCopilotClientService(factory.CreateLogger<MockCopilotClientService>());
+            _sessionManager = new SessionManager(mockClient, factory.CreateLogger<SessionManager>());
         }
         else
         {
-            _clientService = new CopilotClientService(factory.CreateLogger<CopilotClientService>());
+            var nexusUrl = GetNexusUrl();
+            _logger.LogInformation("Connecting to Nexus at {Url}", nexusUrl);
+            _sessionManager = new NexusSessionManager(nexusUrl, _logger);
         }
 
-        var sessionManager = new SessionManager(_clientService, factory.CreateLogger<SessionManager>());
         _stateService = new JsonStatePersistenceService(factory.CreateLogger<JsonStatePersistenceService>());
-        _viewModel = new MainWindowViewModel(sessionManager, dispatcher, factory.CreateLogger<MainWindowViewModel>());
+        _viewModel = new MainWindowViewModel(_sessionManager, dispatcher, factory.CreateLogger<MainWindowViewModel>());
         _viewModel.RestartRequested += OnRestartRequested;
         _viewModel.UpdateDismissed += OnUpdateDismissed;
         DataContext = _viewModel;
 
         Opened += OnWindowOpened;
+    }
+
+    private static string GetNexusUrl()
+    {
+        var args = App.StartupArgs;
+        for (int i = 0; i < args.Length - 1; i++)
+        {
+            if (args[i] == "--nexus-url")
+                return args[i + 1];
+        }
+        return DefaultNexusUrl;
     }
 
     private async void OnWindowOpened(object? sender, EventArgs e)
@@ -196,7 +212,7 @@ public partial class MainWindow : Window
         }
 
         _viewModel.Dispose();
-        await _clientService.DisposeAsync();
+        await _sessionManager.DisposeAsync();
         base.OnClosed(e);
     }
 }

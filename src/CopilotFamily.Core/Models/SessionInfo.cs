@@ -2,7 +2,7 @@ namespace CopilotFamily.Core.Models;
 
 public class SessionInfo
 {
-    public string Id { get; }
+    public string Id { get; private set; }
     public string Name { get; set; }
     public string? Model { get; set; }
 
@@ -32,5 +32,20 @@ public class SessionInfo
         SdkSessionId = sdkSessionId ?? Id;
         State = SessionState.NotStarted;
         CreatedAt = DateTime.UtcNow;
+    }
+
+    /// <summary>
+    /// Factory for recreating a SessionInfo from persisted/remote data (e.g., Nexus DTO).
+    /// </summary>
+    public static SessionInfo FromRemote(string id, string name, string? model, string sdkSessionId, bool isAutopilot = true, string? workingDirectory = null)
+    {
+        var info = new SessionInfo(name, model, sdkSessionId)
+        {
+            Id = id,
+            IsAutopilot = isAutopilot,
+            WorkingDirectory = workingDirectory,
+            State = SessionState.Running
+        };
+        return info;
     }
 }
