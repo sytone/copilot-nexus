@@ -228,12 +228,12 @@ dotnet run --project src/CopilotFamily.App
 
 ## 9. Updating
 
-### Publish new builds to the install directory
+### Publish new builds to staging
 
-After making code changes:
+After making code changes, `nexus publish` builds and stages the update:
 
 ```powershell
-# Publish both Nexus and App
+# Publish both Nexus and App to staging
 nexus publish
 
 # Publish only Nexus
@@ -243,35 +243,44 @@ nexus publish --component nexus
 nexus publish --component app
 ```
 
-The `publish` command runs `dotnet publish` and copies the output directly to the
-install directory. If Nexus is running while you publish it, you'll need to restart it:
+> **Note:** `nexus publish` requires a prior `nexus install`. If no installation is
+> detected it will tell you to run `nexus install` first.
+
+`publish` outputs to the **staging** directory (`%LOCALAPPDATA%\CopilotFamily\staging\`),
+not directly to the install directory. This keeps the running service untouched until
+you explicitly apply the update.
+
+### Apply staged updates
 
 ```powershell
-nexus stop
-nexus publish --component nexus
-nexus start
+# Apply all staged updates (stops Nexus if needed, copies, restarts)
+nexus update
+
+# Apply only Nexus
+nexus update --component nexus
+
+# Apply only App
+nexus update --component app
 ```
 
-### Staged updates (automatic)
+### Desktop app auto-detection
 
-For the desktop app, updates can also be **staged** — files are placed in the staging
-directory and the app detects them automatically:
+The desktop app watches its staging directory automatically. When you run
+`nexus publish --component app`, the app will show an "Update available" banner.
+Click **Restart now** to apply the update.
 
-1. Place updated files in `%LOCALAPPDATA%\CopilotFamily\staging\app\`
-2. The app's `StagingUpdateDetectionService` detects the new files
-3. A notification banner appears: "Update available — Restart now?"
-4. On restart, the updater script copies staging → install and relaunches
-
-### Update command (stop → copy → restart)
-
-For Nexus, the `update` command handles the full stop-copy-restart cycle:
+### Quick update cycle
 
 ```powershell
-# Stage the update first (manual or via CI)
-dotnet publish src/CopilotFamily.Nexus -c Release -o "$env:LOCALAPPDATA\CopilotFamily\staging\nexus"
+# Build, stage, and apply in one go
+nexus publish && nexus update
+```
 
-# Then apply the staged update
-nexus update --component nexus
+Or for just the app (auto-detected):
+
+```powershell
+nexus publish --component app
+# → App shows update banner → click Restart
 ```
 
 The `update` command:
@@ -292,7 +301,7 @@ The `update` command:
 | `nexus stop` | Stop the running Nexus process |
 | `nexus status [--url URL]` | Check if Nexus is running and show info |
 | `nexus install` | Build and install both Nexus and App |
-| `nexus publish [--component C]` | Publish to install dir (`nexus`, `app`, or `both`) |
+| `nexus publish [--component C]` | Build and stage an update (`nexus`, `app`, or `both`). Requires prior `nexus install`. |
 | `nexus update [--component C]` | Apply staged update (`nexus`, `app`, or `both`) |
 | `nexus winapp start [--nexus-url URL] [--test-mode]` | Launch the desktop app |
 | `nexus --help` | Show help for all commands |

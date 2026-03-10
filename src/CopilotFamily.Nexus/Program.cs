@@ -303,8 +303,8 @@ public partial class Program
         Console.WriteLine($"  Repo:    {repoRoot}");
         Console.WriteLine($"  Install: {CopilotFamilyPaths.Root}");
 
-        await PublishComponent(repoRoot, "nexus");
-        await PublishComponent(repoRoot, "app");
+        await PublishComponent(repoRoot, "nexus", CopilotFamilyPaths.NexusInstall);
+        await PublishComponent(repoRoot, "app", CopilotFamilyPaths.AppInstall);
 
         Console.WriteLine("Installation complete.");
     }
@@ -365,7 +365,19 @@ public partial class Program
     // --- publish ---
     internal static async Task RunPublishAsync(string component)
     {
-        CopilotFamilyPaths.EnsureDirectories();
+        // Check if the app has been installed
+        var nexusInstalled = File.Exists(CopilotFamilyPaths.NexusExe);
+        var appInstalled = File.Exists(CopilotFamilyPaths.AppExe);
+
+        if (!nexusInstalled && !appInstalled)
+        {
+            Console.Error.WriteLine("CopilotFamily is not installed.");
+            Console.Error.WriteLine($"  Expected install at: {CopilotFamilyPaths.Root}");
+            Console.Error.WriteLine();
+            Console.Error.WriteLine("Run 'nexus install' first to perform the initial installation.");
+            Environment.ExitCode = 1;
+            return;
+        }
 
         var repoRoot = FindRepoRoot(AppContext.BaseDirectory);
         if (repoRoot == null)
@@ -375,14 +387,24 @@ public partial class Program
             return;
         }
 
+        CopilotFamilyPaths.EnsureDirectories();
+
         var components = component == "both" ? new[] { "nexus", "app" } : new[] { component };
 
+        Console.WriteLine("Publishing to staging...");
         foreach (var comp in components)
         {
-            await PublishComponent(repoRoot, comp);
+            var stagingPath = CopilotFamilyPaths.GetStagingPath(comp);
+            await PublishComponent(repoRoot, comp, stagingPath);
         }
 
-        Console.WriteLine("Publish complete.");
+        Console.WriteLine();
+        Console.WriteLine("Staged updates ready. To apply:");
+        Console.WriteLine("  nexus update              — apply all staged updates");
+        Console.WriteLine("  nexus update --component nexus  — apply Nexus update only");
+        Console.WriteLine("  nexus update --component app    — apply App update only");
+        Console.WriteLine();
+        Console.WriteLine("The desktop app will also detect staged app updates automatically.");
     }
 
     // --- winapp start ---
@@ -432,7 +454,7 @@ public partial class Program
         try { File.Delete(CopilotFamilyPaths.NexusLockFile); } catch { /* best effort */ }
     }
 
-    private static async Task PublishComponent(string repoRoot, string component)
+    private static async Task PublishComponent(string repoRoot, string component, string outputPath)
     {
         var projectPath = component switch
         {
@@ -440,8 +462,6 @@ public partial class Program
             "app" => Path.Combine(repoRoot, "src", "CopilotFamily.App", "CopilotFamily.App.csproj"),
             _ => throw new ArgumentException($"Unknown component: {component}"),
         };
-
-        var outputPath = CopilotFamilyPaths.GetInstallPath(component);
 
         Console.WriteLine($"  Publishing {component} → {outputPath}");
 
