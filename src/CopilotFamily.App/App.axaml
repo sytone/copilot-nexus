@@ -1,0 +1,65 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="CopilotFamily.App.App"
+             RequestedThemeVariant="Dark">
+
+    <Application.Styles>
+        <FluentTheme />
+
+        <!-- Global dark-mode button style -->
+        <Style Selector="Button">
+            <Setter Property="Background" Value="#333333"/>
+            <Setter Property="Foreground" Value="#CCCCCC"/>
+            <Setter Property="BorderBrush" Value="#555555"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="CornerRadius" Value="3"/>
+        </Style>
+        <Style Selector="Button:pointerover">
+            <Setter Property="Background" Value="#444444"/>
+        </Style>
+        <Style Selector="Button:pressed">
+            <Setter Property="Background" Value="#555555"/>
+        </Style>
+        <Style Selector="Button:disabled">
+            <Setter Property="Opacity" Value="0.4"/>
+        </Style>
+
+        <!-- Dark-mode TextBox style -->
+        <Style Selector="TextBox">
+            <Setter Property="Background" Value="#1E1E1E"/>
+            <Setter Property="Foreground" Value="#CCCCCC"/>
+            <Setter Property="CaretBrush" Value="#CCCCCC"/>
+            <Setter Property="BorderBrush" Value="#3C3C3C"/>
+            <Setter Property="Padding" Value="6,4"/>
+        </Style>
+
+        <!-- Dark-mode ListBox style -->
+        <Style Selector="ListBox">
+            <Setter Property="Background" Value="#1E1E1E"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+
+        <!-- Dark-mode TabControl style -->
+        <Style Selector="TabControl">
+            <Setter Property="Background" Value="#1E1E1E"/>
+        </Style>
+    </Application.Styles>
+
+    <Application.Resources>
+        <SolidColorBrush x:Key="BackgroundBrush" Color="#1E1E1E"/>
+        <SolidColorBrush x:Key="SurfaceBrush" Color="#252526"/>
+        <SolidColorBrush x:Key="BorderBrush" Color="#3C3C3C"/>
+        <SolidColorBrush x:Key="ForegroundBrush" Color="#CCCCCC"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#0078D4"/>
+        <SolidColorBrush x:Key="UserMessageBrush" Color="#569CD6"/>
+        <SolidColorBrush x:Key="AssistantMessageBrush" Color="#CCCCCC"/>
+        <SolidColorBrush x:Key="SystemMessageBrush" Color="#808080"/>
+        <SolidColorBrush x:Key="InputBackgroundBrush" Color="#1E1E1E"/>
+        <SolidColorBrush x:Key="TabActiveBrush" Color="#1E1E1E"/>
+        <SolidColorBrush x:Key="TabInactiveBrush" Color="#2D2D2D"/>
+        <SolidColorBrush x:Key="RunningIndicatorBrush" Color="#4EC9B0"/>
+    </Application.Resources>
+
+</Application>

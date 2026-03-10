@@ -1,0 +1,133 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:views="clr-namespace:CopilotFamily.App.Views"
+        xmlns:converters="clr-namespace:CopilotFamily.App.Converters"
+        x:Class="CopilotFamily.App.MainWindow"
+        Title="Copilot Family"
+        Height="800" Width="1200"
+        Background="{StaticResource BackgroundBrush}"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <converters:BoolToVisibleConverter x:Key="BoolToVisible"/>
+        <converters:EmptyToVisibleConverter x:Key="EmptyToVisible"/>
+        <converters:NullToCollapsedConverter x:Key="NullToVisible"/>
+    </Window.Resources>
+
+    <Window.KeyBindings>
+        <KeyBinding Gesture="Ctrl+T" Command="{Binding NewTabCommand}"/>
+        <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseTabCommand}"/>
+    </Window.KeyBindings>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+
+        <!-- Update notification bar -->
+        <Border Grid.Row="0"
+                Background="#0078D4"
+                Padding="10,6"
+                IsVisible="{Binding IsUpdateAvailable}"
+                Name="UpdateNotificationBar">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="Restart Now"
+                            Command="{Binding RestartNowCommand}"
+                            Name="RestartNowButton"
+                            Background="#005A9E"
+                            Foreground="White"
+                            Margin="8,0,0,0"/>
+                    <Button Content="Later"
+                            Command="{Binding DismissUpdateCommand}"
+                            Name="DismissUpdateButton"
+                            Background="Transparent"
+                            Foreground="White"
+                            BorderBrush="#FFFFFF40"
+                            Margin="8,0,0,0"/>
+                </StackPanel>
+                <TextBlock Text="A new version is available."
+                           Foreground="White"
+                           FontSize="13"
+                           VerticalAlignment="Center"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Top bar with New Session button and tabs -->
+        <DockPanel Grid.Row="1" Background="{StaticResource SurfaceBrush}">
+            <Button DockPanel.Dock="Right"
+                    Content="＋ New Session"
+                    Command="{Binding NewTabCommand}"
+                    Name="NewSessionButton"
+                    FontSize="12"
+                    Padding="12,6"
+                    Margin="4"
+                    Background="Transparent"
+                    Foreground="{StaticResource ForegroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    Cursor="Hand"
+                    ToolTip.Tip="New Session (Ctrl+T)"/>
+
+            <TabControl ItemsSource="{Binding Tabs}"
+                        SelectedItem="{Binding SelectedTab}"
+                        Name="SessionTabControl"
+                        Background="Transparent"
+                        Padding="0">
+
+                <TabControl.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal" Margin="4,2">
+                            <Ellipse Width="8" Height="8" Margin="0,0,6,0"
+                                     Fill="{StaticResource RunningIndicatorBrush}"/>
+                            <TextBlock Text="{Binding Title}"
+                                       Foreground="{StaticResource ForegroundBrush}"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,8,0"/>
+                            <Button Content="✕"
+                                    Name="CloseTabButton"
+                                    FontSize="10"
+                                    Background="Transparent"
+                                    Foreground="{StaticResource SystemMessageBrush}"
+                                    BorderThickness="0"
+                                    Cursor="Hand"
+                                    Padding="4,0"
+                                    Click="CloseTab_Click"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </TabControl.ItemTemplate>
+
+                <TabControl.ContentTemplate>
+                    <DataTemplate>
+                        <views:SessionTabView/>
+                    </DataTemplate>
+                </TabControl.ContentTemplate>
+            </TabControl>
+        </DockPanel>
+
+        <!-- Welcome message when no tabs are open -->
+        <StackPanel Grid.Row="2"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    IsVisible="{Binding Tabs.Count, Converter={StaticResource EmptyToVisible}}">
+            <TextBlock Text="Copilot Family"
+                       FontSize="36"
+                       FontWeight="Light"
+                       Foreground="{StaticResource ForegroundBrush}"
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,12"/>
+            <TextBlock Text="Press Ctrl+T or click ＋ New Session to get started"
+                       FontSize="14"
+                       Foreground="{StaticResource SystemMessageBrush}"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Status bar -->
+        <Border Grid.Row="3"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="8,4"
+                IsVisible="{Binding StatusText, Converter={StaticResource NullToVisible}}">
+            <TextBlock Text="{Binding StatusText}"
+                       Foreground="{StaticResource RunningIndicatorBrush}"
+                       FontSize="12"/>
+        </Border>
+    </Grid>
+</Window>

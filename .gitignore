@@ -1,0 +1,41 @@
+## Build results
+[Bb]uild/
+[Oo]bj/
+[Bb]in/
+[Dd]ebug/
+[Rr]elease/
+
+## Distribution
+dist/
+
+## UI test screenshots
+test/screenshots/
+
+## NuGet
+*.nupkg
+**/[Pp]ackages/*
+!**/[Pp]ackages/build/
+
+## Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.rsuser
+
+## Rider
+.idea/
+
+## OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+## Test results
+TestResults/
+*.trx
+
+## Publish
+publish/

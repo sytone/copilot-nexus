@@ -1,0 +1,135 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "build",
+                "${workspaceFolder}/CopilotFamily.slnx",
+                "--no-incremental"
+            ],
+            "problemMatcher": "$msCompile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "run",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/src/CopilotFamily.App/CopilotFamily.App.csproj"
+            ],
+            "dependsOn": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "run (test mode)",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "run",
+                "--project",
+                "${workspaceFolder}/src/CopilotFamily.App/CopilotFamily.App.csproj",
+                "--",
+                "--test-mode"
+            ],
+            "dependsOn": "build",
+            "problemMatcher": []
+        },
+        {
+            "label": "test: all",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "test",
+                "${workspaceFolder}/CopilotFamily.slnx",
+                "--verbosity",
+                "normal"
+            ],
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "test: core",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "test",
+                "${workspaceFolder}/test/CopilotFamily.Core.Tests/CopilotFamily.Core.Tests.csproj",
+                "--verbosity",
+                "normal"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "test: app",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "test",
+                "${workspaceFolder}/test/CopilotFamily.App.Tests/CopilotFamily.App.Tests.csproj",
+                "--verbosity",
+                "normal"
+            ],
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "test: ui",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "test",
+                "${workspaceFolder}/test/CopilotFamily.UI.Tests/CopilotFamily.UI.Tests.csproj",
+                "--verbosity",
+                "normal"
+            ],
+            "dependsOn": "build",
+            "problemMatcher": "$msCompile"
+        },
+        {
+            "label": "publish-dist",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "publish",
+                "${workspaceFolder}/src/CopilotFamily.App/CopilotFamily.App.csproj",
+                "-c",
+                "Release",
+                "-o",
+                "${workspaceFolder}/dist",
+                "--self-contained",
+                "false"
+            ],
+            "dependsOn": "build",
+            "problemMatcher": "$msCompile",
+            "group": "build"
+        },
+        {
+            "label": "stage-update",
+            "command": "dotnet",
+            "type": "process",
+            "args": [
+                "publish",
+                "${workspaceFolder}/src/CopilotFamily.App/CopilotFamily.App.csproj",
+                "-c",
+                "Release",
+                "-o",
+                "${workspaceFolder}/dist/staging",
+                "--self-contained",
+                "false"
+            ],
+            "dependsOn": "build",
+            "problemMatcher": "$msCompile",
+            "group": "build"
+        }
+    ]
+}

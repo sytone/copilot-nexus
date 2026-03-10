@@ -1,0 +1,125 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:CopilotFamily.App.Converters"
+             x:Class="CopilotFamily.App.Views.SessionTabView"
+             Background="{StaticResource BackgroundBrush}">
+
+    <UserControl.Resources>
+        <converters:MessageRoleToBrushConverter x:Key="RoleToBrushConverter"/>
+        <converters:MessageRoleToLabelConverter x:Key="RoleToLabelConverter"/>
+    </UserControl.Resources>
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <!-- Session status bar -->
+        <Border Grid.Row="0"
+                Background="{StaticResource SurfaceBrush}"
+                Padding="8,4"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button Content="Clear"
+                            Command="{Binding ClearCommand}"
+                            Name="ClearButton"
+                            Margin="4,0"
+                            Padding="8,2"
+                            Background="Transparent"
+                            Foreground="{StaticResource ForegroundBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"/>
+                    <Button Content="Abort"
+                            Command="{Binding AbortCommand}"
+                            Name="AbortButton"
+                            Margin="4,0"
+                            Padding="8,2"
+                            Background="Transparent"
+                            Foreground="#F44747"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            ToolTip.Tip="Cancel current request"/>
+                </StackPanel>
+                <TextBlock Foreground="{StaticResource SystemMessageBrush}"
+                           VerticalAlignment="Center"
+                           Text="{Binding Info.Model, FallbackValue='default model'}"/>
+            </DockPanel>
+        </Border>
+
+        <!-- Messages area -->
+        <ListBox Grid.Row="1"
+                 ItemsSource="{Binding Messages}"
+                 Name="MessagesList"
+                 Background="{StaticResource BackgroundBrush}"
+                 BorderThickness="0"
+                 ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="Focusable" Value="False"/>
+                    <Setter Property="Padding" Value="0"/>
+                    <Setter Property="Margin" Value="0"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                </Style>
+            </ListBox.Styles>
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <Border Padding="12,6"
+                            BorderBrush="{StaticResource BorderBrush}"
+                            BorderThickness="0,0,0,0.5">
+                        <StackPanel>
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Left"
+                                           Text="{Binding Role, Converter={StaticResource RoleToLabelConverter}}"
+                                           FontWeight="SemiBold"
+                                           FontSize="11"
+                                           Foreground="{Binding Role, Converter={StaticResource RoleToBrushConverter}}"
+                                           Margin="0,0,8,2"/>
+                                <TextBlock DockPanel.Dock="Right"
+                                           Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}"
+                                           FontSize="10"
+                                           Foreground="{StaticResource SystemMessageBrush}"
+                                           HorizontalAlignment="Right"/>
+                                <TextBlock/>
+                            </DockPanel>
+                            <TextBlock Text="{Binding Content}"
+                                       Foreground="{Binding Role, Converter={StaticResource RoleToBrushConverter}}"
+                                       TextWrapping="Wrap"
+                                       FontFamily="Cascadia Code, Consolas, Courier New"
+                                       FontSize="13"/>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Input area -->
+        <Border Grid.Row="2"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="8">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBox Grid.Column="0"
+                         Text="{Binding InputText}"
+                         Name="InputTextBox"
+                         Background="{StaticResource InputBackgroundBrush}"
+                         Foreground="{StaticResource ForegroundBrush}"
+                         CaretBrush="{StaticResource ForegroundBrush}"
+                         BorderBrush="{StaticResource BorderBrush}"
+                         FontFamily="Cascadia Code, Consolas, Courier New"
+                         FontSize="13"
+                         Padding="8,6"
+                         VerticalContentAlignment="Center"
+                         KeyDown="InputTextBox_KeyDown"/>
+                <Button Grid.Column="1"
+                        Content="Send"
+                        Command="{Binding SendCommand}"
+                        Name="SendButton"
+                        Margin="8,0,0,0"
+                        Padding="16,6"
+                        Background="{StaticResource AccentBrush}"
+                        Foreground="White"
+                        BorderThickness="0"
+                        Cursor="Hand"/>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>
