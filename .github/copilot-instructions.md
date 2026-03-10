@@ -81,21 +81,60 @@ dotnet test test/CopilotFamily.App.Tests/
 - Update documentation when making code changes that affect public interfaces or behavior
 - The `README.md` at the root is the entry point; link to `docs/` for deeper content
 
-## Feature Development Process
+## Development Cycle
 
-Follow this process for every new feature, bug fix, or significant change:
+Every change — feature, bug fix, or refactor — follows this cycle. The cycle is sequential: **do not skip or reorder steps**. Each step has a clear exit gate before proceeding.
 
-### 1. Research
+```
+┌─────────────────────────────────────────────────────────┐
+│                    DEVELOPMENT CYCLE                     │
+│                                                          │
+│  1. RESEARCH ──────► 2. SPECIFY (BDD) ──────► 3. REVIEW │
+│       │                     │                      │     │
+│       │  Exit: findings     │  Exit: scenarios     │     │
+│       │  documented         │  written             │     │
+│       │                     │                      │     │
+│       │                     ▼                      │     │
+│       │              2b. MAINTAIN BDD ◄────────────┘     │
+│       │              (ongoing — update                   │
+│       │               when new info                      │
+│       │               surfaces)          Exit: design    │
+│       │                                  validated       │
+│       │                                      │           │
+│       │    ┌─────────────────────────────────┘           │
+│       │    ▼                                             │
+│       │  4. COMMIT CHECKPOINT (pre-implementation)       │
+│       │    │                                             │
+│       │    ▼                                             │
+│       │  5. IMPLEMENT ──────► 6. BUILD & TEST            │
+│       │                            │                     │
+│       │                  ┌─── fail ┤ pass ───┐           │
+│       │                  │         │         │           │
+│       │                  ▼         │         ▼           │
+│       │             Fix & loop     │   7. COMMIT         │
+│       │                            │         │           │
+│       │                            │         ▼           │
+│       │                            │   8. SUMMARY        │
+│       │                            │         │           │
+│       │                            │         ▼           │
+│       │                            │   Present to user   │
+│       └────────────────────────────┘                     │
+└─────────────────────────────────────────────────────────┘
+```
 
-Before designing or coding, spend time understanding the problem space:
+### Step 1 — Research
+
+Before designing or coding, understand the problem space:
 
 - **Consult the Copilot SDK repo** — check [github/copilot-sdk](https://github.com/github/copilot-sdk) docs for native SDK capabilities before building custom solutions. The SDK may already support features like session persistence, tool registration, or lifecycle management.
-- **Investigate best practices** — search for how similar problems are solved in the ecosystem (e.g., WPF patterns, SDK usage, desktop app update mechanisms)
+- **Investigate best practices** — search for how similar problems are solved in the ecosystem (e.g., Avalonia patterns, SDK usage, desktop app update mechanisms)
 - **Review existing code** — understand how the current codebase handles related concerns to maintain consistency
 - **Identify constraints** — note platform limitations, SDK quirks, or dependency requirements discovered during research
 - **Document findings** — record key research results in the relevant `docs/` file or as comments in the BDD spec
 
-### 2. BDD Specification
+**Exit gate:** Research findings documented. You can articulate *what* the SDK/platform supports and *how* the current codebase handles related concerns.
+
+### Step 2 — BDD Specification
 
 Write Gherkin-style feature specs **before** writing any implementation code:
 
@@ -109,7 +148,9 @@ Write Gherkin-style feature specs **before** writing any implementation code:
   - Interactions with existing features
 - Use concrete examples with realistic data, not abstract placeholders
 
-### 2b. BDD Maintenance
+**Exit gate:** BDD spec file created with ≥1 happy-path and ≥1 error/edge-case scenario.
+
+### Step 2b — BDD Maintenance (ongoing)
 
 BDD specs are living documents — update them whenever new information surfaces:
 
@@ -119,7 +160,7 @@ BDD specs are living documents — update them whenever new information surfaces
 - **Bug discoveries** — add new scenarios to cover the failure mode that was found
 - **Always check** `docs/bdd/` for specs that reference the area being changed
 
-### 3. Design Review
+### Step 3 — Design Review
 
 After writing the BDD specs, **stop and review** the design before implementing:
 
@@ -130,40 +171,70 @@ After writing the BDD specs, **stop and review** the design before implementing:
 - Consider **performance and resource implications** — file I/O, memory, thread safety
 - If the design has issues, revise the BDD specs before proceeding
 
-### 4. Implementation
+**Exit gate:** Each scenario is complete, no conflicts found, technical approach validated. If issues found, loop back to Step 2.
 
-Only after the BDD specs pass review:
+### Step 4 — Commit Checkpoint
+
+Before touching any code, **commit any uncommitted work**. This creates a rollback point.
+
+```bash
+git add -A && git commit -m "chore: checkpoint before <feature-name>"
+```
+
+**Exit gate:** `git status` shows a clean working tree.
+
+### Step 5 — Implementation
+
+Only after the design review passes:
 
 1. Define interfaces in `Core/Interfaces/`
 2. Implement services in `Core/Services/`
 3. Create ViewModels in `App/ViewModels/`
 4. Create Views (AXAML) in `App/Views/`
-5. Add unit tests in both `test/CopilotFamily.Core.Tests/` and `test/CopilotFamily.App.Tests/`
-6. Update documentation in `docs/` if the feature changes architecture or public API
-7. Update `CHANGELOG.md` under the `[Unreleased]` section (see changelog rules below)
+5. Add unit tests in `test/CopilotFamily.Core.Tests/` and `test/CopilotFamily.App.Tests/`
+6. Add headless UI tests in `test/CopilotFamily.UI.Tests/` if the feature has visual elements
+7. Update documentation in `docs/` if the feature changes architecture or public API
+8. Update `CHANGELOG.md` under the `[Unreleased]` section (see changelog rules below)
 
-### 5. Verification
+### Step 6 — Build & Test
 
-After implementation:
+Run the full verification suite:
 
-- Run `dotnet build CopilotFamily.slnx` — fix all warnings and errors
-- Run `dotnet test CopilotFamily.slnx` — all tests must pass
+```bash
+dotnet build CopilotFamily.slnx        # must be 0 errors, 0 warnings
+dotnet test CopilotFamily.slnx         # all tests must pass
+```
+
 - Walk through each BDD scenario and confirm it is satisfied by the implementation
 - If any scenario is not covered, add tests or fix the implementation
+- **If build/tests fail:** fix and re-run. Do not proceed until green.
 
-### 6. Dev Cycle Summary
+**Exit gate:** Build succeeds with 0 warnings, all tests pass, all BDD scenarios satisfied.
 
-After every completed feature, bug fix, or refactor, produce a **metrics summary** to give the user visibility into what changed. Include:
+### Step 7 — Commit
+
+Commit the completed work using Conventional Commits format:
+
+```bash
+git add -A
+git commit -m "feat(scope): description
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
+```
+
+### Step 8 — Dev Cycle Summary
+
+Produce a **metrics summary** and present it to the user. This is the final output of every dev cycle.
 
 | Metric | How to collect |
 |---|---|
 | **Tests** | Added / Updated / Removed count, plus total pass/fail/skip (`dotnet test`) |
 | **Code coverage** | Run `dotnet test --collect:"XPlat Code Coverage"` and report line/branch % (if coverage tooling is configured) |
-| **Files** | Added / Modified / Removed (`git diff --stat` against last commit) |
-| **Lines** | Insertions / Deletions (`git diff --shortstat`) |
+| **Files** | Added / Modified / Removed (`git diff --stat HEAD~1`) |
+| **Lines** | Insertions / Deletions (`git diff --shortstat HEAD~1`) |
 | **Build** | Errors / Warnings count |
 
-Example output format:
+Example output:
 
 ```
 📊 Dev Cycle Summary
@@ -175,10 +246,8 @@ Lines:     +210 inserted, −45 deleted
 Build:     0 errors, 0 warnings
 ```
 
-- Present this summary to the user at the end of each dev cycle (after verification passes)
-- Use `git diff --stat HEAD~1` and `git diff --shortstat HEAD~1` for file/line metrics when a commit has been made
-- Use `git diff --stat --cached` when changes are staged but not yet committed
-- If code coverage tooling is not yet configured, note that and report "not configured" rather than omitting
+- Use `git diff --stat HEAD~1` and `git diff --shortstat HEAD~1` for file/line metrics
+- If code coverage tooling is not yet configured, report "not configured" rather than omitting
 
 ## Git Workflow
 
