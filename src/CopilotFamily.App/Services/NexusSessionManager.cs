@@ -31,10 +31,18 @@ public class NexusSessionManager : ISessionManager
     public event EventHandler<SessionInfo>? SessionRemoved;
 
     public NexusSessionManager(string nexusBaseUrl, ILogger logger)
+        : this(nexusBaseUrl, logger, handler: null) { }
+
+    /// <summary>
+    /// Constructor for testing — accepts a custom HttpMessageHandler.
+    /// </summary>
+    internal NexusSessionManager(string nexusBaseUrl, ILogger logger, HttpMessageHandler? handler)
     {
         _nexusBaseUrl = nexusBaseUrl.TrimEnd('/');
         _logger = logger;
-        _httpClient = new HttpClient { BaseAddress = new Uri(_nexusBaseUrl) };
+        _httpClient = handler != null
+            ? new HttpClient(handler) { BaseAddress = new Uri(_nexusBaseUrl) }
+            : new HttpClient { BaseAddress = new Uri(_nexusBaseUrl) };
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)

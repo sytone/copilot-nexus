@@ -2,64 +2,68 @@
 
 ## High-Level Design
 
-Copilot Family is a WPF desktop application that manages multiple GitHub Copilot SDK
-sessions in a tabbed interface. It uses the **MVVM pattern** with interface-based
-abstractions for testability.
+Copilot Family is a cross-platform desktop application (Avalonia 11.3.12 / .NET 8) that
+manages multiple GitHub Copilot SDK sessions in a tabbed interface. It uses the
+**MVVM pattern** with interface-based abstractions for testability.
+
+The application follows a **client–service split architecture**. The Avalonia desktop app
+is a thin client that communicates with **CopilotFamily.Nexus**, an ASP.NET Core backend
+service that owns all SDK interactions. The app has no direct dependency on the Copilot
+SDK — all session management, streaming, and model queries flow through the Nexus service
+via **SignalR** (real-time events) and **REST** (CRUD operations).
+
+This split enables multiple future clients (web UI, CLI, webhook-driven automation) to
+share the same backend without duplicating SDK integration logic.
+
+### Architecture Diagram
+
+```
+┌────────────────────────────┐     ┌──────────────────────────────────┐
+│  Avalonia App (thin client)│     │  CopilotFamily.Nexus             │
+│                            │     │  (ASP.NET Core service)          │
+│  NexusSessionManager ──────┼────►│  SignalR Hub (SessionHub)        │
+│  NexusSessionProxy    ──────┼────►│  REST API (SessionsController)  │
+│                            │     │  Webhook (WebhookController)     │
+│  Renders session UI        │     │  ModelsController                │
+│  No direct SDK dependency  │     │                                  │
+│                            │     │  SessionManager ◄── SDK          │
+│  In test mode: uses local  │     │  CopilotClientService            │
+│  SessionManager + mocks    │     └──────────────────────────────────┘
+└────────────────────────────┘                    ▲
+                                   ┌──────────────┘
+┌────────────────────────────┐     │
+│  Future: Web UI            │─────┘
+│  Future: CLI client        │
+│  Future: Webhooks/CI       │────► POST /api/webhooks/sessions/{id}/message
+└────────────────────────────┘
+```
 
 ### SDK Integration
 
-The app integrates with the [GitHub Copilot SDK](https://github.com/github/copilot-sdk)
-(`GitHub.Copilot.SDK` NuGet package) which communicates with the locally installed
-Copilot CLI over **JSON-RPC**. This is not a process wrapper — the SDK manages the
-connection lifecycle and provides typed events for streaming responses.
+The [GitHub Copilot SDK](https://github.com/github/copilot-sdk) (`GitHub.Copilot.SDK`
+NuGet package) communicates with the locally installed Copilot CLI over **JSON-RPC**. This
+is not a process wrapper — the SDK manages the connection lifecycle and provides typed
+events for streaming responses. In the Nexus architecture, only the Nexus service
+references the SDK directly; the Avalonia app interacts exclusively through Nexus APIs.
 
-```
-┌──────────────────────────────────────────────┐
-│  CopilotFamily.App  (WPF / MVVM)             │
-│                                              │
-│  MainWindowViewModel                         │
-│    └── SessionTabViewModel (one per tab)     │
-│          └── handles streaming deltas        │
-│                                              │
-│  State persistence: save/restore on exit     │
-│  Update detection: staging → hot restart     │
-│  Logging: Serilog → file + debug sinks       │
-│  Global exception handlers                   │
-│  --test-mode with mock services              │
-└────────────────┬─────────────────────────────┘
-                 │ uses interfaces
-┌────────────────▼─────────────────────────────┐
-│  CopilotFamily.Core  (business logic)        │
-│                                              │
-│  ISessionManager                             │
-│    └── SessionManager                        │
-│          ├── ICopilotClientService           │
-│          │     ├── CopilotClientService      │
-│          │     │     └── CopilotClient (SDK) │
-│          │     └── MockCopilotClientService  │
-│          └── ICopilotSessionWrapper          │
-│                ├── CopilotSessionWrapper     │
-│                │     └── CopilotSession (SDK)│
-│                └── MockCopilotSessionWrapper │
-│                                              │
-│  IStatePersistenceService                    │
-│    └── JsonStatePersistenceService           │
-│  IUpdateDetectionService                     │
-│    └── StagingUpdateDetectionService         │
-└──────────────────────────────────────────────┘
-                 │ JSON-RPC (production)
-┌────────────────▼─────────────────────────────┐
-│  GitHub Copilot CLI  (local process)         │
-│    └── authenticates, routes to LLM          │
-│    └── session state: ~/.copilot/session-state/
-└──────────────────────────────────────────────┘
-```
+## Solution Projects
+
+| Project                      | Purpose                                                                    |
+| ---------------------------- | -------------------------------------------------------------------------- |
+| `CopilotFamily.Core`         | Core business logic, SDK abstractions, shared DTOs/contracts               |
+| `CopilotFamily.App`          | Avalonia 11 desktop application (MVVM, thin SignalR client)                |
+| `CopilotFamily.Nexus`        | ASP.NET Core backend — SignalR hub, REST API, webhooks                     |
+| `CopilotFamily.Core.Tests`   | 65 unit tests (xUnit + Moq)                                               |
+| `CopilotFamily.App.Tests`    | 47 ViewModel/converter tests (xUnit + Moq)                                |
+| `CopilotFamily.Nexus.Tests`  | 20 integration tests (WebApplicationFactory)                               |
+| `CopilotFamily.UI.Tests`     | 17 headless UI tests (Avalonia.Headless.XUnit)                             |
 
 ## Layer Responsibilities
 
 ### CopilotFamily.Core
 
-No UI dependencies. Contains all business logic and SDK abstractions.
+No UI dependencies. Contains all business logic, SDK abstractions, and the shared
+contract types used by both App and Nexus.
 
 | Component                       | Responsibility                                                                    |
 | ------------------------------- | --------------------------------------------------------------------------------- |
@@ -77,41 +81,72 @@ No UI dependencies. Contains all business logic and SDK abstractions.
 | `StagingUpdateDetectionService` | FileSystemWatcher + timer fallback for staging detection                          |
 | `IUiDispatcher`                 | Abstracts UI thread marshalling for testability                                   |
 | `SessionMessage`                | Chat message model with `INotifyPropertyChanged` for streaming                    |
-| `SessionInfo`                   | Session metadata (id, name, model, state, SDK session ID)                         |
+| `SessionInfo`                   | Session metadata (id, name, model, state, SDK session ID); includes `FromRemote()` static factory for reconstructing from DTOs |
 | `SessionOutputEventArgs`        | Carries output data with `OutputKind` (Delta, Message, Idle)                      |
 | `AppState` / `TabState`         | Serialization models for lightweight state persistence                            |
+| `Contracts/Dtos.cs`             | Shared DTOs: `SessionInfoDto`, `SessionOutputDto`, `ModelInfoDto`, `CreateSessionRequest`, etc. |
+| `Contracts/ISessionHubClient.cs`| SignalR client interface — defines methods the hub can invoke on connected clients |
 
 ### CopilotFamily.App
 
-WPF application following strict MVVM. Views are pure XAML data-binding with no
-business logic in code-behind (only focus management and scroll behavior).
+Avalonia 11.3.12 application following strict MVVM. Views are pure AXAML data-binding
+with no business logic in code-behind (only focus management and scroll behavior).
 
-| Component                            | Responsibility                                                            |
-| ------------------------------------ | ------------------------------------------------------------------------- |
-| `App.xaml.cs`                        | Serilog logging config, global exception handlers, `--test-mode` flag     |
-| `MainWindow.xaml.cs`                 | Service creation, state save/restore, update detection, updater wiring    |
-| `MainWindowViewModel`                | Manages tab collection, creates/closes tabs, update notification commands |
-| `SessionTabViewModel`                | Manages one tab — input, streaming message accumulation, commands         |
-| `ViewModelBase`                      | `INotifyPropertyChanged` base class                                       |
-| `RelayCommand` / `AsyncRelayCommand` | `ICommand` implementations for MVVM                                       |
-| `WpfUiDispatcher`                    | `IUiDispatcher` implementation using WPF's `Dispatcher`                   |
-| Converters                           | `MessageRole` → brush/label, empty count → visibility, bool → visibility  |
-| `Resources/update.ps1`               | Embedded PowerShell updater script for hot restart                        |
+In **production mode**, the app connects to the Nexus backend via `NexusSessionManager`
+and `NexusSessionProxy`. In **test mode**, it uses the local `SessionManager` with
+`MockCopilotClientService` directly — no Nexus service required.
+
+| Component                            | Responsibility                                                                   |
+| ------------------------------------ | -------------------------------------------------------------------------------- |
+| `App.axaml.cs`                       | Serilog logging config, global exception handlers, startup arg parsing           |
+| `MainWindow.axaml.cs`               | Service creation — `NexusSessionManager(nexusUrl)` in prod, local `SessionManager` in test; state save/restore, update detection, updater wiring |
+| `MainWindowViewModel`                | Manages tab collection, creates/closes tabs, update notification commands        |
+| `SessionTabViewModel`                | Manages one tab — input, streaming message accumulation, commands                |
+| `NexusSessionManager`                | `ISessionManager` implementation via SignalR + REST calls to Nexus (production)  |
+| `NexusSessionProxy`                  | `ICopilotSessionWrapper` for Nexus-backed sessions — receives SignalR events     |
+| `ViewModelBase`                      | `INotifyPropertyChanged` base class                                              |
+| `RelayCommand` / `AsyncRelayCommand` | `ICommand` implementations for MVVM                                              |
+| `AvaloniaUiDispatcher`               | `IUiDispatcher` implementation using Avalonia's `Dispatcher`                     |
+| Converters                           | `MessageRole` → brush/label, empty count → visibility, bool → visibility         |
+| `Resources/update.ps1`               | Embedded PowerShell updater script for hot restart                               |
+
+**Startup arguments:**
+
+| Argument         | Effect                                                                   |
+| ---------------- | ------------------------------------------------------------------------ |
+| `--nexus-url`    | URL of the Nexus backend service (e.g., `https://localhost:5001`)        |
+| `--test-mode`    | Use local `SessionManager` + `MockCopilotClientService` (no Nexus)      |
+| `--reset-state`  | Clear persisted app state on launch                                      |
+| `--minimized`    | Start the window minimized                                               |
+
+### CopilotFamily.Nexus
+
+ASP.NET Core backend service that owns all SDK interactions and exposes them through
+multiple protocols. Any client (desktop, web, CLI, automation) connects here.
+
+| Component              | Responsibility                                                                        |
+| ---------------------- | ------------------------------------------------------------------------------------- |
+| `SessionHub` (SignalR) | Real-time session operations: `JoinSession`, `LeaveSession`, `SendInput`, `AbortSession` |
+| `SessionsController`   | REST API for session CRUD — create, list, get, configure, send input, delete          |
+| `ModelsController`     | REST API for listing available Copilot models                                         |
+| `WebhookController`    | Automation endpoint — accepts callback URLs for async session interaction (`POST /api/webhooks/sessions/{id}/message`) |
+| `SessionManager`       | Reuses `SessionManager` from Core to manage SDK session lifecycle                     |
+| `CopilotClientService` | Reuses `CopilotClientService` from Core for SDK client management                    |
 
 ## Session Persistence (SDK Native)
 
-The app leverages the Copilot SDK's built-in session persistence:
+The app leverages the Copilot SDK's built-in session persistence (managed by Nexus in
+production, or locally in test mode):
 
 1. **Structured session IDs** — generated as `copilot-family-{timestamp}-{guid}` and
    passed to `SessionConfig.SessionId`. The SDK stores all conversation history, tool
    call results, and planning state at `~/.copilot/session-state/{sessionId}/`.
 
-2. **Disconnect on exit** — when the app closes, sessions are disconnected (not disposed)
-   via `session.Disconnect()`. This releases in-memory resources but preserves data on disk.
+2. **Disconnect on exit** — when sessions are disconnected (not disposed)
+   via `session.Disconnect()`, in-memory resources are released but data is preserved on disk.
 
 3. **Resume on startup** — `client.ResumeSessionAsync(sessionId, config)` restores a
-   previous session. If resume fails (session expired/deleted), the app falls back to
-   creating a fresh session.
+   previous session. If resume fails (session expired/deleted), a fresh session is created.
 
 4. **Delete on tab close** — `client.DeleteSessionAsync(sessionId)` permanently removes
    session data when the user explicitly closes a tab.
@@ -137,7 +172,7 @@ The app supports a fast iteration pipeline:
 
 All services and ViewModels accept `ILogger<T>` via constructor injection.
 
-- **Serilog** is configured in `App.xaml.cs` with two sinks:
+- **Serilog** is configured in `App.axaml.cs` with two sinks:
   - **File sink** — rolling daily logs at `%LOCALAPPDATA%\CopilotFamily\logs\`
   - **Debug sink** — writes to Visual Studio Output window
 - **Global exception handlers** catch unhandled exceptions on the UI thread,
@@ -150,29 +185,43 @@ All services and ViewModels accept `ILogger<T>` via constructor injection.
 
 ## Test Mode
 
-Launch with `--test-mode` to use mock services instead of the real Copilot SDK:
+Launch with `--test-mode` to use local mock services instead of the Nexus backend:
 
 ```
 CopilotFamily.App.exe --test-mode
 ```
 
-Mock services simulate streaming responses with word-by-word delays, allowing
-UI testing and development without a Copilot CLI installation.
+In test mode, the app creates a local `SessionManager` with `MockCopilotClientService`
+directly — no Nexus service is required. Mock services simulate streaming responses with
+word-by-word delays, allowing UI testing and development without a Copilot CLI
+installation or a running Nexus instance.
 
 ## Streaming Flow
 
 When a user sends a prompt, the following sequence occurs:
 
+### Production Mode (via Nexus)
+
 1. `SessionTabViewModel.SendCommand` → adds `User` message to `Messages`
-2. Calls `ICopilotSessionWrapper.SendAsync(prompt)` (internally `SendAndWaitAsync`)
-3. SDK fires `AssistantMessageDeltaEvent` events during generation
-4. `CopilotSessionWrapper` translates to `SessionOutputEventArgs(OutputKind.Delta)`
-5. `SessionTabViewModel.HandleOutput` receives delta via `IUiDispatcher.BeginInvoke`:
+2. Calls `NexusSessionProxy.SendAsync(prompt)` which invokes `SessionHub.SendInput` via SignalR
+3. Nexus dispatches the prompt to the SDK session via `CopilotSessionWrapper.SendAndWaitAsync`
+4. SDK fires `AssistantMessageDeltaEvent` events during generation
+5. `CopilotSessionWrapper` translates to `SessionOutputEventArgs(OutputKind.Delta)`
+6. Nexus broadcasts delta events to connected clients via SignalR hub
+7. `NexusSessionProxy` receives SignalR delta, raises `OutputReceived` event
+8. `SessionTabViewModel.HandleOutput` receives delta via `IUiDispatcher.BeginInvoke`:
    - First delta → creates new `SessionMessage(isStreaming: true)`, adds to collection
    - Subsequent deltas → calls `AppendContent()` on the same message
-6. SDK fires `SessionIdleEvent` when response is complete
-7. `HandleOutput` calls `CompleteStreaming()` on the message
-8. `SendAndWaitAsync` returns, `IsProcessing` set to false, send button re-enabled
+9. SDK fires `SessionIdleEvent` when response is complete
+10. Nexus broadcasts idle event via SignalR; `HandleOutput` calls `CompleteStreaming()`
+11. `IsProcessing` set to false, send button re-enabled
+
+### Test Mode (local)
+
+1. `SessionTabViewModel.SendCommand` → adds `User` message to `Messages`
+2. Calls `MockCopilotSessionWrapper.SendAsync(prompt)` directly (no Nexus)
+3. Mock wrapper streams word-by-word deltas with simulated delays
+4. `SessionTabViewModel.HandleOutput` processes deltas identically to production mode
 
 ## Testability
 
@@ -186,22 +235,29 @@ All SDK and UI dependencies are behind interfaces, enabling pure unit tests:
 
 ### Test Projects
 
-| Project                    | Tests | Coverage                                                                |
-| -------------------------- | ----- | ----------------------------------------------------------------------- |
-| `CopilotFamily.Core.Tests` | 62    | SessionManager, SessionMessage, persistence, staging detection, dist/staging integration |
-| `CopilotFamily.App.Tests`  | 47    | ViewModels (MainWindow, SessionTab), Converters                         |
-| `CopilotFamily.UI.Tests`   | 10    | FlaUI automation — app launch, tab create/close, input/send             |
+| Project                      | Tests | Coverage                                                                              |
+| ---------------------------- | ----- | ------------------------------------------------------------------------------------- |
+| `CopilotFamily.Core.Tests`   | 65    | SessionManager, SessionMessage, persistence, staging detection, dist/staging integration |
+| `CopilotFamily.App.Tests`    | 47    | ViewModels (MainWindow, SessionTab), Converters                                       |
+| `CopilotFamily.Nexus.Tests`  | 20    | Integration tests — REST API + webhooks via `WebApplicationFactory<Program>` with mock SDK |
+| `CopilotFamily.UI.Tests`     | 17    | Headless UI tests — Avalonia.Headless.XUnit, no visible windows                       |
 
 ## Dependencies
 
-| Package                                     | Purpose                              |
-| ------------------------------------------- | ------------------------------------ |
-| `GitHub.Copilot.SDK`                        | Copilot CLI integration via JSON-RPC |
-| `Microsoft.Extensions.Logging.Abstractions` | `ILogger<T>` for structured logging  |
-| `Serilog.Extensions.Logging`                | Serilog → `ILoggerFactory` bridge    |
-| `Serilog.Sinks.File`                        | Rolling file log sink                |
-| `Serilog.Sinks.Debug`                       | Debug output log sink                |
-| `System.Text.Json`                          | State persistence serialization      |
-| `FlaUI.UIA3`                                | WPF UI automation testing            |
-| `xunit`                                     | Test framework                       |
-| `Moq`                                       | Mocking framework                    |
+| Package                                     | Purpose                                              |
+| ------------------------------------------- | ---------------------------------------------------- |
+| `GitHub.Copilot.SDK`                        | Copilot CLI integration via JSON-RPC (Nexus + Core)  |
+| `Avalonia` (11.3.12)                        | Cross-platform UI framework (replaces WPF)           |
+| `Avalonia.Desktop`                          | Avalonia desktop platform support                    |
+| `Avalonia.Themes.Fluent`                    | Fluent design theme for Avalonia                     |
+| `Microsoft.AspNetCore.SignalR`              | Real-time hub for Nexus ↔ App communication          |
+| `Microsoft.AspNetCore.SignalR.Client`       | SignalR client used by NexusSessionManager           |
+| `Microsoft.Extensions.Logging.Abstractions` | `ILogger<T>` for structured logging                  |
+| `Serilog.Extensions.Logging`                | Serilog → `ILoggerFactory` bridge                    |
+| `Serilog.Sinks.File`                        | Rolling file log sink                                |
+| `Serilog.Sinks.Debug`                       | Debug output log sink                                |
+| `System.Text.Json`                          | State persistence and DTO serialization              |
+| `Avalonia.Headless.XUnit`                   | Headless UI testing (replaces FlaUI)                 |
+| `Microsoft.AspNetCore.Mvc.Testing`          | `WebApplicationFactory` for Nexus integration tests  |
+| `xunit`                                     | Test framework                                       |
+| `Moq`                                       | Mocking framework                                    |

@@ -13,6 +13,7 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - `NexusSessionProxy` — `ICopilotSessionWrapper` implementation for Nexus-backed sessions (sends via SignalR, receives output callbacks)
 - `--nexus-url` startup argument to configure Nexus backend URL (default: `http://localhost:5280`)
 - `SessionInfo.FromRemote()` factory method for reconstructing session info from Nexus DTOs
+- 23 new unit tests for `NexusSessionProxy` (12 tests) and `NexusSessionManager` (11 tests) with mock HTTP handler
 - **CopilotFamily.Nexus** — standalone ASP.NET Core backend service for Copilot session management
   - **SignalR Hub** (`/hubs/session`) — real-time streaming of session output to connected clients
   - **REST API** (`/api/sessions`, `/api/models`) — CRUD for sessions, model listing, input sending, reconfiguration

@@ -2,19 +2,24 @@
 
 ## Project Overview
 
-Copilot Family is a cross-platform desktop application (Avalonia 11 / .NET 8) that provides a tabbed
-interface for managing multiple GitHub Copilot SDK sessions simultaneously. Each tab
-runs an independent Copilot session via the `GitHub.Copilot.SDK` NuGet package,
-communicating with the Copilot CLI over JSON-RPC — not by wrapping a CLI process.
+Copilot Family is a cross-platform desktop application (Avalonia 11.3.12 / .NET 8) that provides a tabbed
+interface for managing multiple GitHub Copilot SDK sessions simultaneously. The app follows
+a client–service split: the Avalonia desktop app is a thin client that communicates with
+**CopilotFamily.Nexus**, an ASP.NET Core backend service that owns all SDK interactions.
+Nexus exposes sessions via SignalR (real-time streaming) and REST (CRUD), enabling future
+clients (web UI, CLI, webhook automation) to share the same backend. In test mode, the app
+bypasses Nexus and uses local mock services directly.
 
 ## Solution Structure
 
 ```
-src/CopilotFamily.Core         — Core business logic, SDK abstractions, models, services
-src/CopilotFamily.App          — Avalonia desktop application with MVVM architecture
-test/CopilotFamily.Core.Tests  — Unit tests for Core (xUnit + Moq)
-test/CopilotFamily.App.Tests   — Unit tests for ViewModels and converters (xUnit + Moq)
-test/CopilotFamily.UI.Tests    — Headless UI tests (Avalonia.Headless.XUnit)
+src/CopilotFamily.Core         — Core business logic, SDK abstractions, shared DTOs/contracts
+src/CopilotFamily.App          — Avalonia 11 desktop application (MVVM, thin SignalR client)
+src/CopilotFamily.Nexus        — ASP.NET Core backend — SignalR hub, REST API, webhooks
+test/CopilotFamily.Core.Tests  — Unit tests for Core (xUnit + Moq, 65 tests)
+test/CopilotFamily.App.Tests   — Unit tests for ViewModels and converters (xUnit + Moq, 47 tests)
+test/CopilotFamily.Nexus.Tests — Integration tests for Nexus (WebApplicationFactory, 20 tests)
+test/CopilotFamily.UI.Tests    — Headless UI tests (Avalonia.Headless.XUnit, 17 tests)
 docs/                          — Project documentation
 .github/                       — GitHub configuration and Copilot instructions
 ```
@@ -34,10 +39,15 @@ docs/                          — Project documentation
 | `ICopilotSessionWrapper` | Wraps `CopilotSession` (one per tab, streaming events)                     |
 | `ISessionManager`        | Manages lifecycle of multiple sessions                                     |
 | `IUiDispatcher`          | Abstracts UI thread dispatching for testability                            |
+| `NexusSessionManager`    | `ISessionManager` implementation via SignalR + REST (production mode)      |
+| `NexusSessionProxy`      | `ICopilotSessionWrapper` for Nexus-backed sessions (receives SignalR events) |
+| `SessionHub`             | SignalR hub in Nexus — `JoinSession`, `LeaveSession`, `SendInput`, `AbortSession` |
 | `SessionTabViewModel`    | Manages UI state for a single tab, handles streaming deltas                |
 | `MainWindowViewModel`    | Manages the collection of tabs and client lifecycle                        |
 | `SessionMessage`         | Observable message model with streaming support (`INotifyPropertyChanged`) |
-| `SessionInfo`            | Metadata for a session (id, name, model, state)                            |
+| `SessionInfo`            | Metadata for a session (id, name, model, state); `FromRemote()` factory for DTO reconstruction |
+| `Dtos.cs`                | Shared DTOs: `SessionInfoDto`, `SessionOutputDto`, `ModelInfoDto`, `CreateSessionRequest` |
+| `ISessionHubClient`      | SignalR client interface — methods the hub can invoke on connected clients  |
 
 ## Building
 
@@ -305,8 +315,10 @@ This project uses git for version control. Follow these rules:
 
 ## Future Enhancement Areas
 
-- Session persistence and restoration across app restarts
-- Model selection per session (dropdown in tab bar)
+- Web client — browser-based UI connecting to Nexus via SignalR + REST
+- CLI client — terminal-based session management against the Nexus API
+- Webhook automation — CI/CD pipelines triggering sessions via `POST /api/webhooks/sessions/{id}/message`
+- Multi-user session sharing — multiple clients collaborating on the same session in real time
 - Custom copilot CLI path configuration via settings
 - Theme customization (light/dark/custom)
 - Session output search and filtering
