@@ -90,6 +90,21 @@ public class SessionManagerTests
     }
 
     [Fact]
+    public async Task CreateSessionAsync_UsesResolvedDefaultModel_WhenNotSpecified()
+    {
+        var info = await _manager.CreateSessionAsync("Test");
+
+        Assert.Equal("gpt-4.1", info.Model);
+        _mockClientService.Verify(c => c.CreateSessionAsync(
+                It.IsAny<string?>(),
+                It.Is<SessionConfiguration?>(cfg => cfg != null && cfg.Model == "gpt-4.1"),
+                It.IsAny<Func<ToolPermissionRequest, Task<PermissionDecision>>?>(),
+                It.IsAny<Func<AgentUserInputRequest, Task<AgentUserInputResponse>>?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task ResumeSessionAsync_ResumesExistingSession()
     {
         var info = await _manager.ResumeSessionAsync("Test", "my-sdk-id");

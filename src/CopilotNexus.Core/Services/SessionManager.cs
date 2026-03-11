@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 
 public class SessionManager : ISessionManager
 {
+    private const string FallbackModelId = "gpt-4.1";
     private readonly ICopilotClientService _clientService;
     private readonly ILogger<SessionManager> _logger;
     private readonly ConcurrentDictionary<string, SessionInfo> _sessions = new();
@@ -54,19 +55,26 @@ public class SessionManager : ISessionManager
         CancellationToken cancellationToken = default)
     {
         config ??= new SessionConfiguration();
+        var resolvedModel = ResolveModel(config.Model);
+        var effectiveConfig = new SessionConfiguration
+        {
+            Model = resolvedModel,
+            WorkingDirectory = config.WorkingDirectory,
+            IsAutopilot = config.IsAutopilot,
+        };
 
         // Generate a structured SDK session ID for persistence
         var sdkSessionId = $"copilot-nexus-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}-{Guid.NewGuid().ToString("N")[..6]}";
 
         _logger.LogInformation("Creating session '{Name}' with model {Model}, autopilot={Autopilot}, workDir={WorkDir}, SDK ID {SdkId}",
-            name, config.Model ?? "default", config.IsAutopilot, config.WorkingDirectory ?? "(default)", sdkSessionId);
+            name, resolvedModel, effectiveConfig.IsAutopilot, effectiveConfig.WorkingDirectory ?? "(default)", sdkSessionId);
 
-        var wrapper = await _clientService.CreateSessionAsync(sdkSessionId, config, permissionHandler, userInputHandler, cancellationToken);
-        var info = new SessionInfo(name, config.Model, wrapper.SessionId)
+        var wrapper = await _clientService.CreateSessionAsync(sdkSessionId, effectiveConfig, permissionHandler, userInputHandler, cancellationToken);
+        var info = new SessionInfo(name, resolvedModel, wrapper.SessionId)
         {
             State = SessionState.Running,
-            WorkingDirectory = config.WorkingDirectory,
-            IsAutopilot = config.IsAutopilot,
+            WorkingDirectory = effectiveConfig.WorkingDirectory,
+            IsAutopilot = effectiveConfig.IsAutopilot,
         };
 
         _sessions[info.Id] = info;
@@ -194,6 +202,16 @@ public class SessionManager : ISessionManager
     {
         _wrappers.TryGetValue(sessionId, out var wrapper);
         return wrapper;
+    }
+
+    private string ResolveModel(string? requestedModel)
+    {
+        if (!string.IsNullOrWhiteSpace(requestedModel))
+            return requestedModel;
+
+        return _availableModels.FirstOrDefault(m => m.ModelId == FallbackModelId)?.ModelId
+            ?? _availableModels.FirstOrDefault()?.ModelId
+            ?? FallbackModelId;
     }
 
     private ICopilotSessionWrapper GetSessionOrThrow(string sessionId)

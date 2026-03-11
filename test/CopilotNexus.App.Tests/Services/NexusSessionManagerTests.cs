@@ -40,6 +40,24 @@ public class NexusSessionManagerTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task LoadModelsAsync_PopulatesAvailableModelsFromApi()
+    {
+        var models = new List<ModelInfoDto>
+        {
+            new() { ModelId = "gpt-4.1", Name = "GPT-4.1", Capabilities = new List<string> { "reasoning" } },
+            new() { ModelId = "gpt-5.2-codex", Name = "GPT-5.2 Codex", Capabilities = new List<string> { "reasoning" } },
+        };
+
+        _mockHandler.SetResponse("/api/models", HttpMethod.Get, HttpStatusCode.OK, JsonSerializer.Serialize(models));
+
+        await _manager.LoadModelsAsync();
+
+        Assert.Equal(2, _manager.AvailableModels.Count);
+        Assert.Equal("gpt-4.1", _manager.AvailableModels[0].ModelId);
+        Assert.Equal("gpt-5.2-codex", _manager.AvailableModels[1].ModelId);
+    }
+
+    [Fact]
     public async Task CreateSessionAsync_SendsPostRequest_ReturnsSessionInfo()
     {
         var dto = new SessionInfoDto

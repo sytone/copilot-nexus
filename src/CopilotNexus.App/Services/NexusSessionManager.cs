@@ -68,10 +68,10 @@ public class NexusSessionManager : ISessionManager
             return Task.CompletedTask;
         };
 
-        _hubConnection.Reconnected += _ =>
+        _hubConnection.Reconnected += async _ =>
         {
             _logger.LogInformation("SignalR reconnected to Nexus");
-            return Task.CompletedTask;
+            await LoadModelsAsync();
         };
 
         _hubConnection.Closed += ex =>
@@ -82,6 +82,9 @@ public class NexusSessionManager : ISessionManager
 
         await _hubConnection.StartAsync(cancellationToken);
         _logger.LogInformation("Connected to Nexus via SignalR (state: {State})", _hubConnection.State);
+
+        // Avoid startup race with SignalR callback timing by loading models via REST before returning.
+        await LoadModelsAsync(cancellationToken);
     }
 
     public async Task<SessionInfo> CreateSessionAsync(
@@ -198,11 +201,25 @@ public class NexusSessionManager : ISessionManager
 
     // --- SignalR callbacks ---
 
+    internal async Task LoadModelsAsync(CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var models = await _httpClient.GetFromJsonAsync<List<ModelInfoDto>>("/api/models", cancellationToken)
+                ?? new List<ModelInfoDto>();
+            OnModelsLoaded(models);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load models from Nexus API");
+        }
+    }
+
     private void OnModelsLoaded(List<ModelInfoDto> models)
     {
         _availableModels.Clear();
         _availableModels.AddRange(models.Select(ToModelInfo));
-        _logger.LogInformation("Received {Count} models from Nexus", models.Count);
+        _logger.LogInformation("Model catalog updated with {Count} entries", models.Count);
     }
 
     private void OnSessionAdded(SessionInfoDto dto)
