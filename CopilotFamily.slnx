@@ -3,6 +3,7 @@
     <Project Path="src/CopilotFamily.App/CopilotFamily.App.csproj" />
     <Project Path="src/CopilotFamily.Core/CopilotFamily.Core.csproj" />
     <Project Path="src/CopilotFamily.Nexus/CopilotFamily.Nexus.csproj" />
+    <Project Path="src/CopilotFamily.Updater/CopilotFamily.Updater.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/CopilotFamily.App.Tests/CopilotFamily.App.Tests.csproj" />

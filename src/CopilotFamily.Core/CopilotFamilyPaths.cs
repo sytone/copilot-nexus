@@ -41,6 +41,9 @@ public static class CopilotFamilyPaths
     /// <summary>App executable path in the install directory.</summary>
     public static string AppExe { get; } = Path.Combine(AppInstall, "CopilotFamily.App.exe");
 
+    /// <summary>Updater shim executable path (lives alongside the app).</summary>
+    public static string UpdaterExe { get; } = Path.Combine(AppInstall, "CopilotFamily.Updater.exe");
+
     /// <summary>Ensures all required directories exist.</summary>
     public static void EnsureDirectories()
     {

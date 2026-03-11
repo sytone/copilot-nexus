@@ -2,7 +2,6 @@ namespace CopilotFamily.App;
 
 using System.Diagnostics;
 using System.IO;
-using System.Reflection;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -123,7 +122,7 @@ public partial class MainWindow : Window
             var state = _viewModel.CaptureState();
             await _stateService.SaveAsync(state);
 
-            var updaterPath = ExtractUpdaterScript();
+            var updaterExe = FindUpdaterExe();
             var appExePath = Environment.ProcessPath!;
             var installDir = CopilotFamily.Core.CopilotFamilyPaths.AppInstall;
             var stagingDir = CopilotFamily.Core.CopilotFamilyPaths.AppStaging;
@@ -133,8 +132,8 @@ public partial class MainWindow : Window
 
             var psi = new ProcessStartInfo
             {
-                FileName = "powershell.exe",
-                Arguments = $"-ExecutionPolicy Bypass -File \"{updaterPath}\" -AppPid {pid} -InstallPath \"{installDir}\" -StagingPath \"{stagingDir}\" -AppExe \"{appExePath}\"",
+                FileName = updaterExe,
+                Arguments = $"--app-pid {pid} --install-path \"{installDir}\" --staging-path \"{stagingDir}\" --app-exe \"{appExePath}\"",
                 UseShellExecute = false,
                 CreateNoWindow = true,
             };
@@ -165,21 +164,25 @@ public partial class MainWindow : Window
         _redisplayTimer.Start();
     }
 
-    private static string ExtractUpdaterScript()
+    /// <summary>
+    /// Finds the updater executable. Checks next to the running app first,
+    /// then falls back to the installed location.
+    /// </summary>
+    private static string FindUpdaterExe()
     {
-        var assembly = Assembly.GetExecutingAssembly();
-        var resourceName = assembly.GetManifestResourceNames()
-            .First(n => n.EndsWith("update.ps1", StringComparison.OrdinalIgnoreCase));
+        // Check next to the running executable first (dev/debug scenario)
+        var appDir = Path.GetDirectoryName(Environment.ProcessPath!)!;
+        var localUpdater = Path.Combine(appDir, "CopilotFamily.Updater.exe");
+        if (File.Exists(localUpdater))
+            return localUpdater;
 
-        var tempDir = Path.Combine(Path.GetTempPath(), "CopilotFamily-Updater");
-        Directory.CreateDirectory(tempDir);
-        var tempPath = Path.Combine(tempDir, "update.ps1");
+        // Fall back to the installed location
+        var installedUpdater = CopilotFamily.Core.CopilotFamilyPaths.UpdaterExe;
+        if (File.Exists(installedUpdater))
+            return installedUpdater;
 
-        using var stream = assembly.GetManifestResourceStream(resourceName)!;
-        using var fs = File.Create(tempPath);
-        stream.CopyTo(fs);
-
-        return tempPath;
+        throw new FileNotFoundException(
+            "CopilotFamily.Updater.exe not found. Ensure it is published alongside the app.");
     }
 
     private void CloseTab_Click(object? sender, RoutedEventArgs e)
