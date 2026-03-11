@@ -11,6 +11,8 @@ record HealthResponse(string? Status, int Sessions, int Models, string? Uptime);
 /// </summary>
 internal static class CliCommands
 {
+    private sealed record ProcessExecutionResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Elapsed);
+
     // --- start ---
     internal static void RunStart(string url)
     {
@@ -196,6 +198,8 @@ internal static class CliCommands
     // --- build ---
     internal static async Task RunBuildAsync(string configuration)
     {
+        CopilotNexusPaths.EnsureDirectories();
+
         var repoRoot = FindRepoRoot();
         if (repoRoot == null)
         {
@@ -228,22 +232,23 @@ internal static class CliCommands
                     WorkingDirectory = repoRoot,
                 };
 
-                var proc = Process.Start(psi)!;
-                var stdout = await proc.StandardOutput.ReadToEndAsync();
-                var stderr = await proc.StandardError.ReadToEndAsync();
-                await proc.WaitForExitAsync();
+                WriteCliLog($"build start: {psi.FileName} {psi.Arguments}");
+                var result = await RunProcessWithCapturedOutputAsync(psi);
+                WriteCliLog(
+                    $"build complete: exit={result.ExitCode}, elapsed={result.Elapsed.TotalSeconds:F1}s, " +
+                    $"stdoutChars={result.StandardOutput.Length}, stderrChars={result.StandardError.Length}");
 
-                if (proc.ExitCode != 0)
+                if (result.ExitCode != 0)
                 {
                     AnsiConsole.MarkupLine("[red]✗ Build failed[/]");
                     AnsiConsole.WriteLine();
-                    if (!string.IsNullOrWhiteSpace(stderr))
-                        AnsiConsole.MarkupLine(Markup.Escape(stderr.Trim()));
-                    if (!string.IsNullOrWhiteSpace(stdout))
-                        AnsiConsole.MarkupLine(Markup.Escape(stdout.Trim()));
+                    if (!string.IsNullOrWhiteSpace(result.StandardError))
+                        AnsiConsole.MarkupLine(Markup.Escape(result.StandardError.Trim()));
+                    if (!string.IsNullOrWhiteSpace(result.StandardOutput))
+                        AnsiConsole.MarkupLine(Markup.Escape(result.StandardOutput.Trim()));
                 }
 
-                return proc.ExitCode;
+                return result.ExitCode;
             });
 
         sw.Stop();
@@ -564,20 +569,64 @@ internal static class CliCommands
             CreateNoWindow = true,
         };
 
-        var proc = Process.Start(psi)!;
-        var stderr = await proc.StandardError.ReadToEndAsync();
-        await proc.WaitForExitAsync();
+        WriteCliLog($"publish start [{component}]: {psi.FileName} {psi.Arguments}");
+        var result = await RunProcessWithCapturedOutputAsync(psi);
+        WriteCliLog(
+            $"publish complete [{component}]: exit={result.ExitCode}, elapsed={result.Elapsed.TotalSeconds:F1}s, " +
+            $"stdoutChars={result.StandardOutput.Length}, stderrChars={result.StandardError.Length}");
 
-        if (proc.ExitCode != 0)
+        if (result.ExitCode != 0)
         {
+            WriteCliLog($"publish failed [{component}] stdout tail:\n{Tail(result.StandardOutput)}");
+            WriteCliLog($"publish failed [{component}] stderr tail:\n{Tail(result.StandardError)}");
             AnsiConsole.MarkupLine($"  [red]✗ Failed to publish {component}[/]");
-            AnsiConsole.WriteException(new InvalidOperationException(stderr.Trim()));
+            var errorOutput = !string.IsNullOrWhiteSpace(result.StandardError)
+                ? result.StandardError
+                : result.StandardOutput;
+            if (!string.IsNullOrWhiteSpace(errorOutput))
+            {
+                AnsiConsole.MarkupLine(Markup.Escape(Tail(errorOutput)));
+            }
             Environment.ExitCode = 1;
         }
         else
         {
-            AnsiConsole.MarkupLine($"  [green]✓[/] {component} published");
+            AnsiConsole.MarkupLine($"  [green]✓[/] {component} published [dim]({result.Elapsed.TotalSeconds:F1}s)[/]");
         }
+    }
+
+    private static async Task<ProcessExecutionResult> RunProcessWithCapturedOutputAsync(ProcessStartInfo psi)
+    {
+        using var proc = Process.Start(psi)
+            ?? throw new InvalidOperationException($"Failed to start process: {psi.FileName} {psi.Arguments}");
+
+        var sw = Stopwatch.StartNew();
+        var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+        var stderrTask = proc.StandardError.ReadToEndAsync();
+
+        await Task.WhenAll(proc.WaitForExitAsync(), stdoutTask, stderrTask);
+        sw.Stop();
+
+        return new ProcessExecutionResult(
+            proc.ExitCode,
+            stdoutTask.Result,
+            stderrTask.Result,
+            sw.Elapsed);
+    }
+
+    private static string Tail(string text, int maxLength = 4000)
+    {
+        if (string.IsNullOrEmpty(text) || text.Length <= maxLength)
+            return text;
+
+        return text[^maxLength..];
+    }
+
+    private static void WriteCliLog(string message)
+    {
+        var logPath = Path.Combine(CopilotNexusPaths.Logs, $"cli-{DateTime.UtcNow:yyyyMMdd}.log");
+        var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} {message}";
+        File.AppendAllText(logPath, line + Environment.NewLine);
     }
 
     private static bool IsCliArtifact(string filePath)

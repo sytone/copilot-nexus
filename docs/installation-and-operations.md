@@ -350,6 +350,12 @@ All logs are written to `%LOCALAPPDATA%\CopilotNexus\logs\`:
 Get-Content "$env:LOCALAPPDATA\CopilotNexus\logs\*.log" -Tail 50
 ```
 
+Notable logs:
+
+- `copilot-nexus-YYYYMMDD.log` — desktop app runtime logs
+- `nexus-YYYYMMDD.log` — Nexus service logs
+- `cli-YYYYMMDD.log` — CLI build/publish command diagnostics (command, exit code, elapsed, output sizes)
+
 ### Clean reinstall
 
 ```powershell
