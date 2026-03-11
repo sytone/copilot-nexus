@@ -58,6 +58,15 @@ statusCommand.SetAction(async (parseResult, _) =>
 var installCommand = new Command("install", "Install Nexus and App to the local install directory");
 installCommand.SetAction(async (_, _) => { await Program.RunInstallAsync(); });
 
+// --- nexus build ---
+var buildConfigOption = new Option<string>("--configuration", "-c") { Description = "Build configuration", DefaultValueFactory = _ => "Release" };
+var buildCommand = new Command("build", "Build the solution from the repository") { buildConfigOption };
+buildCommand.SetAction(async (parseResult, _) =>
+{
+    var config = parseResult.GetValue(buildConfigOption)!;
+    await Program.RunBuildAsync(config);
+});
+
 // --- nexus update ---
 var updateComponentOption = new Option<string>("--component") { Description = "Component to update (nexus, app, or both)", DefaultValueFactory = _ => "both" };
 var updateCommand = new Command("update", "Update a component from staging") { updateComponentOption };
@@ -100,6 +109,7 @@ var rootCommand = new RootCommand("CopilotFamily Nexus — Copilot session manag
 rootCommand.Subcommands.Add(startCommand);
 rootCommand.Subcommands.Add(stopCommand);
 rootCommand.Subcommands.Add(statusCommand);
+rootCommand.Subcommands.Add(buildCommand);
 rootCommand.Subcommands.Add(installCommand);
 rootCommand.Subcommands.Add(updateCommand);
 rootCommand.Subcommands.Add(publishCommand);
@@ -115,7 +125,7 @@ public partial class Program
     internal static bool IsCliCommand(string[] args)
     {
         if (args.Length == 0) return false;
-        string[] commands = ["start", "stop", "status", "install", "update", "publish", "winapp", "--help", "-h", "-?"];
+        string[] commands = ["start", "stop", "status", "build", "install", "update", "publish", "winapp", "--help", "-h", "-?"];
         return commands.Contains(args[0], StringComparer.OrdinalIgnoreCase);
     }
 
@@ -334,6 +344,74 @@ public partial class Program
         table.AddRow("Log dir", Markup.Escape(CopilotFamilyPaths.Logs));
 
         AnsiConsole.Write(table);
+    }
+
+    // --- build ---
+    internal static async Task RunBuildAsync(string configuration)
+    {
+        var repoRoot = FindRepoRoot(AppContext.BaseDirectory);
+        if (repoRoot == null)
+        {
+            AnsiConsole.MarkupLine("[red]Cannot find repository root.[/] Run from within the repo.");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var slnPath = Path.Combine(repoRoot, "CopilotFamily.slnx");
+
+        var rule = new Rule($"[bold blue]Building CopilotFamily[/] [dim]({configuration})[/]").LeftJustified();
+        AnsiConsole.Write(rule);
+        AnsiConsole.MarkupLine($"  Solution: [dim]{Markup.Escape(slnPath)}[/]");
+        AnsiConsole.WriteLine();
+
+        var sw = Stopwatch.StartNew();
+
+        var exitCode = await AnsiConsole.Status()
+            .Spinner(Spinner.Known.Dots)
+            .SpinnerStyle(Style.Parse("blue"))
+            .StartAsync("Building...", async _ =>
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "dotnet",
+                    Arguments = $"build \"{slnPath}\" -c {configuration} --nologo -v q",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    WorkingDirectory = repoRoot,
+                };
+
+                var proc = Process.Start(psi)!;
+                var stdout = await proc.StandardOutput.ReadToEndAsync();
+                var stderr = await proc.StandardError.ReadToEndAsync();
+                await proc.WaitForExitAsync();
+
+                if (proc.ExitCode != 0)
+                {
+                    AnsiConsole.MarkupLine("[red]✗ Build failed[/]");
+                    AnsiConsole.WriteLine();
+                    if (!string.IsNullOrWhiteSpace(stderr))
+                        AnsiConsole.MarkupLine(Markup.Escape(stderr.Trim()));
+                    if (!string.IsNullOrWhiteSpace(stdout))
+                        AnsiConsole.MarkupLine(Markup.Escape(stdout.Trim()));
+                }
+
+                return proc.ExitCode;
+            });
+
+        sw.Stop();
+
+        if (exitCode == 0)
+        {
+            AnsiConsole.MarkupLine($"[green]✓ Build succeeded[/] in [bold]{sw.Elapsed.TotalSeconds:F1}s[/]");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("Next: [blue]nexus publish[/] to stage the update.");
+        }
+        else
+        {
+            Environment.ExitCode = 1;
+        }
     }
 
     // --- install ---

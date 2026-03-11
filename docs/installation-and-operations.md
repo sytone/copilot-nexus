@@ -40,10 +40,18 @@ Everything installs under `%LOCALAPPDATA%\CopilotFamily\`:
 From the repo root:
 
 ```powershell
+# Via nexus CLI (recommended after install)
+nexus build
+
+# Or with a specific configuration
+nexus build -c Debug
+
+# Or directly with dotnet
 dotnet build CopilotFamily.slnx
 ```
 
-This builds all projects: Core, App, Nexus, and test projects.
+This builds all projects: Core, App, Nexus, and test projects. On success it
+shows elapsed time and suggests `nexus publish` as the next step.
 
 ---
 
@@ -273,13 +281,13 @@ Click **Restart now** to apply the update.
 
 ```powershell
 # Build, stage, and apply in one go
-nexus publish && nexus update
+nexus build && nexus publish && nexus update
 ```
 
 Or for just the app (auto-detected):
 
 ```powershell
-nexus publish --component app
+nexus build && nexus publish --component app
 # → App shows update banner → click Restart
 ```
 
@@ -300,6 +308,7 @@ The `update` command:
 | `nexus start [--url URL] [--interactive]` | Start Nexus (background by default; `--interactive` for foreground) |
 | `nexus stop` | Stop the running Nexus process |
 | `nexus status [--url URL]` | Check if Nexus is running and show info |
+| `nexus build [-c CONFIG]` | Build the solution from the repo (default: Release) |
 | `nexus install` | Build and install both Nexus and App |
 | `nexus publish [--component C]` | Build and stage an update (`nexus`, `app`, or `both`). Requires prior `nexus install`. |
 | `nexus update [--component C]` | Apply staged update (`nexus`, `app`, or `both`) |
