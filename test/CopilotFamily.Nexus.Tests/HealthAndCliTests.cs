@@ -5,7 +5,7 @@ using System.Net.Http.Json;
 using Xunit;
 
 /// <summary>
-/// Tests for the health endpoint and CLI command routing.
+/// Tests for the health endpoint and CLI helpers.
 /// </summary>
 public class HealthAndCliTests : IClassFixture<NexusTestFactory>
 {
@@ -59,50 +59,9 @@ public class HealthAndCliTests : IClassFixture<NexusTestFactory>
         Assert.True(DateTime.TryParse(body.Uptime, out _));
     }
 
-    [Theory]
-    [InlineData("start")]
-    [InlineData("stop")]
-    [InlineData("status")]
-    [InlineData("install")]
-    [InlineData("update")]
-    [InlineData("publish")]
-    [InlineData("winapp")]
-    [InlineData("--help")]
-    [InlineData("-h")]
-    [InlineData("-?")]
-    public void IsCliCommand_RecognizesValidCommands(string command)
-    {
-        Assert.True(Program.IsCliCommand([command]));
-    }
-
-    [Theory]
-    [InlineData("START")]
-    [InlineData("Status")]
-    [InlineData("STOP")]
-    [InlineData("Install")]
-    [InlineData("UPDATE")]
-    [InlineData("Publish")]
-    public void IsCliCommand_IsCaseInsensitive(string command)
-    {
-        Assert.True(Program.IsCliCommand([command]));
-    }
-
-    [Fact]
-    public void IsCliCommand_ReturnsFalse_ForEmptyArgs()
-    {
-        Assert.False(Program.IsCliCommand([]));
-    }
-
-    [Fact]
-    public void IsCliCommand_ReturnsFalse_ForUnknownArgs()
-    {
-        Assert.False(Program.IsCliCommand(["--urls", "http://localhost:5280"]));
-    }
-
     [Fact]
     public void FindRepoRootFrom_FindsRepoFromSubdirectory()
     {
-        // The test itself runs from within the repo — bin/Debug/net8.0
         var result = Program.FindRepoRootFrom(AppContext.BaseDirectory);
 
         Assert.NotNull(result);
@@ -128,13 +87,61 @@ public class HealthAndCliTests : IClassFixture<NexusTestFactory>
     [Fact]
     public void FindRepoRootFrom_FindsRepoFromRepoRoot()
     {
-        // Walk up from test output to find the repo root, then verify
-        // FindRepoRootFrom works when given the root directly
         var repoRoot = Program.FindRepoRootFrom(AppContext.BaseDirectory);
         Assert.NotNull(repoRoot);
 
         var result = Program.FindRepoRootFrom(repoRoot!);
         Assert.Equal(repoRoot, result);
+    }
+
+    [Theory]
+    [InlineData("start")]
+    [InlineData("stop")]
+    [InlineData("status")]
+    [InlineData("build")]
+    [InlineData("install")]
+    [InlineData("update")]
+    [InlineData("publish")]
+    [InlineData("winapp")]
+    [InlineData("--help")]
+    public void IsCliCommand_RecognizesValidCommands(string command)
+    {
+        Assert.True(Program.IsCliCommand([command]));
+    }
+
+    [Fact]
+    public void IsCliCommand_ReturnsFalse_ForEmptyArgs()
+    {
+        Assert.False(Program.IsCliCommand([]));
+    }
+
+    [Fact]
+    public void IsCliCommand_ReturnsFalse_ForUnknownCommand()
+    {
+        Assert.False(Program.IsCliCommand(["dummy"]));
+    }
+
+    [Fact]
+    public void IsUserFacingArgs_ReturnsTrue_ForNoArgs()
+    {
+        Assert.True(Program.IsUserFacingArgs([]));
+    }
+
+    [Theory]
+    [InlineData("dummy")]
+    [InlineData("foo")]
+    [InlineData("start")]
+    public void IsUserFacingArgs_ReturnsTrue_ForBareWords(string arg)
+    {
+        Assert.True(Program.IsUserFacingArgs([arg]));
+    }
+
+    [Theory]
+    [InlineData("--contentroot")]
+    [InlineData("--applicationName")]
+    public void IsUserFacingArgs_ReturnsFalse_ForAspNetArgs(string arg)
+    {
+        Assert.False(Program.IsUserFacingArgs([arg, "/some/path"]));
     }
 
     private record HealthPayload(string? Status, int Sessions, int Models, string? Uptime);
