@@ -9,11 +9,16 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// WebApplicationFactory that swaps the real SDK for mock services.
-/// The Program entry point creates a WebApplication directly (no-args path),
-/// which WebApplicationFactory intercepts via HostFactoryResolver.
+/// Sets NEXUS_TEST_MODE so Program.Main takes the web host path
+/// instead of System.CommandLine routing.
 /// </summary>
 public class NexusTestFactory : WebApplicationFactory<Program>
 {
+    public NexusTestFactory()
+    {
+        Environment.SetEnvironmentVariable("NEXUS_TEST_MODE", "1");
+    }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureServices(services =>
@@ -41,5 +46,11 @@ public class NexusTestFactory : WebApplicationFactory<Program>
                 return new SessionManager(client, logger);
             });
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        Environment.SetEnvironmentVariable("NEXUS_TEST_MODE", null);
     }
 }

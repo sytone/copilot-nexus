@@ -94,55 +94,5 @@ public class HealthAndCliTests : IClassFixture<NexusTestFactory>
         Assert.Equal(repoRoot, result);
     }
 
-    [Theory]
-    [InlineData("start")]
-    [InlineData("stop")]
-    [InlineData("status")]
-    [InlineData("build")]
-    [InlineData("install")]
-    [InlineData("update")]
-    [InlineData("publish")]
-    [InlineData("winapp")]
-    [InlineData("--help")]
-    public void IsCliCommand_RecognizesValidCommands(string command)
-    {
-        Assert.True(Program.IsCliCommand([command]));
-    }
-
-    [Fact]
-    public void IsCliCommand_ReturnsFalse_ForEmptyArgs()
-    {
-        Assert.False(Program.IsCliCommand([]));
-    }
-
-    [Fact]
-    public void IsCliCommand_ReturnsFalse_ForUnknownCommand()
-    {
-        Assert.False(Program.IsCliCommand(["dummy"]));
-    }
-
-    [Fact]
-    public void IsUserFacingArgs_ReturnsTrue_ForNoArgs()
-    {
-        Assert.True(Program.IsUserFacingArgs([]));
-    }
-
-    [Theory]
-    [InlineData("dummy")]
-    [InlineData("foo")]
-    [InlineData("start")]
-    public void IsUserFacingArgs_ReturnsTrue_ForBareWords(string arg)
-    {
-        Assert.True(Program.IsUserFacingArgs([arg]));
-    }
-
-    [Theory]
-    [InlineData("--contentroot")]
-    [InlineData("--applicationName")]
-    public void IsUserFacingArgs_ReturnsFalse_ForAspNetArgs(string arg)
-    {
-        Assert.False(Program.IsUserFacingArgs([arg, "/some/path"]));
-    }
-
     private record HealthPayload(string? Status, int Sessions, int Models, string? Uptime);
 }

@@ -7,25 +7,15 @@ using CopilotFamily.Nexus;
 using Serilog;
 using Spectre.Console;
 
-// WebApplicationFactory invokes Main() to discover the web host via HostFactoryResolver.
-// It may pass ASP.NET-internal args (e.g., --contentroot) that aren't CLI commands.
-// Those must reach CreateBuilder() so the factory can intercept it.
-//
-// For real users:
-//   - No args → show help (via System.CommandLine root command)
-//   - Unknown command (e.g., "dummy") → System.CommandLine shows error + help
-//   - Known command → System.CommandLine dispatches to handler
-//
-// We detect the WebApplicationFactory scenario by checking for ASP.NET-style args
-// that are NOT our CLI commands.
-if (args.Length > 0 && !Program.IsCliCommand(args) && !Program.IsUserFacingArgs(args))
+// WebApplicationFactory needs a code path that builds a WebApplication host
+// so HostFactoryResolver can intercept it. We set NEXUS_TEST_MODE in the
+// test factory to signal this — all other invocations go through System.CommandLine.
+if (Environment.GetEnvironmentVariable("NEXUS_TEST_MODE") == "1")
 {
-    // ASP.NET-style args from WebApplicationFactory — build the host directly
     var builder = NexusHostBuilder.CreateBuilder(args);
     var app = NexusHostBuilder.ConfigureApp(builder.Build());
     var mgr = app.Services.GetRequiredService<ISessionManager>();
     await mgr.InitializeAsync();
-    Log.Information("Nexus service starting");
     await app.RunAsync();
     return 0;
 }
@@ -132,29 +122,6 @@ record HealthResponse(string? Status, int Sessions, int Models, string? Uptime);
 /// <summary>Partial class with command implementations.</summary>
 public partial class Program
 {
-    /// <summary>
-    /// Checks if the first arg matches a known CLI command.
-    /// Unknown args fall through to the web host path (needed for WebApplicationFactory).
-    /// </summary>
-    internal static bool IsCliCommand(string[] args)
-    {
-        if (args.Length == 0) return false;
-        string[] commands = ["start", "stop", "status", "build", "install", "update", "publish", "winapp", "--help", "-h", "-?"];
-        return commands.Contains(args[0], StringComparer.OrdinalIgnoreCase);
-    }
-
-    /// <summary>
-    /// Returns true if the args look like a user typed them at the command line
-    /// (no args, or unrecognized commands like "dummy"), as opposed to ASP.NET
-    /// internal args from WebApplicationFactory (e.g. --contentroot, --applicationName).
-    /// </summary>
-    internal static bool IsUserFacingArgs(string[] args)
-    {
-        if (args.Length == 0) return true;
-        // ASP.NET/hosting args always start with -- and are key-value pairs
-        // User-typed unknown commands are bare words like "dummy"
-        return !args[0].StartsWith("--");
-    }
 
     // --- start (background) ---
     internal static void RunStartBackground(string url)
