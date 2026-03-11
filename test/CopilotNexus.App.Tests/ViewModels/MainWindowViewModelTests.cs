@@ -163,6 +163,24 @@ public class MainWindowViewModelTests : IDisposable
         Assert.DoesNotContain("SelectedTab", changedProps);
     }
 
+    [Fact]
+    public void ShowUpdateNotification_WithVersionTransition_SetsBannerText()
+    {
+        _viewModel.ShowUpdateNotification("1.0.0", "1.1.0");
+
+        Assert.True(_viewModel.IsUpdateAvailable);
+        Assert.Equal("Update available: 1.0.0 → 1.1.0.", _viewModel.UpdateNotificationText);
+    }
+
+    [Fact]
+    public void ShowUpdateNotification_WithoutVersions_UsesDefaultText()
+    {
+        _viewModel.ShowUpdateNotification();
+
+        Assert.True(_viewModel.IsUpdateAvailable);
+        Assert.Equal("A new version is available.", _viewModel.UpdateNotificationText);
+    }
+
     private void SetupSessionCreation(string name)
     {
         var sessionInfo = new SessionInfo(name);

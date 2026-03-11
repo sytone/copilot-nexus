@@ -74,6 +74,21 @@ public class UpdaterServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task CopyStagingAsync_SkipsUpdaterArtifacts()
+    {
+        await CreateFakeFile(Path.Combine(_installDir, "CopilotNexus.Updater.dll"), "installed-updater");
+        await CreateFakeFile(Path.Combine(_stagingDir, "CopilotNexus.Updater.dll"), "staged-updater");
+        await CreateFakeFile(Path.Combine(_stagingDir, "CopilotNexus.App.dll"), "staged-app");
+
+        var svc = CreateService();
+        var result = await svc.CopyStagingAsync(_stagingDir, _installDir, CancellationToken.None);
+
+        Assert.True(result);
+        Assert.Equal("installed-updater", await File.ReadAllTextAsync(Path.Combine(_installDir, "CopilotNexus.Updater.dll")));
+        Assert.Equal("staged-app", await File.ReadAllTextAsync(Path.Combine(_installDir, "CopilotNexus.App.dll")));
+    }
+
+    [Fact]
     public async Task CopyStagingAsync_SkipsWhenStagingEmpty()
     {
         var svc = CreateService();

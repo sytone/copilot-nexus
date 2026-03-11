@@ -16,6 +16,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     private bool _disposed;
     private string? _statusText;
     private bool _isUpdateAvailable;
+    private string _updateNotificationText = "A new version is available.";
     private ModelInfo? _selectedModel;
 
     public ObservableCollection<SessionTabViewModel> Tabs { get; } = new();
@@ -39,6 +40,12 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     {
         get => _isUpdateAvailable;
         set => SetProperty(ref _isUpdateAvailable, value);
+    }
+
+    public string UpdateNotificationText
+    {
+        get => _updateNotificationText;
+        private set => SetProperty(ref _updateNotificationText, value);
     }
 
     /// <summary>Default model for new sessions (user can override per-tab).</summary>
@@ -82,9 +89,32 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         DismissUpdateCommand = new RelayCommand(OnDismissUpdate);
     }
 
-    public void ShowUpdateNotification()
+    public void ShowUpdateNotification(string? currentVersion = null, string? availableVersion = null)
     {
-        _dispatcher.BeginInvoke(() => IsUpdateAvailable = true);
+        _dispatcher.BeginInvoke(() =>
+        {
+            UpdateNotificationText = BuildUpdateNotificationText(currentVersion, availableVersion);
+            IsUpdateAvailable = true;
+        });
+    }
+
+    private static string BuildUpdateNotificationText(string? currentVersion, string? availableVersion)
+    {
+        var current = string.IsNullOrWhiteSpace(currentVersion) ? null : currentVersion;
+        var available = string.IsNullOrWhiteSpace(availableVersion) ? null : availableVersion;
+
+        if (current != null && available != null)
+        {
+            if (string.Equals(current, available, StringComparison.OrdinalIgnoreCase))
+                return $"Update available: version {available}.";
+
+            return $"Update available: {current} → {available}.";
+        }
+
+        if (available != null)
+            return $"Update available: {available}.";
+
+        return "A new version is available.";
     }
 
     private void OnRestartNow()

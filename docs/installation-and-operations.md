@@ -295,7 +295,8 @@ nexus update --component cli
 
 The desktop app watches its staging directory automatically. When you run
 `nexus publish --component app`, the app will show an "Update available" banner.
-Click **Restart now** to apply the update.
+The banner shows the current and available versions. Click **Restart now** to
+apply the update.
 
 ### Quick update cycle
 

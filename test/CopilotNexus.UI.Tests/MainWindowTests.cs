@@ -111,4 +111,16 @@ public class MainWindowTests
         var tabControl = window.FindControl<TabControl>("SessionTabControl");
         Assert.NotNull(tabControl);
     }
+
+    [AvaloniaFact]
+    public void MainWindow_UsesStarSizedContentRow()
+    {
+        var window = CreateTestWindow();
+        window.Show();
+
+        var root = window.Content as Grid;
+        Assert.NotNull(root);
+        Assert.Equal(3, root.RowDefinitions.Count);
+        Assert.True(root.RowDefinitions[1].Height.IsStar);
+    }
 }

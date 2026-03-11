@@ -136,4 +136,22 @@ public class SessionTabTests
         Assert.NotNull(tabControl);
         Assert.Equal(1, tabControl.ItemCount);
     }
+
+    [AvaloniaFact]
+    public async Task SessionTabView_UsesBottomInputLayout()
+    {
+        var (window, vm) = await CreateWindowWithTabAsync();
+
+        var sessionView = window.GetVisualDescendants().OfType<SessionTabView>().FirstOrDefault();
+        Assert.NotNull(sessionView);
+
+        var layoutGrid = sessionView.Content as Grid;
+        Assert.NotNull(layoutGrid);
+        Assert.Equal(3, layoutGrid.RowDefinitions.Count);
+        Assert.True(layoutGrid.RowDefinitions[1].Height.IsStar);
+
+        var inputContainer = sessionView.FindControl<Border>("InputContainer");
+        Assert.NotNull(inputContainer);
+        Assert.Equal(2, Grid.GetRow(inputContainer));
+    }
 }

@@ -108,7 +108,10 @@ public partial class MainWindow : Window
         _updateService = new StagingUpdateDetectionService(stagingDir, _logger);
         _updateService.UpdateAvailable += (_, _) =>
         {
-            Dispatcher.UIThread.Post(() => _viewModel.ShowUpdateNotification());
+            var currentVersion = GetExecutableVersion(Environment.ProcessPath);
+            var stagedApp = Path.Combine(CopilotNexus.Core.CopilotNexusPaths.AppStaging, "CopilotNexus.App.exe");
+            var availableVersion = GetExecutableVersion(stagedApp);
+            Dispatcher.UIThread.Post(() => _viewModel.ShowUpdateNotification(currentVersion, availableVersion));
         };
         _updateService.StartWatching();
     }
@@ -183,6 +186,18 @@ public partial class MainWindow : Window
 
         throw new FileNotFoundException(
             "CopilotNexus.Updater.exe not found. Ensure it is published alongside the app.");
+    }
+
+    private static string? GetExecutableVersion(string? exePath)
+    {
+        if (string.IsNullOrWhiteSpace(exePath) || !File.Exists(exePath))
+            return null;
+
+        var info = FileVersionInfo.GetVersionInfo(exePath);
+        if (!string.IsNullOrWhiteSpace(info.ProductVersion))
+            return info.ProductVersion;
+
+        return string.IsNullOrWhiteSpace(info.FileVersion) ? null : info.FileVersion;
     }
 
     private void CloseTab_Click(object? sender, RoutedEventArgs e)

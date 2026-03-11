@@ -112,7 +112,8 @@ public class UpdaterService
         {
             try
             {
-                CopyDirectory(stagingPath, installPath);
+                // Updater cannot replace its own binaries while running.
+                CopyDirectory(stagingPath, installPath, sourceFile => !IsUpdaterArtifact(sourceFile));
                 _log($"Copy succeeded on attempt {attempt}.");
                 return true;
             }
@@ -166,15 +167,25 @@ public class UpdaterService
     }
 
     /// <summary>Recursively copies all files from source to destination.</summary>
-    internal static void CopyDirectory(string sourceDir, string destDir)
+    internal static void CopyDirectory(string sourceDir, string destDir, Func<string, bool>? shouldCopyFile = null)
     {
         foreach (var srcFile in Directory.GetFiles(sourceDir, "*", SearchOption.AllDirectories))
         {
+            if (shouldCopyFile != null && !shouldCopyFile(srcFile))
+                continue;
+
             var relativePath = Path.GetRelativePath(sourceDir, srcFile);
             var destFile = Path.Combine(destDir, relativePath);
             var destFileDir = Path.GetDirectoryName(destFile)!;
             Directory.CreateDirectory(destFileDir);
             File.Copy(srcFile, destFile, overwrite: true);
         }
+    }
+
+    private static bool IsUpdaterArtifact(string sourceFile)
+    {
+        var fileName = Path.GetFileName(sourceFile);
+        return fileName.StartsWith("CopilotNexus.Updater.", StringComparison.OrdinalIgnoreCase)
+            || fileName.Equals("CopilotNexus.Updater.exe", StringComparison.OrdinalIgnoreCase);
     }
 }

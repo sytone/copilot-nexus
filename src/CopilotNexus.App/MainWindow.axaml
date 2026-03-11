@@ -19,7 +19,7 @@
         <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseTabCommand}"/>
     </Window.KeyBindings>
 
-    <Grid RowDefinitions="Auto,Auto,*,Auto">
+    <Grid RowDefinitions="Auto,*,Auto">
 
         <!-- Update notification bar -->
         <Border Grid.Row="0"
@@ -43,28 +43,15 @@
                             BorderBrush="#FFFFFF40"
                             Margin="8,0,0,0"/>
                 </StackPanel>
-                <TextBlock Text="A new version is available."
+                <TextBlock Text="{Binding UpdateNotificationText}"
                            Foreground="White"
                            FontSize="13"
                            VerticalAlignment="Center"/>
             </DockPanel>
         </Border>
 
-        <!-- Top bar with New Session button and tabs -->
-        <DockPanel Grid.Row="1" Background="{StaticResource SurfaceBrush}">
-            <Button DockPanel.Dock="Right"
-                    Content="＋ New Session"
-                    Command="{Binding NewTabCommand}"
-                    Name="NewSessionButton"
-                    FontSize="12"
-                    Padding="12,6"
-                    Margin="4"
-                    Background="Transparent"
-                    Foreground="{StaticResource ForegroundBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    Cursor="Hand"
-                    ToolTip.Tip="New Session (Ctrl+T)"/>
-
+        <!-- Main content area -->
+        <Grid Grid.Row="1">
             <TabControl ItemsSource="{Binding Tabs}"
                         SelectedItem="{Binding SelectedTab}"
                         Name="SessionTabControl"
@@ -99,27 +86,40 @@
                     </DataTemplate>
                 </TabControl.ContentTemplate>
             </TabControl>
-        </DockPanel>
 
-        <!-- Welcome message when no tabs are open -->
-        <StackPanel Grid.Row="2"
-                    VerticalAlignment="Center"
-                    HorizontalAlignment="Center"
-                    IsVisible="{Binding Tabs.Count, Converter={StaticResource EmptyToVisible}}">
-            <TextBlock Text="Copilot Nexus"
-                       FontSize="36"
-                       FontWeight="Light"
-                       Foreground="{StaticResource ForegroundBrush}"
-                       HorizontalAlignment="Center"
-                       Margin="0,0,0,12"/>
-            <TextBlock Text="Press Ctrl+T or click ＋ New Session to get started"
-                       FontSize="14"
-                       Foreground="{StaticResource SystemMessageBrush}"
-                       HorizontalAlignment="Center"/>
-        </StackPanel>
+            <Button Content="＋ New Session"
+                    Command="{Binding NewTabCommand}"
+                    Name="NewSessionButton"
+                    FontSize="12"
+                    Padding="12,6"
+                    Margin="8"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    Background="Transparent"
+                    Foreground="{StaticResource ForegroundBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    Cursor="Hand"
+                    ToolTip.Tip="New Session (Ctrl+T)"/>
+
+            <!-- Welcome message when no tabs are open -->
+            <StackPanel VerticalAlignment="Center"
+                        HorizontalAlignment="Center"
+                        IsVisible="{Binding Tabs.Count, Converter={StaticResource EmptyToVisible}}">
+                <TextBlock Text="Copilot Nexus"
+                           FontSize="36"
+                           FontWeight="Light"
+                           Foreground="{StaticResource ForegroundBrush}"
+                           HorizontalAlignment="Center"
+                           Margin="0,0,0,12"/>
+                <TextBlock Text="Press Ctrl+T or click ＋ New Session to get started"
+                           FontSize="14"
+                           Foreground="{StaticResource SystemMessageBrush}"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Grid>
 
         <!-- Status bar -->
-        <Border Grid.Row="3"
+        <Border Grid.Row="2"
                 Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,1,0,0"
