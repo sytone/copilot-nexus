@@ -8,6 +8,10 @@ public class CopilotNexusPathsTests
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "CopilotNexus");
 
+    private static readonly string ExpectedUserConfigRoot = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".copilot-nexus");
+
     [Fact]
     public void Root_IsUnderLocalAppData()
     {
@@ -63,9 +67,15 @@ public class CopilotNexusPathsTests
     }
 
     [Fact]
-    public void AppStateFile_IsUnderRoot()
+    public void UserConfigRoot_IsUnderUserProfile()
     {
-        Assert.Equal(Path.Combine(ExpectedRoot, "app-state.json"), CopilotNexusPaths.AppStateFile);
+        Assert.Equal(ExpectedUserConfigRoot, CopilotNexusPaths.UserConfigRoot);
+    }
+
+    [Fact]
+    public void AppStateFile_IsUnderUserConfigRoot()
+    {
+        Assert.Equal(Path.Combine(ExpectedUserConfigRoot, "session-state.json"), CopilotNexusPaths.AppStateFile);
     }
 
     [Fact]
@@ -152,6 +162,7 @@ public class CopilotNexusPathsTests
         Assert.True(Directory.Exists(CopilotNexusPaths.NexusStaging));
         Assert.True(Directory.Exists(CopilotNexusPaths.AppStaging));
         Assert.True(Directory.Exists(CopilotNexusPaths.Logs));
+        Assert.True(Directory.Exists(CopilotNexusPaths.UserConfigRoot));
     }
 
     [Fact]

@@ -27,8 +27,13 @@ Everything installs under `%LOCALAPPDATA%\CopilotNexus\`:
 │   ├── nexus\
 │   └── app\
 ├── logs\               ← Shared log files
-├── app-state.json      ← Saved tab/session state
 └── nexus.lock          ← PID file for the running Nexus process
+```
+
+User-specific app state is stored separately at:
+
+```
+%USERPROFILE%\.copilot-nexus\session-state.json
 ```
 
 > **Important:** The `staging/` folder is a sibling of the install dirs — updates are

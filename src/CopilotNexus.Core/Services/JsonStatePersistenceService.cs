@@ -6,7 +6,7 @@ using CopilotNexus.Core.Models;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
-/// Persists application state as JSON to the local app data folder.
+/// Persists application state as JSON to the user configuration folder.
 /// Uses atomic writes (write to .tmp, then rename) to prevent corruption.
 /// Only stores lightweight tab metadata — the SDK handles conversation history.
 /// </summary>
@@ -131,8 +131,6 @@ public class JsonStatePersistenceService : IStatePersistenceService
 
     private static string GetDefaultStatePath()
     {
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "CopilotNexus", "state", "session-state.json");
+        return CopilotNexusPaths.AppStateFile;
     }
 }

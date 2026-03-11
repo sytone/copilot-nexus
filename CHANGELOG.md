@@ -17,6 +17,7 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - **CLI/Service split** — `CopilotNexus.Service` is now a pure ASP.NET Core web host (~40 lines) with no CLI commands, no Spectre.Console, and no System.CommandLine; all CLI functionality moved to `CopilotNexus.Cli`
 - `nexus` alias now points to `CopilotNexus.Cli.exe` instead of `CopilotNexus.Service.exe`
 - `CopilotNexusPaths.NexusExe` replaced by `CliExe` (CLI entry point) and `ServiceExe` (web server)
+- User-specific session state moved from `%LOCALAPPDATA%\CopilotNexus\...` to `%USERPROFILE%\.copilot-nexus\session-state.json`; install/runtime binaries remain under `%LOCALAPPDATA%\CopilotNexus\`
 
 ### Added (prior)
 

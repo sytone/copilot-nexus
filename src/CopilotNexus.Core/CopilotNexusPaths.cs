@@ -2,7 +2,8 @@ namespace CopilotNexus.Core;
 
 /// <summary>
 /// Centralized path definitions for the CopilotNexus installation layout.
-/// All paths are rooted at %LOCALAPPDATA%\CopilotNexus\.
+/// Install/runtime binaries live under %LOCALAPPDATA%\CopilotNexus\.
+/// User-specific app configuration/state lives under %USERPROFILE%\.copilot-nexus\.
 /// </summary>
 public static class CopilotNexusPaths
 {
@@ -35,8 +36,13 @@ public static class CopilotNexusPaths
     /// <summary>PID lock file for the Nexus service process.</summary>
     public static string NexusLockFile { get; } = Path.Combine(Root, "nexus.lock");
 
+    /// <summary>User-specific config root: %USERPROFILE%\.copilot-nexus\.</summary>
+    public static string UserConfigRoot { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".copilot-nexus");
+
     /// <summary>Application state file (tab layout, session IDs).</summary>
-    public static string AppStateFile { get; } = Path.Combine(Root, "app-state.json");
+    public static string AppStateFile { get; } = Path.Combine(UserConfigRoot, "session-state.json");
 
     /// <summary>CLI executable — the 'nexus' command users interact with.</summary>
     public static string CliExe { get; } = Path.Combine(CliInstall, "CopilotNexus.Cli.exe");
@@ -61,6 +67,7 @@ public static class CopilotNexusPaths
         Directory.CreateDirectory(NexusStaging);
         Directory.CreateDirectory(AppStaging);
         Directory.CreateDirectory(Logs);
+        Directory.CreateDirectory(UserConfigRoot);
     }
 
     /// <summary>

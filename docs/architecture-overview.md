@@ -183,7 +183,7 @@ production, or locally in test mode):
    session data when the user explicitly closes a tab.
 
 5. **App state file** — only lightweight metadata is persisted locally:
-   `%LOCALAPPDATA%\CopilotNexus\app-state.json` stores tab names, models, and SDK
+   `%USERPROFILE%\\.copilot-nexus\\session-state.json` stores tab names, models, and SDK
    session IDs. The SDK handles all conversation history.
 
 ## Distribution and Hot Restart

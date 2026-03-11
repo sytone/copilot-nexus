@@ -53,7 +53,7 @@ launch. The user returns to exactly where they left off.
 ## Background
 
 ```gherkin
-Given the state file is stored at "%LOCALAPPDATA%/CopilotNexus/state/session-state.json"
+Given the state file is stored at "%USERPROFILE%/.copilot-nexus/session-state.json"
 And the state file contains tab metadata: name, model, SDK session ID, and tab order
 And SDK session data is stored at "~/.copilot/session-state/{sessionId}/"
 And the state file includes a schema version for forward compatibility
@@ -80,7 +80,7 @@ And "Session 2" is open with SDK session ID "copilot-nexus-2-1706932801"
 And "Session 1" is the selected tab
 When the user closes the application
 Then each SDK session is disconnected (not disposed) to preserve state on disk
-And a state file is written to "%LOCALAPPDATA%/CopilotNexus/state/session-state.json"
+And a state file is written to "%USERPROFILE%/.copilot-nexus/session-state.json"
 And the state file contains tab metadata for 2 tabs (name, model, SDK session ID)
 And the selected tab index is 0
 And the session counter is preserved

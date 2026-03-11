@@ -95,3 +95,4 @@ docs/                             Project documentation
 - [Installation & Operations Guide](docs/installation-and-operations.md) — Install, run, update, troubleshoot
 - [Architecture Overview](docs/architecture-overview.md) — Detailed design and patterns
 - [Testing Guide](docs/testing-guide.md) — Test structure and conventions
+- [Configuration Management](docs/configuration-management.md) — Runtime args, persisted state, and user-local paths
