@@ -470,12 +470,13 @@ public partial class Program
                     {
                         ctx.Status("Stopping Nexus for update...");
                         RunStop();
-                        await Task.Delay(2000);
+                        // Wait for process to fully exit and release file locks
+                        await WaitForFileLockRelease(installPath, 15);
                     }
 
-                    // Copy staging to install
+                    // Copy staging to install with retry for lingering locks
                     ctx.Status($"Copying {comp} files...");
-                    CopyDirectory(stagingPath, installPath);
+                    await CopyDirectoryWithRetryAsync(stagingPath, installPath);
 
                     // Clear staging
                     ctx.Status("Clearing staging...");
@@ -696,6 +697,52 @@ public partial class Program
         {
             var destDir = Path.Combine(destination, Path.GetFileName(dir));
             CopyDirectory(dir, destDir);
+        }
+    }
+
+    /// <summary>
+    /// Copies a directory with retry logic for files locked by a recently-exited process.
+    /// </summary>
+    private static async Task CopyDirectoryWithRetryAsync(string source, string destination, int maxRetries = 10)
+    {
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                CopyDirectory(source, destination);
+                return;
+            }
+            catch (IOException) when (attempt < maxRetries)
+            {
+                await Task.Delay(1000);
+            }
+        }
+
+        // Final attempt — let the exception propagate
+        CopyDirectory(source, destination);
+    }
+
+    /// <summary>
+    /// Waits until files in the target directory are no longer locked.
+    /// </summary>
+    private static async Task WaitForFileLockRelease(string directory, int timeoutSeconds)
+    {
+        if (!Directory.Exists(directory)) return;
+
+        var testFile = Directory.GetFiles(directory, "*.dll", SearchOption.TopDirectoryOnly).FirstOrDefault();
+        if (testFile == null) return;
+
+        for (int i = 0; i < timeoutSeconds; i++)
+        {
+            try
+            {
+                using var fs = File.Open(testFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                return; // File is unlocked
+            }
+            catch (IOException)
+            {
+                await Task.Delay(1000);
+            }
         }
     }
 }
