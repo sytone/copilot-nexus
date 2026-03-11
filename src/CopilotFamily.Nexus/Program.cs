@@ -5,6 +5,7 @@ using CopilotFamily.Core;
 using CopilotFamily.Core.Interfaces;
 using CopilotFamily.Nexus;
 using Serilog;
+using Spectre.Console;
 
 // When invoked with no args or via WebApplicationFactory, start the server directly.
 // WebApplicationFactory intercepts WebApplication.CreateBuilder(args) to capture the host.
@@ -131,8 +132,8 @@ public partial class Program
                 try
                 {
                     Process.GetProcessById(existingPid);
-                    Console.WriteLine($"Nexus is already running (PID {existingPid}).");
-                    Console.WriteLine("Use 'nexus stop' first, or 'nexus start --interactive' to run in foreground.");
+                    AnsiConsole.MarkupLine($"[yellow]Nexus is already running[/] (PID [bold]{existingPid}[/]).");
+                    AnsiConsole.MarkupLine("Use [blue]nexus stop[/] first, or [blue]nexus start --interactive[/] to run in foreground.");
                     return;
                 }
                 catch (ArgumentException)
@@ -146,7 +147,7 @@ public partial class Program
         var exePath = Environment.ProcessPath;
         if (exePath == null)
         {
-            Console.Error.WriteLine("Cannot determine executable path. Use 'nexus start --interactive' instead.");
+            AnsiConsole.MarkupLine("[red]Cannot determine executable path.[/] Use [blue]nexus start --interactive[/] instead.");
             Environment.ExitCode = 1;
             return;
         }
@@ -164,14 +165,14 @@ public partial class Program
         var proc = Process.Start(psi);
         if (proc == null)
         {
-            Console.Error.WriteLine("Failed to start Nexus background process.");
+            AnsiConsole.MarkupLine("[red]Failed to start Nexus background process.[/]");
             Environment.ExitCode = 1;
             return;
         }
 
-        Console.WriteLine($"Nexus started in background (PID {proc.Id}).");
-        Console.WriteLine($"  URL: {url}");
-        Console.WriteLine("Use 'nexus status' to check or 'nexus stop' to stop.");
+        AnsiConsole.MarkupLine($"[green]✓[/] Nexus started in background (PID [bold]{proc.Id}[/])");
+        AnsiConsole.MarkupLine($"  URL: [link]{url}[/]");
+        AnsiConsole.MarkupLine("  Use [blue]nexus status[/] to check · [blue]nexus stop[/] to stop");
     }
 
     // --- start (interactive/foreground) ---
@@ -205,7 +206,7 @@ public partial class Program
         var lockFile = CopilotFamilyPaths.NexusLockFile;
         if (!File.Exists(lockFile))
         {
-            Console.Error.WriteLine("Nexus is not running (no lock file found)");
+            AnsiConsole.MarkupLine("[yellow]Nexus is not running[/] (no lock file found)");
             Environment.ExitCode = 1;
             return;
         }
@@ -213,7 +214,7 @@ public partial class Program
         var pidText = File.ReadAllText(lockFile).Trim();
         if (!int.TryParse(pidText, out var pid))
         {
-            Console.Error.WriteLine($"Invalid PID in lock file: {pidText}");
+            AnsiConsole.MarkupLine($"[red]Invalid PID in lock file:[/] {Markup.Escape(pidText)}");
             File.Delete(lockFile);
             Environment.ExitCode = 1;
             return;
@@ -222,14 +223,14 @@ public partial class Program
         try
         {
             var proc = Process.GetProcessById(pid);
-            Console.WriteLine($"Stopping Nexus (PID {pid})...");
+            AnsiConsole.MarkupLine($"Stopping Nexus (PID [bold]{pid}[/])...");
             proc.Kill(entireProcessTree: true);
             proc.WaitForExit(10_000);
-            Console.WriteLine("Nexus stopped.");
+            AnsiConsole.MarkupLine("[green]✓[/] Nexus stopped.");
         }
         catch (ArgumentException)
         {
-            Console.WriteLine($"Nexus process (PID {pid}) is not running. Cleaning up lock file.");
+            AnsiConsole.MarkupLine($"[yellow]Nexus process (PID {pid}) is not running.[/] Cleaning up lock file.");
         }
 
         DeleteLockFile();
@@ -240,19 +241,45 @@ public partial class Program
     {
         var baseUrl = url.TrimEnd('/');
 
-        // Check lock file for PID
+        // Gather process info
+        string processStatus;
+        string pidDisplay;
         var lockFile = CopilotFamilyPaths.NexusLockFile;
         if (File.Exists(lockFile))
         {
             var pidText = File.ReadAllText(lockFile).Trim();
-            Console.WriteLine($"Lock file PID: {pidText}");
+            if (int.TryParse(pidText, out var pid))
+            {
+                try
+                {
+                    Process.GetProcessById(pid);
+                    processStatus = "[green]Running[/]";
+                    pidDisplay = pid.ToString();
+                }
+                catch (ArgumentException)
+                {
+                    processStatus = "[yellow]Stale lock file[/]";
+                    pidDisplay = $"{pid} (dead)";
+                }
+            }
+            else
+            {
+                processStatus = "[red]Invalid lock file[/]";
+                pidDisplay = Markup.Escape(pidText);
+            }
         }
         else
         {
-            Console.WriteLine("Lock file: not found");
+            processStatus = "[grey]Not running[/]";
+            pidDisplay = "—";
         }
 
-        // Check health
+        // Query health endpoint
+        string serviceStatus;
+        string sessions = "—";
+        string models = "—";
+        string uptime = "—";
+
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
         try
         {
@@ -260,20 +287,19 @@ public partial class Program
             response.EnsureSuccessStatusCode();
 
             var health = await response.Content.ReadFromJsonAsync<HealthResponse>();
-            Console.WriteLine($"Nexus Status: {health?.Status ?? "Unknown"}");
-            Console.WriteLine($"  URL:       {baseUrl}");
-            Console.WriteLine($"  Sessions:  {health?.Sessions ?? 0}");
-            Console.WriteLine($"  Models:    {health?.Models ?? 0}");
-            Console.WriteLine($"  Timestamp: {health?.Uptime ?? "N/A"}");
+            serviceStatus = "[green]Responding[/]";
+            sessions = (health?.Sessions ?? 0).ToString();
+            models = (health?.Models ?? 0).ToString();
+            uptime = health?.Uptime ?? "—";
         }
         catch (HttpRequestException)
         {
-            Console.Error.WriteLine($"Nexus is not responding at {baseUrl}");
+            serviceStatus = "[red]Not responding[/]";
             Environment.ExitCode = 1;
         }
         catch (TaskCanceledException)
         {
-            Console.Error.WriteLine($"Nexus at {baseUrl} did not respond (timeout)");
+            serviceStatus = "[red]Timeout[/]";
             Environment.ExitCode = 1;
         }
 
@@ -282,8 +308,32 @@ public partial class Program
         var appStaging = CopilotFamilyPaths.AppStaging;
         var nexusHasUpdate = Directory.Exists(nexusStaging) && Directory.EnumerateFiles(nexusStaging).Any();
         var appHasUpdate = Directory.Exists(appStaging) && Directory.EnumerateFiles(appStaging).Any();
-        Console.WriteLine($"  Nexus update staged: {(nexusHasUpdate ? "yes" : "no")}");
-        Console.WriteLine($"  App update staged:   {(appHasUpdate ? "yes" : "no")}");
+
+        // Render status table
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .Title("[bold]Nexus Status[/]")
+            .AddColumn(new TableColumn("[bold]Property[/]").Width(22))
+            .AddColumn(new TableColumn("[bold]Value[/]"));
+
+        table.AddRow("Process", processStatus);
+        table.AddRow("PID", pidDisplay);
+        table.AddRow("URL", Markup.Escape(baseUrl));
+        table.AddRow("Health", serviceStatus);
+        table.AddRow("Sessions", sessions);
+        table.AddRow("Models", models);
+        table.AddRow("Started", Markup.Escape(uptime));
+
+        table.AddEmptyRow();
+        table.AddRow("Nexus update staged", nexusHasUpdate ? "[green]Yes[/]" : "[grey]No[/]");
+        table.AddRow("App update staged", appHasUpdate ? "[green]Yes[/]" : "[grey]No[/]");
+
+        // Paths
+        table.AddEmptyRow();
+        table.AddRow("Install dir", Markup.Escape(CopilotFamilyPaths.Root));
+        table.AddRow("Log dir", Markup.Escape(CopilotFamilyPaths.Logs));
+
+        AnsiConsole.Write(table);
     }
 
     // --- install ---
@@ -294,19 +344,32 @@ public partial class Program
         var repoRoot = FindRepoRoot(AppContext.BaseDirectory);
         if (repoRoot == null)
         {
-            Console.Error.WriteLine("Cannot find repository root. Run from within the repo.");
+            AnsiConsole.MarkupLine("[red]Cannot find repository root.[/] Run from within the repo.");
             Environment.ExitCode = 1;
             return;
         }
 
-        Console.WriteLine("Installing CopilotFamily...");
-        Console.WriteLine($"  Repo:    {repoRoot}");
-        Console.WriteLine($"  Install: {CopilotFamilyPaths.Root}");
+        var rule = new Rule("[bold blue]Installing CopilotFamily[/]").LeftJustified();
+        AnsiConsole.Write(rule);
+        AnsiConsole.MarkupLine($"  Repo:    [dim]{Markup.Escape(repoRoot)}[/]");
+        AnsiConsole.MarkupLine($"  Install: [dim]{Markup.Escape(CopilotFamilyPaths.Root)}[/]");
+        AnsiConsole.WriteLine();
 
-        await PublishComponent(repoRoot, "nexus", CopilotFamilyPaths.NexusInstall);
-        await PublishComponent(repoRoot, "app", CopilotFamilyPaths.AppInstall);
+        await AnsiConsole.Status()
+            .Spinner(Spinner.Known.Dots)
+            .SpinnerStyle(Style.Parse("blue"))
+            .StartAsync("Publishing Nexus...", async ctx =>
+            {
+                await PublishComponent(repoRoot, "nexus", CopilotFamilyPaths.NexusInstall);
+                ctx.Status("Publishing App...");
+                await PublishComponent(repoRoot, "app", CopilotFamilyPaths.AppInstall);
+            });
 
-        Console.WriteLine("Installation complete.");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[green]✓ Installation complete.[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("Set up the [blue]nexus[/] alias for easy access:");
+        AnsiConsole.MarkupLine($"  [dim]Set-Alias nexus \"{Markup.Escape(CopilotFamilyPaths.NexusExe)}\"[/]");
     }
 
     // --- update ---
@@ -321,44 +384,49 @@ public partial class Program
 
             if (!Directory.Exists(stagingPath) || !Directory.EnumerateFiles(stagingPath, "*", SearchOption.AllDirectories).Any())
             {
-                Console.WriteLine($"No staged update for {comp}.");
+                AnsiConsole.MarkupLine($"[grey]No staged update for {comp}.[/]");
                 continue;
             }
 
-            Console.WriteLine($"Updating {comp}...");
-
-            // Stop Nexus if updating it
-            if (comp == "nexus" && File.Exists(CopilotFamilyPaths.NexusLockFile))
-            {
-                Console.WriteLine("  Stopping Nexus for update...");
-                RunStop();
-                await Task.Delay(2000); // Wait for process to fully exit
-            }
-
-            // Copy staging to install
-            CopyDirectory(stagingPath, installPath);
-            Console.WriteLine($"  Copied staging → {installPath}");
-
-            // Clear staging
-            foreach (var file in Directory.GetFiles(stagingPath, "*", SearchOption.AllDirectories))
-                File.Delete(file);
-            foreach (var dir in Directory.GetDirectories(stagingPath).Reverse())
-                Directory.Delete(dir, true);
-            Console.WriteLine("  Staging cleared.");
-
-            // Restart Nexus if we updated it
-            if (comp == "nexus")
-            {
-                Console.WriteLine("  Restarting Nexus...");
-                var psi = new ProcessStartInfo
+            await AnsiConsole.Status()
+                .Spinner(Spinner.Known.Dots)
+                .SpinnerStyle(Style.Parse("blue"))
+                .StartAsync($"Updating {comp}...", async ctx =>
                 {
-                    FileName = CopilotFamilyPaths.NexusExe,
-                    Arguments = "start",
-                    UseShellExecute = false,
-                };
-                Process.Start(psi);
-                Console.WriteLine("  Nexus restarted.");
-            }
+                    // Stop Nexus if updating it
+                    if (comp == "nexus" && File.Exists(CopilotFamilyPaths.NexusLockFile))
+                    {
+                        ctx.Status("Stopping Nexus for update...");
+                        RunStop();
+                        await Task.Delay(2000);
+                    }
+
+                    // Copy staging to install
+                    ctx.Status($"Copying {comp} files...");
+                    CopyDirectory(stagingPath, installPath);
+
+                    // Clear staging
+                    ctx.Status("Clearing staging...");
+                    foreach (var file in Directory.GetFiles(stagingPath, "*", SearchOption.AllDirectories))
+                        File.Delete(file);
+                    foreach (var dir in Directory.GetDirectories(stagingPath).Reverse())
+                        Directory.Delete(dir, true);
+
+                    // Restart Nexus if we updated it
+                    if (comp == "nexus")
+                    {
+                        ctx.Status("Restarting Nexus...");
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = CopilotFamilyPaths.NexusExe,
+                            Arguments = "start",
+                            UseShellExecute = false,
+                        };
+                        Process.Start(psi);
+                    }
+                });
+
+            AnsiConsole.MarkupLine($"[green]✓[/] {comp} updated successfully.");
         }
     }
 
@@ -371,10 +439,10 @@ public partial class Program
 
         if (!nexusInstalled && !appInstalled)
         {
-            Console.Error.WriteLine("CopilotFamily is not installed.");
-            Console.Error.WriteLine($"  Expected install at: {CopilotFamilyPaths.Root}");
-            Console.Error.WriteLine();
-            Console.Error.WriteLine("Run 'nexus install' first to perform the initial installation.");
+            AnsiConsole.MarkupLine("[red]CopilotFamily is not installed.[/]");
+            AnsiConsole.MarkupLine($"  Expected install at: [dim]{Markup.Escape(CopilotFamilyPaths.Root)}[/]");
+            AnsiConsole.WriteLine();
+            AnsiConsole.MarkupLine("Run [blue]nexus install[/] first to perform the initial installation.");
             Environment.ExitCode = 1;
             return;
         }
@@ -382,7 +450,7 @@ public partial class Program
         var repoRoot = FindRepoRoot(AppContext.BaseDirectory);
         if (repoRoot == null)
         {
-            Console.Error.WriteLine("Cannot find repository root. Run from within the repo.");
+            AnsiConsole.MarkupLine("[red]Cannot find repository root.[/] Run from within the repo.");
             Environment.ExitCode = 1;
             return;
         }
@@ -391,42 +459,50 @@ public partial class Program
 
         var components = component == "both" ? new[] { "nexus", "app" } : new[] { component };
 
-        Console.WriteLine("Publishing to staging...");
-        foreach (var comp in components)
-        {
-            var stagingPath = CopilotFamilyPaths.GetStagingPath(comp);
-            await PublishComponent(repoRoot, comp, stagingPath);
-        }
+        await AnsiConsole.Status()
+            .Spinner(Spinner.Known.Dots)
+            .SpinnerStyle(Style.Parse("blue"))
+            .StartAsync("Publishing to staging...", async ctx =>
+            {
+                foreach (var comp in components)
+                {
+                    ctx.Status($"Publishing {comp} to staging...");
+                    var stagingPath = CopilotFamilyPaths.GetStagingPath(comp);
+                    await PublishComponent(repoRoot, comp, stagingPath);
+                }
+            });
 
-        Console.WriteLine();
-        Console.WriteLine("Staged updates ready. To apply:");
-        Console.WriteLine("  nexus update              — apply all staged updates");
-        Console.WriteLine("  nexus update --component nexus  — apply Nexus update only");
-        Console.WriteLine("  nexus update --component app    — apply App update only");
-        Console.WriteLine();
-        Console.WriteLine("The desktop app will also detect staged app updates automatically.");
+        AnsiConsole.WriteLine();
+        AnsiConsole.MarkupLine("[green]✓ Staged updates ready.[/]");
+        AnsiConsole.WriteLine();
+
+        var panel = new Panel(
+            "  [blue]nexus update[/]                      apply all staged updates\n" +
+            "  [blue]nexus update --component nexus[/]    apply Nexus update only\n" +
+            "  [blue]nexus update --component app[/]      apply App update only\n\n" +
+            "  [dim]The desktop app also detects staged app updates automatically.[/]")
+            .Header("[bold]Next steps[/]")
+            .Border(BoxBorder.Rounded)
+            .Padding(1, 0);
+
+        AnsiConsole.Write(panel);
     }
 
     // --- winapp start ---
     internal static void RunWinApp(string nexusUrl, bool testMode)
     {
-        // Search in: install dir, sibling dir, repo dist
         var appExe = FindAppExecutable();
 
         if (appExe == null)
         {
-            Console.Error.WriteLine("Could not find CopilotFamily.App.exe");
-            Console.Error.WriteLine($"  Install dir: {CopilotFamilyPaths.AppInstall}");
+            AnsiConsole.MarkupLine("[red]Could not find CopilotFamily.App.exe[/]");
+            AnsiConsole.MarkupLine($"  Install dir: [dim]{Markup.Escape(CopilotFamilyPaths.AppInstall)}[/]");
             Environment.ExitCode = 1;
             return;
         }
 
         var arguments = $"--nexus-url {nexusUrl}";
         if (testMode) arguments += " --test-mode";
-
-        Console.WriteLine($"Launching {Path.GetFileName(appExe)}...");
-        Console.WriteLine($"  Nexus URL: {nexusUrl}");
-        if (testMode) Console.WriteLine("  Mode: test");
 
         var psi = new ProcessStartInfo
         {
@@ -438,7 +514,9 @@ public partial class Program
         var process = Process.Start(psi);
         if (process != null)
         {
-            Console.WriteLine($"  PID: {process.Id}");
+            AnsiConsole.MarkupLine($"[green]✓[/] Launched [bold]{Markup.Escape(Path.GetFileName(appExe))}[/] (PID [bold]{process.Id}[/])");
+            AnsiConsole.MarkupLine($"  Nexus URL: [link]{nexusUrl}[/]");
+            if (testMode) AnsiConsole.MarkupLine("  Mode: [yellow]test[/]");
         }
     }
 
@@ -463,7 +541,7 @@ public partial class Program
             _ => throw new ArgumentException($"Unknown component: {component}"),
         };
 
-        Console.WriteLine($"  Publishing {component} → {outputPath}");
+        AnsiConsole.MarkupLine($"  [blue]{component}[/] → [dim]{Markup.Escape(outputPath)}[/]");
 
         var psi = new ProcessStartInfo
         {
@@ -481,13 +559,13 @@ public partial class Program
 
         if (proc.ExitCode != 0)
         {
-            Console.Error.WriteLine($"  Failed to publish {component}:");
-            Console.Error.WriteLine(stderr);
+            AnsiConsole.MarkupLine($"  [red]✗ Failed to publish {component}[/]");
+            AnsiConsole.WriteException(new InvalidOperationException(stderr.Trim()));
             Environment.ExitCode = 1;
         }
         else
         {
-            Console.WriteLine($"  {component} published successfully.");
+            AnsiConsole.MarkupLine($"  [green]✓[/] {component} published");
         }
     }
 

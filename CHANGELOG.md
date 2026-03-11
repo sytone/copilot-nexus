@@ -9,6 +9,10 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Added
 
+- **Spectre.Console** rich CLI output for all Nexus commands — coloured markup, status spinners, tables, and panels
+- `nexus status` renders a formatted table with process, health, staging, and path info
+- `nexus install` and `nexus publish` show animated status spinners during `dotnet publish`
+- `nexus publish` shows a "Next steps" panel with available follow-up commands
 - `CopilotFamilyPaths` static class in Core — centralized path constants for the install layout (`%LOCALAPPDATA%\CopilotFamily\`)
 - Nexus CLI commands: `stop`, `install`, `update [--component]`, `publish [--component]`
 - PID lock file (`nexus.lock`) — written on `start`, read by `stop`/`status`, cleaned on exit
