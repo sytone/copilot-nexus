@@ -282,9 +282,11 @@ dotnet publish src/CopilotNexus.App/CopilotNexus.App.csproj -c Release -o dist/s
 This project uses git for version control. Follow these rules:
 
 - **Commit after every logical set of changes** — each feature, bug fix, or refactor gets its own commit
+- **Commit before handoff** — once a logical set is verified (build/tests green), create the commit before reporting completion
 - **Use Conventional Commits** format (see below)
 - **Never leave uncommitted work** at the end of a dev cycle
 - **Commit before destructive operations** — if about to delete files, refactor heavily, or change architecture, commit first so rollback is easy
+- **Scope commits to the task** — include only files relevant to the active change set; do not batch unrelated work
 - **Always include the Co-authored-by trailer:**
   ```
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
