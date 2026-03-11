@@ -35,6 +35,14 @@ statusCommand.SetAction(async (parseResult, _) =>
 var installCommand = new Command("install", "Install Nexus and App to the local install directory");
 installCommand.SetAction(async (_, _) => { await CliCommands.RunInstallAsync(); });
 
+// --- nexus version ---
+var versionCommand = new Command("version", "Show current Copilot Nexus version");
+versionCommand.SetAction((_, _) =>
+{
+    CliCommands.RunVersion();
+    return Task.CompletedTask;
+});
+
 // --- nexus build ---
 var buildConfigOption = new Option<string>("--configuration", "-c") { Description = "Build configuration", DefaultValueFactory = _ => "Release" };
 var buildCommand = new Command("build", "Build the solution from the repository") { buildConfigOption };
@@ -88,8 +96,10 @@ rootCommand.Subcommands.Add(stopCommand);
 rootCommand.Subcommands.Add(statusCommand);
 rootCommand.Subcommands.Add(buildCommand);
 rootCommand.Subcommands.Add(installCommand);
+rootCommand.Subcommands.Add(versionCommand);
 rootCommand.Subcommands.Add(updateCommand);
 rootCommand.Subcommands.Add(publishCommand);
 rootCommand.Subcommands.Add(winappCommand);
 
+CliCommands.PrintVersionBanner();
 return rootCommand.Parse(args).Invoke();

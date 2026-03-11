@@ -265,6 +265,10 @@ nexus publish --component cli
 > **Note:** `nexus publish` requires a prior `nexus install`. If no installation is
 > detected it will tell you to run `nexus install` first.
 
+Each `publish` run stamps a new SemVer build version (`0.1.0-dev.YYYYMMDDHHMMSS`) across
+all published components in that run. This gives a monotonically advancing dev version
+until formal GitHub releases are introduced.
+
 `publish` outputs Nexus Service/App/Updater builds to the **staging** directory (`%LOCALAPPDATA%\CopilotNexus\staging\`).
 CLI builds are published directly to `%LOCALAPPDATA%\CopilotNexus\cli\` when safe.
 If the running `nexus` process would overwrite its own binaries, CLI output is staged to
@@ -324,12 +328,15 @@ The `update` command:
 | `nexus start [--url URL] [--interactive]` | Start Nexus (background by default; `--interactive` for foreground) |
 | `nexus stop` | Stop the running Nexus process |
 | `nexus status [--url URL]` | Check if Nexus is running and show info |
+| `nexus version` | Show current CLI/App/Service version information |
 | `nexus build [-c CONFIG]` | Build the solution from the repo (default: Release) |
 | `nexus install` | Build and install CLI, Nexus Service, App, and Updater |
 | `nexus publish [--component C]` | Build and stage updates (`nexus`, `app`, `cli`, or `both`). CLI publishes direct when safe, otherwise to `staging\cli`. Requires prior `nexus install`. |
 | `nexus update [--component C]` | Apply staged update (`nexus`, `app`, `cli`, or `both`) |
 | `nexus winapp start [--nexus-url URL] [--test-mode]` | Launch the desktop app |
 | `nexus --help` | Show help for all commands |
+
+When you run any `nexus` command, the CLI prints its current version banner at startup.
 
 ---
 

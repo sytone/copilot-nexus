@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text;
 using CopilotNexus.Core;
 using Spectre.Console;
@@ -12,7 +13,34 @@ record HealthResponse(string? Status, int Sessions, int Models, string? Uptime);
 /// </summary>
 internal static class CliCommands
 {
+    private const string PublishVersionBase = "0.1.0";
+    private const string PublishVersionChannel = "dev";
     private sealed record ProcessExecutionResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Elapsed);
+
+    internal static string GetCurrentVersion()
+    {
+        var assembly = typeof(CliCommands).Assembly;
+        var informational = assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?
+            .InformationalVersion;
+        return !string.IsNullOrWhiteSpace(informational)
+            ? informational
+            : assembly.GetName().Version?.ToString() ?? "0.0.0";
+    }
+
+    internal static void PrintVersionBanner()
+    {
+        AnsiConsole.MarkupLine($"[dim]Copilot Nexus CLI {Markup.Escape(GetCurrentVersion())}[/]");
+    }
+
+    internal static void RunVersion()
+    {
+        var current = GetCurrentVersion();
+        AnsiConsole.MarkupLine($"[bold]Copilot Nexus[/] [dim]{Markup.Escape(current)}[/]");
+        AnsiConsole.MarkupLine($"  CLI: [dim]{Markup.Escape(GetExecutableVersion(CopilotNexusPaths.CliExe) ?? "not installed")}[/]");
+        AnsiConsole.MarkupLine($"  Service: [dim]{Markup.Escape(GetExecutableVersion(CopilotNexusPaths.ServiceExe) ?? "not installed")}[/]");
+        AnsiConsole.MarkupLine($"  App: [dim]{Markup.Escape(GetExecutableVersion(CopilotNexusPaths.AppExe) ?? "not installed")}[/]");
+    }
 
     // --- start ---
     internal static void RunStart(string url)
@@ -424,6 +452,9 @@ internal static class CliCommands
         CopilotNexusPaths.EnsureDirectories();
         var components = normalizedComponent == "both" ? new[] { "nexus", "app" } : new[] { normalizedComponent };
         var cliPublishedToStaging = false;
+        var publishVersion = CreatePublishVersion();
+
+        AnsiConsole.MarkupLine($"[dim]Publish version: {Markup.Escape(publishVersion)}[/]");
 
         await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
@@ -437,19 +468,19 @@ internal static class CliCommands
                         var cliOutputPath = ResolveCliPublishOutputPath();
                         var stageCli = string.Equals(cliOutputPath, CopilotNexusPaths.CliStaging, StringComparison.OrdinalIgnoreCase);
                         ctx.Status(stageCli ? "Publishing CLI to staging..." : "Publishing CLI to install...");
-                        await PublishComponent(repoRoot, "cli", cliOutputPath);
+                        await PublishComponent(repoRoot, "cli", cliOutputPath, publishVersion);
                         cliPublishedToStaging |= stageCli;
 
                         var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
                         ctx.Status("Publishing Service to staging...");
-                        await PublishComponent(repoRoot, "service", stagingPath);
+                        await PublishComponent(repoRoot, "service", stagingPath, publishVersion);
                     }
                     else if (comp == "cli")
                     {
                         var cliOutputPath = ResolveCliPublishOutputPath();
                         var stageCli = string.Equals(cliOutputPath, CopilotNexusPaths.CliStaging, StringComparison.OrdinalIgnoreCase);
                         ctx.Status(stageCli ? "Publishing CLI to staging..." : "Publishing CLI to install...");
-                        await PublishComponent(repoRoot, "cli", cliOutputPath);
+                        await PublishComponent(repoRoot, "cli", cliOutputPath, publishVersion);
                         cliPublishedToStaging |= stageCli;
                     }
                     else
@@ -458,14 +489,14 @@ internal static class CliCommands
                         if (comp == "app")
                         {
                             ctx.Status("Publishing App to staging...");
-                            await PublishComponent(repoRoot, "app", stagingPath);
+                            await PublishComponent(repoRoot, "app", stagingPath, publishVersion);
                             ctx.Status("Publishing Updater to staging...");
-                            await PublishComponent(repoRoot, "updater", stagingPath);
+                            await PublishComponent(repoRoot, "updater", stagingPath, publishVersion);
                         }
                         else
                         {
                             ctx.Status($"Publishing {comp} to staging...");
-                            await PublishComponent(repoRoot, comp, stagingPath);
+                            await PublishComponent(repoRoot, comp, stagingPath, publishVersion);
                         }
                     }
                 }
@@ -593,7 +624,7 @@ internal static class CliCommands
         return null;
     }
 
-    private static async Task PublishComponent(string repoRoot, string component, string outputPath)
+    private static async Task PublishComponent(string repoRoot, string component, string outputPath, string? version = null)
     {
         var projectPath = component switch
         {
@@ -605,18 +636,21 @@ internal static class CliCommands
         };
 
         AnsiConsole.MarkupLine($"  [blue]{component}[/] → [dim]{Markup.Escape(outputPath)}[/]");
+        var versionArgs = string.IsNullOrWhiteSpace(version)
+            ? string.Empty
+            : $" -p:Version={version} -p:InformationalVersion={version}";
 
         var psi = new ProcessStartInfo
         {
             FileName = "dotnet",
-            Arguments = $"publish \"{projectPath}\" -c Release -o \"{outputPath}\" --self-contained false --nologo -v q",
+            Arguments = $"publish \"{projectPath}\" -c Release -o \"{outputPath}\" --self-contained false --nologo -v q{versionArgs}",
             UseShellExecute = false,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             CreateNoWindow = true,
         };
 
-        WriteCliLog($"publish start [{component}]: {psi.FileName} {psi.Arguments}");
+        WriteCliLog($"publish start [{component}] (version={version ?? "default"}): {psi.FileName} {psi.Arguments}");
         var result = await RunProcessWithCapturedOutputAsync(psi);
         WriteCliLog(
             $"publish complete [{component}]: exit={result.ExitCode}, elapsed={result.Elapsed.TotalSeconds:F1}s, " +
@@ -803,6 +837,24 @@ for ($attempt = 1; $attempt -le 20; $attempt++) {
     private static bool HasFiles(string path)
     {
         return Directory.Exists(path) && Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories).Any();
+    }
+
+    private static string CreatePublishVersion()
+    {
+        return $"{PublishVersionBase}-{PublishVersionChannel}.{DateTime.UtcNow:yyyyMMddHHmmss}";
+    }
+
+    private static string? GetExecutableVersion(string exePath)
+    {
+        if (!File.Exists(exePath))
+            return null;
+
+        var version = FileVersionInfo.GetVersionInfo(exePath).ProductVersion;
+        if (!string.IsNullOrWhiteSpace(version))
+            return version;
+
+        var assemblyVersion = FileVersionInfo.GetVersionInfo(exePath).FileVersion;
+        return string.IsNullOrWhiteSpace(assemblyVersion) ? null : assemblyVersion;
     }
 
     private static void ClearDirectoryContents(string path)
