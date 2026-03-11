@@ -20,7 +20,8 @@ Everything installs under `%LOCALAPPDATA%\CopilotNexus\`:
 
 ```
 %LOCALAPPDATA%\CopilotNexus\
-├── nexus\              ← CLI + Service binaries (CopilotNexus.Cli.exe, CopilotNexus.Service.exe)
+├── cli\                ← CLI binaries (CopilotNexus.Cli.exe)
+├── nexus\              ← Nexus Service binaries (CopilotNexus.Service.exe)
 ├── app\                ← Desktop app binaries
 ├── staging\            ← Pending updates (not inside install dirs)
 │   ├── nexus\
@@ -57,7 +58,7 @@ shows elapsed time and suggests `nexus publish` as the next step.
 
 ## 2. Install (First-Time Setup)
 
-The `install` command builds both components and publishes them to the install directory:
+The `install` command builds CLI, Nexus Service, and App, then publishes them to the install directories:
 
 ```powershell
 # From the repo root — run via dotnet
@@ -67,8 +68,9 @@ dotnet run --project src/CopilotNexus.Cli -- install
 This will:
 
 1. Create the `%LOCALAPPDATA%\CopilotNexus\` directory structure
-2. Run `dotnet publish` for **Nexus** → `%LOCALAPPDATA%\CopilotNexus\nexus\`
-3. Run `dotnet publish` for **App** → `%LOCALAPPDATA%\CopilotNexus\app\`
+2. Run `dotnet publish` for **CLI** → `%LOCALAPPDATA%\CopilotNexus\cli\`
+3. Run `dotnet publish` for **Nexus Service** → `%LOCALAPPDATA%\CopilotNexus\nexus\`
+4. Run `dotnet publish` for **App** → `%LOCALAPPDATA%\CopilotNexus\app\`
 
 After installation, set up the `nexus` alias (see next section) so you can manage
 everything from any terminal.
@@ -82,7 +84,7 @@ To avoid typing the full executable path every time, create a `nexus` alias.
 ### Option A: PowerShell alias (current session only)
 
 ```powershell
-Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Cli.exe"
+Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\cli\CopilotNexus.Cli.exe"
 ```
 
 ### Option B: PowerShell profile (persistent across sessions)
@@ -98,7 +100,7 @@ notepad $PROFILE
 Add this line:
 
 ```powershell
-Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Cli.exe"
+Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\cli\CopilotNexus.Cli.exe"
 ```
 
 Save and reload:
@@ -110,8 +112,8 @@ Save and reload:
 ### Option C: Add to PATH (works in PowerShell, CMD, and other tools)
 
 ```powershell
-# Add the Nexus install directory to your user PATH
-$nexusDir = "$env:LOCALAPPDATA\CopilotNexus\nexus"
+# Add the CLI install directory to your user PATH
+$nexusDir = "$env:LOCALAPPDATA\CopilotNexus\cli"
 $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 if ($currentPath -notlike "*$nexusDir*") {
     [Environment]::SetEnvironmentVariable("PATH", "$currentPath;$nexusDir", "User")
@@ -128,7 +130,7 @@ nexus --help
 ```
 
 All examples below use the `nexus` alias. If you haven't set it up, substitute
-`& "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Cli.exe"` or
+`& "$env:LOCALAPPDATA\CopilotNexus\cli\CopilotNexus.Cli.exe"` or
 `dotnet run --project src/CopilotNexus.Cli --`.
 
 ---
@@ -254,9 +256,9 @@ nexus publish --component app
 > **Note:** `nexus publish` requires a prior `nexus install`. If no installation is
 > detected it will tell you to run `nexus install` first.
 
-`publish` outputs to the **staging** directory (`%LOCALAPPDATA%\CopilotNexus\staging\`),
-not directly to the install directory. This keeps the running service untouched until
-you explicitly apply the update.
+`publish` outputs Nexus Service/App builds to the **staging** directory (`%LOCALAPPDATA%\CopilotNexus\staging\`).
+CLI builds are published directly to `%LOCALAPPDATA%\CopilotNexus\cli\` and do not require
+`nexus update`.
 
 ### Apply staged updates
 
@@ -309,8 +311,8 @@ The `update` command:
 | `nexus stop` | Stop the running Nexus process |
 | `nexus status [--url URL]` | Check if Nexus is running and show info |
 | `nexus build [-c CONFIG]` | Build the solution from the repo (default: Release) |
-| `nexus install` | Build and install both Nexus and App |
-| `nexus publish [--component C]` | Build and stage an update (`nexus`, `app`, or `both`). Requires prior `nexus install`. |
+| `nexus install` | Build and install CLI, Nexus Service, and App |
+| `nexus publish [--component C]` | Build and stage Service/App updates (`nexus`, `app`, or `both`); CLI is published directly. Requires prior `nexus install`. |
 | `nexus update [--component C]` | Apply staged update (`nexus`, `app`, or `both`) |
 | `nexus winapp start [--nexus-url URL] [--test-mode]` | Launch the desktop app |
 | `nexus --help` | Show help for all commands |
