@@ -11,7 +11,7 @@ public static class CopilotNexusPaths
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "CopilotNexus");
 
-    /// <summary>Nexus service install directory.</summary>
+    /// <summary>Nexus CLI + Service install directory.</summary>
     public static string NexusInstall { get; } = Path.Combine(Root, "nexus");
 
     /// <summary>Desktop app install directory.</summary>
@@ -20,7 +20,7 @@ public static class CopilotNexusPaths
     /// <summary>Shared staging root — updates are staged here before being applied.</summary>
     public static string StagingRoot { get; } = Path.Combine(Root, "staging");
 
-    /// <summary>Staging directory for Nexus updates.</summary>
+    /// <summary>Staging directory for Nexus (CLI + Service) updates.</summary>
     public static string NexusStaging { get; } = Path.Combine(StagingRoot, "nexus");
 
     /// <summary>Staging directory for App updates.</summary>
@@ -29,14 +29,17 @@ public static class CopilotNexusPaths
     /// <summary>Shared log directory.</summary>
     public static string Logs { get; } = Path.Combine(Root, "logs");
 
-    /// <summary>PID lock file for the Nexus process.</summary>
+    /// <summary>PID lock file for the Nexus service process.</summary>
     public static string NexusLockFile { get; } = Path.Combine(Root, "nexus.lock");
 
     /// <summary>Application state file (tab layout, session IDs).</summary>
     public static string AppStateFile { get; } = Path.Combine(Root, "app-state.json");
 
-    /// <summary>Nexus executable path in the install directory.</summary>
-    public static string NexusExe { get; } = Path.Combine(NexusInstall, "CopilotNexus.Service.exe");
+    /// <summary>CLI executable — the 'nexus' command users interact with.</summary>
+    public static string CliExe { get; } = Path.Combine(NexusInstall, "CopilotNexus.Cli.exe");
+
+    /// <summary>Service executable — the ASP.NET Core backend launched by the CLI.</summary>
+    public static string ServiceExe { get; } = Path.Combine(NexusInstall, "CopilotNexus.Service.exe");
 
     /// <summary>App executable path in the install directory.</summary>
     public static string AppExe { get; } = Path.Combine(AppInstall, "CopilotNexus.App.exe");

@@ -63,11 +63,19 @@ public class CopilotNexusPathsTests
     }
 
     [Fact]
-    public void NexusExe_IsInNexusInstall()
+    public void CliExe_IsInNexusInstall()
+    {
+        Assert.Equal(
+            Path.Combine(ExpectedRoot, "nexus", "CopilotNexus.Cli.exe"),
+            CopilotNexusPaths.CliExe);
+    }
+
+    [Fact]
+    public void ServiceExe_IsInNexusInstall()
     {
         Assert.Equal(
             Path.Combine(ExpectedRoot, "nexus", "CopilotNexus.Service.exe"),
-            CopilotNexusPaths.NexusExe);
+            CopilotNexusPaths.ServiceExe);
     }
 
     [Fact]

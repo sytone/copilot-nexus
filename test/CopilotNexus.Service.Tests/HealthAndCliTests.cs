@@ -59,40 +59,5 @@ public class HealthAndCliTests : IClassFixture<NexusTestFactory>
         Assert.True(DateTime.TryParse(body.Uptime, out _));
     }
 
-    [Fact]
-    public void FindRepoRootFrom_FindsRepoFromSubdirectory()
-    {
-        var result = Program.FindRepoRootFrom(AppContext.BaseDirectory);
-
-        Assert.NotNull(result);
-        Assert.True(File.Exists(Path.Combine(result!, "CopilotNexus.slnx")));
-    }
-
-    [Fact]
-    public void FindRepoRootFrom_ReturnsNull_ForUnrelatedPath()
-    {
-        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        Directory.CreateDirectory(tempDir);
-        try
-        {
-            var result = Program.FindRepoRootFrom(tempDir);
-            Assert.Null(result);
-        }
-        finally
-        {
-            Directory.Delete(tempDir);
-        }
-    }
-
-    [Fact]
-    public void FindRepoRootFrom_FindsRepoFromRepoRoot()
-    {
-        var repoRoot = Program.FindRepoRootFrom(AppContext.BaseDirectory);
-        Assert.NotNull(repoRoot);
-
-        var result = Program.FindRepoRootFrom(repoRoot!);
-        Assert.Equal(repoRoot, result);
-    }
-
     private record HealthPayload(string? Status, int Sessions, int Models, string? Uptime);
 }

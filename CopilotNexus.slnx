@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/CopilotNexus.App/CopilotNexus.App.csproj" />
+    <Project Path="src/CopilotNexus.Cli/CopilotNexus.Cli.csproj" />
     <Project Path="src/CopilotNexus.Core/CopilotNexus.Core.csproj" />
     <Project Path="src/CopilotNexus.Service/CopilotNexus.Service.csproj" />
     <Project Path="src/CopilotNexus.Updater/CopilotNexus.Updater.csproj" />

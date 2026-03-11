@@ -9,8 +9,7 @@ using Microsoft.Extensions.Logging;
 
 /// <summary>
 /// WebApplicationFactory that swaps the real SDK for mock services.
-/// Sets NEXUS_TEST_MODE so Program.Main takes the web host path
-/// instead of System.CommandLine routing.
+/// Sets NEXUS_TEST_MODE to prevent lock file contention during parallel tests.
 /// </summary>
 public class NexusTestFactory : WebApplicationFactory<Program>
 {
@@ -46,11 +45,5 @@ public class NexusTestFactory : WebApplicationFactory<Program>
                 return new SessionManager(client, logger);
             });
         });
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        base.Dispose(disposing);
-        Environment.SetEnvironmentVariable("NEXUS_TEST_MODE", null);
     }
 }
