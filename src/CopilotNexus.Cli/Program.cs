@@ -45,7 +45,7 @@ buildCommand.SetAction(async (parseResult, _) =>
 });
 
 // --- nexus update ---
-var updateComponentOption = new Option<string>("--component") { Description = "Component to update (nexus, app, or both)", DefaultValueFactory = _ => "both" };
+var updateComponentOption = new Option<string>("--component") { Description = "Component to update (nexus, app, cli, or both)", DefaultValueFactory = _ => "both" };
 var updateCommand = new Command("update", "Update a component from staging") { updateComponentOption };
 updateCommand.SetAction(async (parseResult, _) =>
 {
@@ -54,7 +54,7 @@ updateCommand.SetAction(async (parseResult, _) =>
 });
 
 // --- nexus publish ---
-var publishComponentOption = new Option<string>("--component") { Description = "Component to publish (nexus, app, or both)", DefaultValueFactory = _ => "both" };
+var publishComponentOption = new Option<string>("--component") { Description = "Component to publish (nexus, app, cli, or both)", DefaultValueFactory = _ => "both" };
 var publishCommand = new Command("publish", "Build and publish components to staging") { publishComponentOption };
 publishCommand.SetAction(async (parseResult, _) =>
 {

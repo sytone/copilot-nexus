@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Text;
 using CopilotNexus.Core;
 using Spectre.Console;
 
@@ -308,16 +309,32 @@ internal static class CliCommands
     // --- update ---
     internal static async Task RunUpdateAsync(string component)
     {
-        var components = component == "both" ? new[] { "nexus", "app" } : new[] { component };
+        var normalizedComponent = component.Trim().ToLowerInvariant();
+        if (normalizedComponent is not ("nexus" or "app" or "cli" or "both"))
+        {
+            AnsiConsole.MarkupLine("[red]Invalid component.[/] Use [blue]nexus[/], [blue]app[/], [blue]cli[/], or [blue]both[/].");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var components = normalizedComponent == "both" ? new[] { "nexus", "app" } : new[] { normalizedComponent };
 
         foreach (var comp in components)
         {
+            if (comp == "cli")
+            {
+                await ApplyCliStagedUpdateAsync(reportIfMissing: true);
+                continue;
+            }
+
             var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
             var installPath = CopilotNexusPaths.GetInstallPath(comp);
 
-            if (!Directory.Exists(stagingPath) || !Directory.EnumerateFiles(stagingPath, "*", SearchOption.AllDirectories).Any())
+            if (!HasFiles(stagingPath))
             {
                 AnsiConsole.MarkupLine($"[grey]No staged update for {comp}.[/]");
+                if (comp == "nexus")
+                    await ApplyCliStagedUpdateAsync();
                 continue;
             }
 
@@ -344,10 +361,7 @@ internal static class CliCommands
 
                     // Clear staging
                     ctx.Status("Clearing staging...");
-                    foreach (var file in Directory.GetFiles(stagingPath, "*", SearchOption.AllDirectories))
-                        File.Delete(file);
-                    foreach (var dir in Directory.GetDirectories(stagingPath).Reverse())
-                        Directory.Delete(dir, true);
+                    ClearDirectoryContents(stagingPath);
 
                     // Restart service if we updated nexus
                     if (comp == "nexus")
@@ -369,12 +383,23 @@ internal static class CliCommands
                 });
 
             AnsiConsole.MarkupLine($"[green]✓[/] {comp} updated successfully.");
+
+            if (comp == "nexus")
+                await ApplyCliStagedUpdateAsync();
         }
     }
 
     // --- publish ---
     internal static async Task RunPublishAsync(string component)
     {
+        var normalizedComponent = component.Trim().ToLowerInvariant();
+        if (normalizedComponent is not ("nexus" or "app" or "cli" or "both"))
+        {
+            AnsiConsole.MarkupLine("[red]Invalid component.[/] Use [blue]nexus[/], [blue]app[/], [blue]cli[/], or [blue]both[/].");
+            Environment.ExitCode = 1;
+            return;
+        }
+
         var nexusInstalled = File.Exists(CopilotNexusPaths.CliExe) || File.Exists(CopilotNexusPaths.ServiceExe);
         var appInstalled = File.Exists(CopilotNexusPaths.AppExe);
 
@@ -397,7 +422,8 @@ internal static class CliCommands
         }
 
         CopilotNexusPaths.EnsureDirectories();
-        var components = component == "both" ? new[] { "nexus", "app" } : new[] { component };
+        var components = normalizedComponent == "both" ? new[] { "nexus", "app" } : new[] { normalizedComponent };
+        var cliPublishedToStaging = false;
 
         await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
@@ -408,12 +434,23 @@ internal static class CliCommands
                 {
                     if (comp == "nexus")
                     {
-                        ctx.Status("Publishing CLI to install...");
-                        await PublishComponent(repoRoot, "cli", CopilotNexusPaths.CliInstall);
+                        var cliOutputPath = ResolveCliPublishOutputPath();
+                        var stageCli = string.Equals(cliOutputPath, CopilotNexusPaths.CliStaging, StringComparison.OrdinalIgnoreCase);
+                        ctx.Status(stageCli ? "Publishing CLI to staging..." : "Publishing CLI to install...");
+                        await PublishComponent(repoRoot, "cli", cliOutputPath);
+                        cliPublishedToStaging |= stageCli;
 
                         var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
                         ctx.Status("Publishing Service to staging...");
                         await PublishComponent(repoRoot, "service", stagingPath);
+                    }
+                    else if (comp == "cli")
+                    {
+                        var cliOutputPath = ResolveCliPublishOutputPath();
+                        var stageCli = string.Equals(cliOutputPath, CopilotNexusPaths.CliStaging, StringComparison.OrdinalIgnoreCase);
+                        ctx.Status(stageCli ? "Publishing CLI to staging..." : "Publishing CLI to install...");
+                        await PublishComponent(repoRoot, "cli", cliOutputPath);
+                        cliPublishedToStaging |= stageCli;
                     }
                     else
                     {
@@ -436,12 +473,22 @@ internal static class CliCommands
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[green]✓ Staged updates ready.[/]");
-        AnsiConsole.MarkupLine($"[dim]CLI binaries are published directly to {Markup.Escape(CopilotNexusPaths.CliInstall)}.[/]");
+        if (cliPublishedToStaging)
+        {
+            AnsiConsole.MarkupLine(
+                $"[yellow]CLI binaries were staged to {Markup.Escape(CopilotNexusPaths.CliStaging)} to avoid self-overwrite locks.[/]");
+            AnsiConsole.MarkupLine("[dim]Run [blue]nexus update --component cli[/] (or [blue]nexus update[/]) to apply the staged CLI update.[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[dim]CLI binaries are published directly to {Markup.Escape(CopilotNexusPaths.CliInstall)}.[/]");
+        }
         AnsiConsole.WriteLine();
 
         var panel = new Panel(
             "  [blue]nexus update[/]                      apply all staged updates\n" +
             "  [blue]nexus update --component nexus[/]    apply Nexus update only\n" +
+            "  [blue]nexus update --component cli[/]      apply CLI update only\n" +
             "  [blue]nexus update --component app[/]      apply App update only\n\n" +
             "  [dim]The desktop app also detects staged app updates automatically.[/]")
             .Header("[bold]Next steps[/]")
@@ -620,6 +667,154 @@ internal static class CliCommands
             return text;
 
         return text[^maxLength..];
+    }
+
+    private static async Task ApplyCliStagedUpdateAsync(bool reportIfMissing = false)
+    {
+        var stagingPath = CopilotNexusPaths.CliStaging;
+        if (!HasFiles(stagingPath))
+        {
+            if (reportIfMissing)
+                AnsiConsole.MarkupLine("[grey]No staged update for cli.[/]");
+            return;
+        }
+
+        if (IsRunningFromCliInstall())
+        {
+            ScheduleCliSelfUpdateWorker(stagingPath, CopilotNexusPaths.CliInstall, Environment.ProcessId);
+            AnsiConsole.MarkupLine("[yellow]CLI update scheduled. It will be applied after this command exits.[/]");
+            return;
+        }
+
+        await CopyDirectoryWithRetryAsync(stagingPath, CopilotNexusPaths.CliInstall);
+        ClearDirectoryContents(stagingPath);
+        WriteCliLog("cli update applied from staging");
+        AnsiConsole.MarkupLine("[green]✓[/] cli updated successfully.");
+    }
+
+    private static string ResolveCliPublishOutputPath()
+    {
+        var outputPath = IsRunningFromCliInstall()
+            ? CopilotNexusPaths.CliStaging
+            : CopilotNexusPaths.CliInstall;
+
+        WriteCliLog($"cli publish target resolved to {outputPath}");
+        return outputPath;
+    }
+
+    private static bool IsRunningFromCliInstall()
+    {
+        var cliInstallDir = Path.GetFullPath(CopilotNexusPaths.CliInstall)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var appBaseDir = Path.GetFullPath(AppContext.BaseDirectory)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+        if (string.Equals(cliInstallDir, appBaseDir, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (string.IsNullOrWhiteSpace(Environment.ProcessPath))
+            return false;
+
+        var currentProcessPath = Path.GetFullPath(Environment.ProcessPath);
+        var installedCliPath = Path.GetFullPath(CopilotNexusPaths.CliExe);
+        return string.Equals(currentProcessPath, installedCliPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void ScheduleCliSelfUpdateWorker(string stagingPath, string installPath, int parentPid)
+    {
+        var logPath = Path.Combine(CopilotNexusPaths.Logs, $"cli-{DateTime.UtcNow:yyyyMMdd}.log");
+        var script = BuildCliSelfUpdateScript(parentPid, stagingPath, installPath, logPath);
+        var encodedScript = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = "powershell",
+            Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedScript}",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+        };
+
+        var worker = Process.Start(psi)
+            ?? throw new InvalidOperationException("Failed to launch CLI self-update worker.");
+
+        WriteCliLog($"scheduled cli self-update worker pid={worker.Id} for parentPid={parentPid}");
+    }
+
+    private static string BuildCliSelfUpdateScript(int parentPid, string stagingPath, string installPath, string logPath)
+    {
+        var escapedStagingPath = EscapePowerShellSingleQuoted(stagingPath);
+        var escapedInstallPath = EscapePowerShellSingleQuoted(installPath);
+        var escapedLogPath = EscapePowerShellSingleQuoted(logPath);
+
+        return $$"""
+$ErrorActionPreference = 'Stop'
+$parentPid = {{parentPid}}
+$source = '{{escapedStagingPath}}'
+$destination = '{{escapedInstallPath}}'
+$logPath = '{{escapedLogPath}}'
+
+function Write-Log([string]$message) {
+    Add-Content -Path $logPath -Value ("{0} {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff zzz'), $message)
+}
+
+Write-Log "cli-self-update worker started (parentPid=$parentPid)"
+
+for ($i = 0; $i -lt 120; $i++) {
+    if (-not (Get-Process -Id $parentPid -ErrorAction SilentlyContinue)) {
+        break
+    }
+    Start-Sleep -Milliseconds 500
+}
+
+for ($attempt = 1; $attempt -le 20; $attempt++) {
+    try {
+        if (-not (Test-Path $source)) {
+            Write-Log "cli-self-update source missing; nothing to apply"
+            exit 0
+        }
+
+        New-Item -ItemType Directory -Path $destination -Force | Out-Null
+        $copy = Start-Process -FilePath "robocopy.exe" -ArgumentList @($source, $destination, "/MIR", "/R:5", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS", "/NP") -Wait -PassThru -NoNewWindow
+        if ($copy.ExitCode -gt 7) {
+            throw "robocopy exit code $($copy.ExitCode)"
+        }
+
+        Remove-Item -Path $source -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Log "cli-self-update applied successfully on attempt $attempt (robocopyExit=$($copy.ExitCode))"
+        exit 0
+    }
+    catch {
+        if ($attempt -eq 20) {
+            Write-Log ("cli-self-update failed: " + $_.Exception.Message)
+            exit 1
+        }
+
+        Start-Sleep -Seconds 1
+    }
+}
+""";
+    }
+
+    private static string EscapePowerShellSingleQuoted(string value)
+    {
+        return value.Replace("'", "''");
+    }
+
+    private static bool HasFiles(string path)
+    {
+        return Directory.Exists(path) && Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories).Any();
+    }
+
+    private static void ClearDirectoryContents(string path)
+    {
+        if (!Directory.Exists(path))
+            return;
+
+        foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
+            File.Delete(file);
+
+        foreach (var dir in Directory.GetDirectories(path, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
+            Directory.Delete(dir, true);
     }
 
     private static void WriteCliLog(string message)

@@ -27,6 +27,9 @@ public static class CopilotNexusPaths
     /// <summary>Staging directory for Nexus (CLI + Service) updates.</summary>
     public static string NexusStaging { get; } = Path.Combine(StagingRoot, "nexus");
 
+    /// <summary>Staging directory for CLI updates when self-overwrite is not possible.</summary>
+    public static string CliStaging { get; } = Path.Combine(StagingRoot, "cli");
+
     /// <summary>Staging directory for App updates.</summary>
     public static string AppStaging { get; } = Path.Combine(StagingRoot, "app");
 
@@ -65,6 +68,7 @@ public static class CopilotNexusPaths
         Directory.CreateDirectory(AppInstall);
         Directory.CreateDirectory(StagingRoot);
         Directory.CreateDirectory(NexusStaging);
+        Directory.CreateDirectory(CliStaging);
         Directory.CreateDirectory(AppStaging);
         Directory.CreateDirectory(Logs);
         Directory.CreateDirectory(UserConfigRoot);
@@ -76,6 +80,7 @@ public static class CopilotNexusPaths
     public static string GetStagingPath(string component) => component.ToLowerInvariant() switch
     {
         "nexus" => NexusStaging,
+        "cli" => CliStaging,
         "app" => AppStaging,
         _ => throw new ArgumentException($"Unknown component: {component}", nameof(component)),
     };
@@ -86,6 +91,7 @@ public static class CopilotNexusPaths
     public static string GetInstallPath(string component) => component.ToLowerInvariant() switch
     {
         "nexus" => NexusInstall,
+        "cli" => CliInstall,
         "app" => AppInstall,
         _ => throw new ArgumentException($"Unknown component: {component}", nameof(component)),
     };
