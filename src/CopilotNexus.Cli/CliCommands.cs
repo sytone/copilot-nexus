@@ -289,6 +289,8 @@ internal static class CliCommands
                 await PublishComponent(repoRoot, "service", CopilotNexusPaths.NexusInstall);
                 ctx.Status("Publishing App...");
                 await PublishComponent(repoRoot, "app", CopilotNexusPaths.AppInstall);
+                ctx.Status("Publishing Updater...");
+                await PublishComponent(repoRoot, "updater", CopilotNexusPaths.AppInstall);
             });
 
         AnsiConsole.WriteLine();
@@ -411,8 +413,18 @@ internal static class CliCommands
                     else
                     {
                         var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
-                        ctx.Status($"Publishing {comp} to staging...");
-                        await PublishComponent(repoRoot, comp, stagingPath);
+                        if (comp == "app")
+                        {
+                            ctx.Status("Publishing App to staging...");
+                            await PublishComponent(repoRoot, "app", stagingPath);
+                            ctx.Status("Publishing Updater to staging...");
+                            await PublishComponent(repoRoot, "updater", stagingPath);
+                        }
+                        else
+                        {
+                            ctx.Status($"Publishing {comp} to staging...");
+                            await PublishComponent(repoRoot, comp, stagingPath);
+                        }
                     }
                 }
             });
@@ -536,6 +548,7 @@ internal static class CliCommands
             "cli" => Path.Combine(repoRoot, "src", "CopilotNexus.Cli", "CopilotNexus.Cli.csproj"),
             "service" => Path.Combine(repoRoot, "src", "CopilotNexus.Service", "CopilotNexus.Service.csproj"),
             "app" => Path.Combine(repoRoot, "src", "CopilotNexus.App", "CopilotNexus.App.csproj"),
+            "updater" => Path.Combine(repoRoot, "src", "CopilotNexus.Updater", "CopilotNexus.Updater.csproj"),
             _ => throw new ArgumentException($"Unknown component: {component}"),
         };
 

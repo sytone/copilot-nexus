@@ -283,9 +283,15 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             var permHandler = config.IsAutopilot ? null : GetPermissionHandler();
             var inputHandler = config.IsAutopilot ? null : GetUserInputHandler();
 
+            var oldSessionId = tab.Info.Id;
             var newInfo = await _sessionManager.ReconfigureSessionAsync(
                 tab.Info.Id, config, permHandler, inputHandler);
-            var newSession = _sessionManager.GetSession(newInfo.Id)!;
+            var newSession = _sessionManager.GetSession(newInfo.Id);
+            if (newSession == null)
+            {
+                throw new InvalidOperationException(
+                    $"Reconfigured session wrapper not found (oldId={oldSessionId}, newId={newInfo.Id}).");
+            }
 
             // Replace the tab's session
             tab.Reconfigure(newInfo, newSession);

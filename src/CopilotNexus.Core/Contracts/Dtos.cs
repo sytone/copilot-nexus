@@ -53,6 +53,8 @@ public record ModelInfoDto
 public record CreateSessionRequest
 {
     public string? Name { get; init; }
+    /// <summary>Optional SDK session ID to resume an existing persisted session.</summary>
+    public string? SdkSessionId { get; init; }
     public string? Model { get; init; }
     public string? WorkingDirectory { get; init; }
     public bool IsAutopilot { get; init; } = true;

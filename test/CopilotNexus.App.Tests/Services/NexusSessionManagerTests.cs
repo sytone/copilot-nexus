@@ -199,7 +199,7 @@ public class NexusSessionManagerTests : IAsyncDisposable
     }
 
     [Fact]
-    public async Task ResumeSessionAsync_DelegatesToCreate()
+    public async Task ResumeSessionAsync_SendsSdkSessionIdInCreateRequest()
     {
         var dto = new SessionInfoDto
         {
@@ -213,6 +213,10 @@ public class NexusSessionManagerTests : IAsyncDisposable
 
         Assert.Equal("s1", result.Id);
         Assert.Equal("Resumed Session", result.Name);
+        Assert.NotNull(_mockHandler.LastRequest);
+        var requestBody = await _mockHandler.LastRequest!.Content!.ReadAsStringAsync();
+        using var bodyJson = JsonDocument.Parse(requestBody);
+        Assert.Equal("sdk-old", bodyJson.RootElement.GetProperty("sdkSessionId").GetString());
     }
 
     [Fact]

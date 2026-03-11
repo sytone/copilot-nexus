@@ -125,6 +125,7 @@ public class SessionManager : ISessionManager
             throw new KeyNotFoundException($"Session '{sessionId}' not found.");
 
         _logger.LogInformation("Reconfiguring session '{Name}' — disconnect + resume with new config", existingInfo.Name);
+        var resolvedModel = config.Model ?? existingInfo.Model ?? ResolveModel(null);
 
         // Get the SDK session ID before disposing
         var sdkSessionId = existingInfo.SdkSessionId;
@@ -147,17 +148,18 @@ public class SessionManager : ISessionManager
 
         // Resume with new configuration
         var wrapper = await _clientService.ResumeSessionAsync(sdkSessionId, config, permissionHandler, userInputHandler, cancellationToken);
-        var newInfo = new SessionInfo(name, config.Model, wrapper.SessionId)
-        {
-            State = SessionState.Running,
-            WorkingDirectory = config.WorkingDirectory,
-            IsAutopilot = config.IsAutopilot,
-        };
+        var newInfo = SessionInfo.FromRemote(
+            sessionId,
+            name,
+            resolvedModel,
+            wrapper.SessionId,
+            config.IsAutopilot,
+            config.WorkingDirectory);
 
         _sessions[newInfo.Id] = newInfo;
         _wrappers[newInfo.Id] = wrapper;
 
-        _logger.LogInformation("Session '{Name}' reconfigured with new ID {SessionId}", name, newInfo.Id);
+        _logger.LogInformation("Session '{Name}' reconfigured with ID {SessionId}", name, newInfo.Id);
         return newInfo;
     }
 

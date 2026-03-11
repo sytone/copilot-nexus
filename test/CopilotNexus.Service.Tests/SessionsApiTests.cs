@@ -43,6 +43,23 @@ public class SessionsApiTests : IClassFixture<NexusTestFactory>
     }
 
     [Fact]
+    public async Task CreateSession_WithSdkSessionId_ResumesExistingSession()
+    {
+        var request = new CreateSessionRequest
+        {
+            Name = "Resume Session",
+            SdkSessionId = "sdk-resume-123",
+            IsAutopilot = true,
+        };
+        var response = await _client.PostAsJsonAsync("/api/sessions", request);
+        response.EnsureSuccessStatusCode();
+
+        var dto = await response.Content.ReadFromJsonAsync<SessionInfoDto>();
+        Assert.NotNull(dto);
+        Assert.Equal("sdk-resume-123", dto!.SdkSessionId);
+    }
+
+    [Fact]
     public async Task CreateSession_ThenGetById()
     {
         var request = new CreateSessionRequest { Name = "Get By Id Test" };

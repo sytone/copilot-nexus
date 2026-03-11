@@ -1,7 +1,6 @@
 namespace CopilotNexus.Service.Hubs;
 
 using CopilotNexus.Core.Contracts;
-using CopilotNexus.Core.Events;
 using CopilotNexus.Core.Interfaces;
 using CopilotNexus.Core.Models;
 using Microsoft.AspNetCore.SignalR;
@@ -52,12 +51,6 @@ public class SessionHub : Hub<ISessionHubClient>
     {
         await Groups.AddToGroupAsync(Context.ConnectionId, sessionId);
         _logger.LogDebug("Client {ConnectionId} joined session {SessionId}", Context.ConnectionId, sessionId);
-
-        var session = _sessionManager.GetSession(sessionId);
-        if (session != null)
-        {
-            session.OutputReceived += (_, e) => OnSessionOutput(sessionId, e);
-        }
     }
 
     /// <summary>Unsubscribe from a session's output.</summary>
@@ -97,15 +90,4 @@ public class SessionHub : Hub<ISessionHubClient>
         }
     }
 
-    private void OnSessionOutput(string sessionId, SessionOutputEventArgs e)
-    {
-        var dto = new SessionOutputDto(
-            sessionId,
-            e.Kind.ToString(),
-            e.Role.ToString(),
-            e.Content);
-
-        // Fire and forget — hub context handles thread safety
-        _ = Clients.Group(sessionId).SessionOutput(sessionId, dto);
-    }
 }

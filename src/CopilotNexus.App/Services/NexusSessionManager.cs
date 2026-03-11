@@ -137,8 +137,40 @@ public class NexusSessionManager : ISessionManager
         Func<AgentUserInputRequest, Task<AgentUserInputResponse>>? userInputHandler = null,
         CancellationToken cancellationToken = default)
     {
-        // Resume is just create with existing SDK session — Nexus handles it
-        return await CreateSessionAsync(name, config, permissionHandler, userInputHandler, cancellationToken);
+        var request = new CreateSessionRequest
+        {
+            Name = name,
+            SdkSessionId = sdkSessionId,
+            Model = config?.Model,
+            WorkingDirectory = config?.WorkingDirectory,
+            IsAutopilot = config?.IsAutopilot ?? true,
+        };
+
+        var response = await _httpClient.PostAsJsonAsync("/api/sessions", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var dto = await response.Content.ReadFromJsonAsync<SessionInfoDto>(cancellationToken: cancellationToken);
+        var info = ToSessionInfo(dto!);
+
+        _sessions[info.Id] = info;
+
+        // Create a proxy session wrapper and join the SignalR group
+        var proxy = new NexusSessionProxy(info.Id);
+        proxy.SetTransport(
+            async (sid, input) => await SendInputAsync(sid, input),
+            async (sid) =>
+            {
+                if (_hubConnection?.State == HubConnectionState.Connected)
+                    await _hubConnection.InvokeAsync("AbortSession", sid);
+            });
+        _proxies[info.Id] = proxy;
+
+        if (_hubConnection?.State == HubConnectionState.Connected)
+        {
+            await _hubConnection.InvokeAsync("JoinSession", info.Id, cancellationToken);
+        }
+
+        return info;
     }
 
     public async Task SendInputAsync(string sessionId, string input, CancellationToken cancellationToken = default)
@@ -195,7 +227,30 @@ public class NexusSessionManager : ISessionManager
         var dto = await response.Content.ReadFromJsonAsync<SessionInfoDto>(cancellationToken: cancellationToken);
         var info = ToSessionInfo(dto!);
 
+        if (info.Id != sessionId)
+        {
+            _sessions.TryRemove(sessionId, out _);
+            _proxies.TryRemove(sessionId, out _);
+        }
+
         _sessions[info.Id] = info;
+        if (!_proxies.ContainsKey(info.Id))
+        {
+            var proxy = new NexusSessionProxy(info.Id);
+            proxy.SetTransport(
+                async (sid, input) => await SendInputAsync(sid, input),
+                async (sid) =>
+                {
+                    if (_hubConnection?.State == HubConnectionState.Connected)
+                        await _hubConnection.InvokeAsync("AbortSession", sid);
+                });
+            _proxies[info.Id] = proxy;
+
+            if (_hubConnection?.State == HubConnectionState.Connected)
+            {
+                await _hubConnection.InvokeAsync("JoinSession", info.Id, cancellationToken);
+            }
+        }
         return info;
     }
 

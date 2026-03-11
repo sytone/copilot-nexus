@@ -123,6 +123,21 @@ public class SessionManagerTests
     }
 
     [Fact]
+    public async Task ReconfigureSessionAsync_PreservesSessionId()
+    {
+        var info = await _manager.CreateSessionAsync("Test", new SessionConfiguration { Model = "gpt-4.1" });
+
+        var updated = await _manager.ReconfigureSessionAsync(
+            info.Id,
+            new SessionConfiguration { Model = "claude-opus-4.6", IsAutopilot = true });
+
+        Assert.Equal(info.Id, updated.Id);
+        Assert.Equal("claude-opus-4.6", updated.Model);
+        Assert.NotNull(_manager.GetSession(info.Id));
+        Assert.Single(_manager.Sessions);
+    }
+
+    [Fact]
     public async Task SendInputAsync_CallsSessionSend()
     {
         var info = await _manager.CreateSessionAsync("Test");

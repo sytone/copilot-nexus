@@ -52,8 +52,8 @@ public class SessionsController : ControllerBase
         [FromBody] CreateSessionRequest? request = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Creating session: model={Model}, workDir={WorkDir}",
-            request?.Model, request?.WorkingDirectory);
+        _logger.LogInformation("Creating session: model={Model}, workDir={WorkDir}, sdkSessionId={SdkSessionId}",
+            request?.Model, request?.WorkingDirectory, request?.SdkSessionId);
 
         var config = request != null
             ? new SessionConfiguration
@@ -64,10 +64,24 @@ public class SessionsController : ControllerBase
             }
             : null;
 
-        var sessionInfo = await _sessionManager.CreateSessionAsync(
-            request?.Name ?? $"Session {DateTime.Now:HH:mm:ss}",
-            config,
-            cancellationToken: cancellationToken);
+        var sessionName = request?.Name ?? $"Session {DateTime.Now:HH:mm:ss}";
+        SessionInfo sessionInfo;
+
+        if (!string.IsNullOrWhiteSpace(request?.SdkSessionId))
+        {
+            sessionInfo = await _sessionManager.ResumeSessionAsync(
+                sessionName,
+                request.SdkSessionId,
+                config,
+                cancellationToken: cancellationToken);
+        }
+        else
+        {
+            sessionInfo = await _sessionManager.CreateSessionAsync(
+                sessionName,
+                config,
+                cancellationToken: cancellationToken);
+        }
         var dto = SessionInfoDto.FromSessionInfo(sessionInfo);
 
         // Notify all connected clients
@@ -128,7 +142,7 @@ public class SessionsController : ControllerBase
         await _hubContext.Clients.All.SessionReconfigured(dto);
 
         // Re-wire output forwarding with new session wrapper
-        WireSessionOutputForwarding(id);
+        WireSessionOutputForwarding(newInfo.Id);
 
         return Ok(dto);
     }

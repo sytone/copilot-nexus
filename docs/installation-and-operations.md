@@ -71,6 +71,7 @@ This will:
 2. Run `dotnet publish` for **CLI** → `%LOCALAPPDATA%\CopilotNexus\cli\`
 3. Run `dotnet publish` for **Nexus Service** → `%LOCALAPPDATA%\CopilotNexus\nexus\`
 4. Run `dotnet publish` for **App** → `%LOCALAPPDATA%\CopilotNexus\app\`
+5. Run `dotnet publish` for **Updater** → `%LOCALAPPDATA%\CopilotNexus\app\`
 
 After installation, set up the `nexus` alias (see next section) so you can manage
 everything from any terminal.
@@ -256,7 +257,7 @@ nexus publish --component app
 > **Note:** `nexus publish` requires a prior `nexus install`. If no installation is
 > detected it will tell you to run `nexus install` first.
 
-`publish` outputs Nexus Service/App builds to the **staging** directory (`%LOCALAPPDATA%\CopilotNexus\staging\`).
+`publish` outputs Nexus Service/App/Updater builds to the **staging** directory (`%LOCALAPPDATA%\CopilotNexus\staging\`).
 CLI builds are published directly to `%LOCALAPPDATA%\CopilotNexus\cli\` and do not require
 `nexus update`.
 
@@ -311,8 +312,8 @@ The `update` command:
 | `nexus stop` | Stop the running Nexus process |
 | `nexus status [--url URL]` | Check if Nexus is running and show info |
 | `nexus build [-c CONFIG]` | Build the solution from the repo (default: Release) |
-| `nexus install` | Build and install CLI, Nexus Service, and App |
-| `nexus publish [--component C]` | Build and stage Service/App updates (`nexus`, `app`, or `both`); CLI is published directly. Requires prior `nexus install`. |
+| `nexus install` | Build and install CLI, Nexus Service, App, and Updater |
+| `nexus publish [--component C]` | Build and stage Service/App/Updater updates (`nexus`, `app`, or `both`); CLI is published directly. Requires prior `nexus install`. |
 | `nexus update [--component C]` | Apply staged update (`nexus`, `app`, or `both`) |
 | `nexus winapp start [--nexus-url URL] [--test-mode]` | Launch the desktop app |
 | `nexus --help` | Show help for all commands |
