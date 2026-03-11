@@ -10,9 +10,9 @@ restored.
 - **WPF process lifecycle**: The app must fully exit before files can be replaced.
   The Copilot CLI child process (spawned by the SDK) must also be terminated,
   otherwise `copilot.exe` will hold file locks.
-- **Updater must live outside dist/**: If `update.ps1` is inside `dist/`, it
-  cannot overwrite itself. Solution: the app copies `update.ps1` to a temp
-  directory before launching it.
+- **Updater must live outside the install dir**: `CopilotFamily.Updater.exe` is a
+  standalone console app that runs independently of the main app process. It is
+  published alongside the app but does not overwrite itself during updates.
 - **FileSystemWatcher reliability**: On Windows, FSW can miss events under heavy
   I/O. Use a combination of FSW for responsiveness and a periodic timer (30s)
   as a fallback.

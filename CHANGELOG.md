@@ -9,6 +9,10 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Added
 
+- **CopilotFamily.Updater** — cross-platform C# console app replacing the PowerShell updater script
+- `UpdaterService` with testable logic: wait for process exit, copy staged files, clear staging, relaunch
+- 14 pure C# updater tests (no process spawning) replacing 12 PowerShell-dependent tests
+- `CopilotFamilyPaths.UpdaterExe` path constant for the updater shim location
 - **Spectre.Console** rich CLI output for all Nexus commands — coloured markup, status spinners, tables, and panels
 - `nexus status` renders a formatted table with process, health, staging, and path info
 - `nexus install` and `nexus publish` show animated status spinners during `dotnet publish`
@@ -24,11 +28,16 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Changed
 
+- **Hot restart** now launches `CopilotFamily.Updater.exe` instead of `powershell.exe` — no visible shell windows
 - App staging detection now uses `CopilotFamilyPaths.AppStaging` instead of `dist/staging/`
-- `update.ps1` parameter renamed from `-DistPath` to `-InstallPath`; log file now writes to shared `logs/` dir
 - `README.md` rewritten to reflect Nexus + Avalonia architecture
-- CLI `IsCliCommand` recognizes all new commands (`stop`, `install`, `update`, `publish`)
+- CLI entry point uses `NEXUS_TEST_MODE` env var instead of arg-sniffing
 - `nexus winapp start` searches `CopilotFamilyPaths.AppInstall` first
+
+### Removed
+
+- `update.ps1` PowerShell updater script — replaced by `CopilotFamily.Updater` console app
+- `IsCliCommand` and `IsUserFacingArgs` methods — replaced by env var test mode detection
 
 ### Added (prior)
 

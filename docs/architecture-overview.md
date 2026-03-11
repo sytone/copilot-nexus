@@ -108,7 +108,7 @@ and `NexusSessionProxy`. In **test mode**, it uses the local `SessionManager` wi
 | `RelayCommand` / `AsyncRelayCommand` | `ICommand` implementations for MVVM                                              |
 | `AvaloniaUiDispatcher`               | `IUiDispatcher` implementation using Avalonia's `Dispatcher`                     |
 | Converters                           | `MessageRole` → brush/label, empty count → visibility, bool → visibility         |
-| `Resources/update.ps1`               | Embedded PowerShell updater script for hot restart                               |
+| `Resources/update.ps1`               | *(Removed)* — replaced by `CopilotFamily.Updater` project                       |
 
 **Startup arguments:**
 
@@ -163,9 +163,10 @@ The app supports a fast iteration pipeline:
 2. **Staging folder** — new builds placed in `dist/staging/` trigger update detection
 3. **Update notification** — `StagingUpdateDetectionService` watches staging via
    FileSystemWatcher + 30-second timer fallback; shows notification bar in UI
-4. **Hot restart** — "Restart Now" extracts embedded `update.ps1` to `%TEMP%`,
-   saves state, launches updater, exits. The script waits for the old process to exit,
-   copies staged files to dist root, clears staging, and relaunches the app.
+4. **Hot restart** — "Restart Now" launches `CopilotFamily.Updater.exe` (a
+   cross-platform C# console app), saves state, and exits. The updater waits for the
+   old process to exit, copies staged files to the install directory, clears staging,
+   and relaunches the app — no PowerShell dependency required.
 5. **Session continuity** — on restart, saved SDK session IDs are used to resume sessions
 
 ## Logging
