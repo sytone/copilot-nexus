@@ -9,6 +9,17 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Added
 
+- **CopilotNexus.Cli** — standalone CLI console app (`src/CopilotNexus.Cli/`) providing the `nexus` command interface (start, stop, status, build, install, publish, update, winapp)
+- `CopilotNexusPaths.CliExe` and `CopilotNexusPaths.ServiceExe` path constants replacing the former `NexusExe`
+
+### Changed
+
+- **CLI/Service split** — `CopilotNexus.Service` is now a pure ASP.NET Core web host (~40 lines) with no CLI commands, no Spectre.Console, and no System.CommandLine; all CLI functionality moved to `CopilotNexus.Cli`
+- `nexus` alias now points to `CopilotNexus.Cli.exe` instead of `CopilotNexus.Service.exe`
+- `CopilotNexusPaths.NexusExe` replaced by `CliExe` (CLI entry point) and `ServiceExe` (web server)
+
+### Added (prior)
+
 - **CopilotNexus.Updater** — cross-platform C# console app replacing the PowerShell updater script
 - `UpdaterService` with testable logic: wait for process exit, copy staged files, clear staging, relaunch
 - 14 pure C# updater tests (no process spawning) replacing 12 PowerShell-dependent tests

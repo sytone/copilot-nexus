@@ -20,7 +20,7 @@ Everything installs under `%LOCALAPPDATA%\CopilotNexus\`:
 
 ```
 %LOCALAPPDATA%\CopilotNexus\
-├── nexus\              ← Nexus service binaries
+├── nexus\              ← CLI + Service binaries (CopilotNexus.Cli.exe, CopilotNexus.Service.exe)
 ├── app\                ← Desktop app binaries
 ├── staging\            ← Pending updates (not inside install dirs)
 │   ├── nexus\
@@ -61,7 +61,7 @@ The `install` command builds both components and publishes them to the install d
 
 ```powershell
 # From the repo root — run via dotnet
-dotnet run --project src/CopilotNexus.Service -- install
+dotnet run --project src/CopilotNexus.Cli -- install
 ```
 
 This will:
@@ -82,7 +82,7 @@ To avoid typing the full executable path every time, create a `nexus` alias.
 ### Option A: PowerShell alias (current session only)
 
 ```powershell
-Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Service.exe"
+Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Cli.exe"
 ```
 
 ### Option B: PowerShell profile (persistent across sessions)
@@ -98,7 +98,7 @@ notepad $PROFILE
 Add this line:
 
 ```powershell
-Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Service.exe"
+Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Cli.exe"
 ```
 
 Save and reload:
@@ -118,8 +118,8 @@ if ($currentPath -notlike "*$nexusDir*") {
 }
 ```
 
-> Restart your terminal after modifying PATH. The executable is named
-> `CopilotNexus.Service.exe` — you can rename it to `nexus.exe` after install if preferred.
+> Restart your terminal after modifying PATH. The CLI executable is named
+> `CopilotNexus.Cli.exe` — you can rename it to `nexus.exe` after install if preferred.
 
 ### Verify
 
@@ -128,8 +128,8 @@ nexus --help
 ```
 
 All examples below use the `nexus` alias. If you haven't set it up, substitute
-`& "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Service.exe"` or
-`dotnet run --project src/CopilotNexus.Service --`.
+`& "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Cli.exe"` or
+`dotnet run --project src/CopilotNexus.Cli --`.
 
 ---
 
@@ -226,7 +226,7 @@ Or during development (foreground mode in one terminal):
 
 ```powershell
 # Terminal 1: Start Nexus interactively (see logs)
-dotnet run --project src/CopilotNexus.Service -- start --interactive
+dotnet run --project src/CopilotNexus.Cli -- start --interactive
 
 # Terminal 2: Launch app
 dotnet run --project src/CopilotNexus.App
@@ -354,5 +354,5 @@ nexus stop
 Remove-Item -Recurse -Force "$env:LOCALAPPDATA\CopilotNexus"
 
 # Reinstall from repo
-dotnet run --project src/CopilotNexus.Service -- install
+dotnet run --project src/CopilotNexus.Cli -- install
 ```

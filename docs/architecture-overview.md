@@ -8,9 +8,11 @@ manages multiple GitHub Copilot SDK sessions in a tabbed interface. It uses the
 
 The application follows a **client–service split architecture**. The Avalonia desktop app
 is a thin client that communicates with **CopilotNexus.Service**, an ASP.NET Core backend
-service that owns all SDK interactions. The app has no direct dependency on the Copilot
-SDK — all session management, streaming, and model queries flow through the Nexus service
-via **SignalR** (real-time events) and **REST** (CRUD operations).
+service that owns all SDK interactions. **CopilotNexus.Cli** is a separate console
+application that provides the `nexus` command-line interface for managing the service,
+publishing updates, and launching the desktop app. The app has no direct dependency on the
+Copilot SDK — all session management, streaming, and model queries flow through the Nexus
+service via **SignalR** (real-time events) and **REST** (CRUD operations).
 
 This split enables multiple future clients (web UI, CLI, webhook-driven automation) to
 share the same backend without duplicating SDK integration logic.
@@ -18,19 +20,46 @@ share the same backend without duplicating SDK integration logic.
 ### Architecture Diagram
 
 ```
-┌────────────────────────────┐     ┌──────────────────────────────────┐
-│  Avalonia App (thin client)│     │  CopilotNexus.Service             │
-│                            │     │  (ASP.NET Core service)          │
-│  NexusSessionManager ──────┼────►│  SignalR Hub (SessionHub)        │
-│  NexusSessionProxy    ──────┼────►│  REST API (SessionsController)  │
-│                            │     │  Webhook (WebhookController)     │
-│  Renders session UI        │     │  ModelsController                │
-│  No direct SDK dependency  │     │                                  │
-│                            │     │  SessionManager ◄── SDK          │
-│  In test mode: uses local  │     │  CopilotClientService            │
-│  SessionManager + mocks    │     └──────────────────────────────────┘
-└────────────────────────────┘                    ▲
-                                   ┌──────────────┘
+┌────────────────────────────────┐
+│  CopilotNexus.Cli              │
+│  (nexus CLI — user-facing)     │
+│                                │
+│  start/stop/status/install     │
+│  build/publish/update          │
+│  winapp start                  │
+│                                │
+│  Launches & manages Service    │
+└───────────────┬────────────────┘
+                │ spawns/manages
+                ▼
+┌────────────────────────────────────────┐
+│  CopilotNexus.Service                  │
+│  (ASP.NET Core web host — ~40 lines)   │
+│                                        │
+│  SignalR Hub (SessionHub)              │
+│  REST API (SessionsController)         │
+│  Webhook (WebhookController)           │
+│  ModelsController                      │
+│                                        │
+│  SessionManager ◄── SDK                │
+│  CopilotClientService                  │
+└──────────────────┬─────────────────────┘
+                   ▲
+┌──────────────────┘
+│
+┌────────────────────────────┐     │
+│  Avalonia App (thin client)│     │
+│                            │     │
+│  NexusSessionManager ──────┼─────┘
+│  NexusSessionProxy    ──────┼─────►  SignalR + REST
+│                            │
+│  Renders session UI        │
+│  No direct SDK dependency  │
+│                            │
+│  In test mode: uses local  │
+│  SessionManager + mocks    │
+└────────────────────────────┘
+                                   ▲
 ┌────────────────────────────┐     │
 │  Future: Web UI            │─────┘
 │  Future: CLI client        │
@@ -52,7 +81,8 @@ references the SDK directly; the Avalonia app interacts exclusively through Nexu
 | ---------------------------- | -------------------------------------------------------------------------- |
 | `CopilotNexus.Core`         | Core business logic, SDK abstractions, shared DTOs/contracts               |
 | `CopilotNexus.App`          | Avalonia 11 desktop application (MVVM, thin SignalR client)                |
-| `CopilotNexus.Service`        | ASP.NET Core backend — SignalR hub, REST API, webhooks                     |
+| `CopilotNexus.Cli`          | CLI console app — `nexus` commands (start, stop, build, publish, update)   |
+| `CopilotNexus.Service`      | ASP.NET Core web host — SignalR hub, REST API, webhooks (~40-line Program.cs) |
 | `CopilotNexus.Core.Tests`   | 65 unit tests (xUnit + Moq)                                               |
 | `CopilotNexus.App.Tests`    | 47 ViewModel/converter tests (xUnit + Moq)                                |
 | `CopilotNexus.Service.Tests`  | 20 integration tests (WebApplicationFactory)                               |
@@ -121,8 +151,9 @@ and `NexusSessionProxy`. In **test mode**, it uses the local `SessionManager` wi
 
 ### CopilotNexus.Service
 
-ASP.NET Core backend service that owns all SDK interactions and exposes them through
-multiple protocols. Any client (desktop, web, CLI, automation) connects here.
+Pure ASP.NET Core web host (~40 lines) that owns all SDK interactions and exposes them
+through multiple protocols. Contains no CLI commands — all command-line functionality lives
+in `CopilotNexus.Cli`. Any client (desktop, web, CLI, automation) connects here.
 
 | Component              | Responsibility                                                                        |
 | ---------------------- | ------------------------------------------------------------------------------------- |

@@ -6,6 +6,7 @@ Copilot Nexus is a cross-platform desktop application (Avalonia 11.3.12 / .NET 8
 interface for managing multiple GitHub Copilot SDK sessions simultaneously. The app follows
 a client–service split: the Avalonia desktop app is a thin client that communicates with
 **CopilotNexus.Service**, an ASP.NET Core backend service that owns all SDK interactions.
+**CopilotNexus.Cli** provides the `nexus` command-line interface for managing the service.
 Nexus exposes sessions via SignalR (real-time streaming) and REST (CRUD), enabling future
 clients (web UI, CLI, webhook automation) to share the same backend. In test mode, the app
 bypasses Nexus and uses local mock services directly.
@@ -15,7 +16,8 @@ bypasses Nexus and uses local mock services directly.
 ```
 src/CopilotNexus.Core         — Core business logic, SDK abstractions, shared DTOs/contracts
 src/CopilotNexus.App          — Avalonia 11 desktop application (MVVM, thin SignalR client)
-src/CopilotNexus.Service        — ASP.NET Core backend — SignalR hub, REST API, webhooks
+src/CopilotNexus.Cli          — CLI console app — `nexus` commands (start, stop, build, publish, update)
+src/CopilotNexus.Service      — ASP.NET Core web host — SignalR hub, REST API, webhooks (~40-line Program.cs)
 test/CopilotNexus.Core.Tests  — Unit tests for Core (xUnit + Moq, 65 tests)
 test/CopilotNexus.App.Tests   — Unit tests for ViewModels and converters (xUnit + Moq, 47 tests)
 test/CopilotNexus.Service.Tests — Integration tests for Nexus (WebApplicationFactory, 20 tests)
