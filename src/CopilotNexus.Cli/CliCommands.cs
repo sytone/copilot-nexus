@@ -6,8 +6,8 @@ using Spectre.Console;
 record HealthResponse(string? Status, int Sessions, int Models, string? Uptime);
 
 /// <summary>
-/// All CLI command implementations. The CLI is a separate process from the Service,
-/// so commands like 'update' can safely overwrite Service files without self-locking.
+/// All CLI command implementations. CLI binaries are installed separately from the
+/// Nexus service binaries to reduce self-update lock contention.
 /// </summary>
 internal static class CliCommands
 {
@@ -284,7 +284,7 @@ internal static class CliCommands
             .StartAsync("Publishing components...", async ctx =>
             {
                 ctx.Status("Publishing CLI...");
-                await PublishComponent(repoRoot, "cli", CopilotNexusPaths.NexusInstall);
+                await PublishComponent(repoRoot, "cli", CopilotNexusPaths.CliInstall);
                 ctx.Status("Publishing Service...");
                 await PublishComponent(repoRoot, "service", CopilotNexusPaths.NexusInstall);
                 ctx.Status("Publishing App...");
@@ -327,9 +327,13 @@ internal static class CliCommands
                         await WaitForFileLockRelease(installPath, 15);
                     }
 
-                    // Copy staging to install with retry for lingering locks
+                    // Copy staging to install with retry for lingering locks.
+                    // Skip any stale CLI artifacts that may still exist in Nexus staging from older publish flows.
                     ctx.Status($"Copying {comp} files...");
-                    await CopyDirectoryWithRetryAsync(stagingPath, installPath);
+                    await CopyDirectoryWithRetryAsync(
+                        stagingPath,
+                        installPath,
+                        shouldCopyFile: comp == "nexus" ? file => !IsCliArtifact(file) : null);
 
                     // Clear staging
                     ctx.Status("Clearing staging...");
@@ -395,16 +399,18 @@ internal static class CliCommands
             {
                 foreach (var comp in components)
                 {
-                    var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
                     if (comp == "nexus")
                     {
-                        ctx.Status("Publishing CLI to staging...");
-                        await PublishComponent(repoRoot, "cli", stagingPath);
+                        ctx.Status("Publishing CLI to install...");
+                        await PublishComponent(repoRoot, "cli", CopilotNexusPaths.CliInstall);
+
+                        var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
                         ctx.Status("Publishing Service to staging...");
                         await PublishComponent(repoRoot, "service", stagingPath);
                     }
                     else
                     {
+                        var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
                         ctx.Status($"Publishing {comp} to staging...");
                         await PublishComponent(repoRoot, comp, stagingPath);
                     }
@@ -413,6 +419,7 @@ internal static class CliCommands
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[green]✓ Staged updates ready.[/]");
+        AnsiConsole.MarkupLine($"[dim]CLI binaries are published directly to {Markup.Escape(CopilotNexusPaths.CliInstall)}.[/]");
         AnsiConsole.WriteLine();
 
         var panel = new Panel(
@@ -560,28 +567,42 @@ internal static class CliCommands
         }
     }
 
-    private static void CopyDirectory(string source, string destination)
+    private static bool IsCliArtifact(string filePath)
+    {
+        var fileName = Path.GetFileName(filePath);
+        return fileName.Equals("CopilotNexus.Cli.exe", StringComparison.OrdinalIgnoreCase)
+            || fileName.StartsWith("CopilotNexus.Cli.", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static void CopyDirectory(string source, string destination, Func<string, bool>? shouldCopyFile = null)
     {
         Directory.CreateDirectory(destination);
         foreach (var file in Directory.GetFiles(source))
         {
+            if (shouldCopyFile != null && !shouldCopyFile(file))
+                continue;
+
             var destFile = Path.Combine(destination, Path.GetFileName(file));
             File.Copy(file, destFile, overwrite: true);
         }
         foreach (var dir in Directory.GetDirectories(source))
         {
             var destDir = Path.Combine(destination, Path.GetFileName(dir));
-            CopyDirectory(dir, destDir);
+            CopyDirectory(dir, destDir, shouldCopyFile);
         }
     }
 
-    private static async Task CopyDirectoryWithRetryAsync(string source, string destination, int maxRetries = 10)
+    private static async Task CopyDirectoryWithRetryAsync(
+        string source,
+        string destination,
+        int maxRetries = 10,
+        Func<string, bool>? shouldCopyFile = null)
     {
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
             try
             {
-                CopyDirectory(source, destination);
+                CopyDirectory(source, destination, shouldCopyFile);
                 return;
             }
             catch (IOException) when (attempt < maxRetries)
@@ -589,7 +610,7 @@ internal static class CliCommands
                 await Task.Delay(1000);
             }
         }
-        CopyDirectory(source, destination);
+        CopyDirectory(source, destination, shouldCopyFile);
     }
 
     private static async Task WaitForFileLockRelease(string directory, int timeoutSeconds)

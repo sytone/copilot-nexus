@@ -21,6 +21,12 @@ public class CopilotNexusPathsTests
     }
 
     [Fact]
+    public void CliInstall_IsUnderRoot()
+    {
+        Assert.Equal(Path.Combine(ExpectedRoot, "cli"), CopilotNexusPaths.CliInstall);
+    }
+
+    [Fact]
     public void AppInstall_IsUnderRoot()
     {
         Assert.Equal(Path.Combine(ExpectedRoot, "app"), CopilotNexusPaths.AppInstall);
@@ -63,10 +69,10 @@ public class CopilotNexusPathsTests
     }
 
     [Fact]
-    public void CliExe_IsInNexusInstall()
+    public void CliExe_IsInCliInstall()
     {
         Assert.Equal(
-            Path.Combine(ExpectedRoot, "nexus", "CopilotNexus.Cli.exe"),
+            Path.Combine(ExpectedRoot, "cli", "CopilotNexus.Cli.exe"),
             CopilotNexusPaths.CliExe);
     }
 
@@ -140,6 +146,7 @@ public class CopilotNexusPathsTests
 
         Assert.True(Directory.Exists(CopilotNexusPaths.Root));
         Assert.True(Directory.Exists(CopilotNexusPaths.NexusInstall));
+        Assert.True(Directory.Exists(CopilotNexusPaths.CliInstall));
         Assert.True(Directory.Exists(CopilotNexusPaths.AppInstall));
         Assert.True(Directory.Exists(CopilotNexusPaths.StagingRoot));
         Assert.True(Directory.Exists(CopilotNexusPaths.NexusStaging));
@@ -152,6 +159,7 @@ public class CopilotNexusPathsTests
     {
         // Key requirement: staging is NOT inside install dirs
         Assert.DoesNotContain(CopilotNexusPaths.NexusInstall, CopilotNexusPaths.NexusStaging.AsSpan());
+        Assert.DoesNotContain(CopilotNexusPaths.CliInstall, CopilotNexusPaths.NexusStaging.AsSpan());
         Assert.DoesNotContain(CopilotNexusPaths.AppInstall, CopilotNexusPaths.AppStaging.AsSpan());
 
         // Staging IS under the shared staging root

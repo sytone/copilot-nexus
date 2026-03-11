@@ -11,8 +11,11 @@ public static class CopilotNexusPaths
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "CopilotNexus");
 
-    /// <summary>Nexus CLI + Service install directory.</summary>
+    /// <summary>Nexus service install directory.</summary>
     public static string NexusInstall { get; } = Path.Combine(Root, "nexus");
+
+    /// <summary>Nexus CLI install directory (separate to avoid self-update locks).</summary>
+    public static string CliInstall { get; } = Path.Combine(Root, "cli");
 
     /// <summary>Desktop app install directory.</summary>
     public static string AppInstall { get; } = Path.Combine(Root, "app");
@@ -36,7 +39,7 @@ public static class CopilotNexusPaths
     public static string AppStateFile { get; } = Path.Combine(Root, "app-state.json");
 
     /// <summary>CLI executable — the 'nexus' command users interact with.</summary>
-    public static string CliExe { get; } = Path.Combine(NexusInstall, "CopilotNexus.Cli.exe");
+    public static string CliExe { get; } = Path.Combine(CliInstall, "CopilotNexus.Cli.exe");
 
     /// <summary>Service executable — the ASP.NET Core backend launched by the CLI.</summary>
     public static string ServiceExe { get; } = Path.Combine(NexusInstall, "CopilotNexus.Service.exe");
@@ -52,6 +55,7 @@ public static class CopilotNexusPaths
     {
         Directory.CreateDirectory(Root);
         Directory.CreateDirectory(NexusInstall);
+        Directory.CreateDirectory(CliInstall);
         Directory.CreateDirectory(AppInstall);
         Directory.CreateDirectory(StagingRoot);
         Directory.CreateDirectory(NexusStaging);
