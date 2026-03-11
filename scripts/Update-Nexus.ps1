@@ -68,14 +68,13 @@ if (-not (Test-Path (Join-Path $projectRoot 'CopilotNexus.slnx'))) {
     throw "Solution file not found under project root: $projectRoot"
 }
 
-if (-not (Get-Command nexus -ErrorAction SilentlyContinue)) {
-    if (Test-Path $defaultNexusExe) {
-        Set-Alias nexus $defaultNexusExe
-        Write-Host "nexus alias created for this session: $defaultNexusExe" -ForegroundColor Yellow
-    }
-    else {
-        throw "'nexus' command not found and default install was not found at: $defaultNexusExe"
-    }
+if (Test-Path $defaultNexusExe) {
+    # Always prefer the installed CLI path so stale user aliases don't point to old locations.
+    Set-Alias nexus $defaultNexusExe
+    Write-Host "Using installed nexus CLI: $defaultNexusExe" -ForegroundColor Yellow
+}
+elseif (-not (Get-Command nexus -ErrorAction SilentlyContinue)) {
+    throw "'nexus' command not found and default install was not found at: $defaultNexusExe"
 }
 
 Push-Location $projectRoot
