@@ -1,6 +1,6 @@
-namespace CopilotFamily.Core.Interfaces;
+namespace CopilotNexus.Core.Interfaces;
 
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Models;
 
 /// <summary>
 /// Saves and loads application state to/from persistent storage.

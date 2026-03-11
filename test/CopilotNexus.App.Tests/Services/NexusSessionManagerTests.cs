@@ -1,12 +1,12 @@
-namespace CopilotFamily.App.Tests.Services;
+namespace CopilotNexus.App.Tests.Services;
 
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using CopilotFamily.App.Services;
-using CopilotFamily.Core.Contracts;
-using CopilotFamily.Core.Events;
-using CopilotFamily.Core.Models;
+using CopilotNexus.App.Services;
+using CopilotNexus.Core.Contracts;
+using CopilotNexus.Core.Events;
+using CopilotNexus.Core.Models;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 

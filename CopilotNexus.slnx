@@ -1,14 +1,14 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/CopilotFamily.App/CopilotFamily.App.csproj" />
-    <Project Path="src/CopilotFamily.Core/CopilotFamily.Core.csproj" />
-    <Project Path="src/CopilotFamily.Nexus/CopilotFamily.Nexus.csproj" />
-    <Project Path="src/CopilotFamily.Updater/CopilotFamily.Updater.csproj" />
+    <Project Path="src/CopilotNexus.App/CopilotNexus.App.csproj" />
+    <Project Path="src/CopilotNexus.Core/CopilotNexus.Core.csproj" />
+    <Project Path="src/CopilotNexus.Service/CopilotNexus.Service.csproj" />
+    <Project Path="src/CopilotNexus.Updater/CopilotNexus.Updater.csproj" />
   </Folder>
   <Folder Name="/test/">
-    <Project Path="test/CopilotFamily.App.Tests/CopilotFamily.App.Tests.csproj" />
-    <Project Path="test/CopilotFamily.Core.Tests/CopilotFamily.Core.Tests.csproj" />
-    <Project Path="test/CopilotFamily.Nexus.Tests/CopilotFamily.Nexus.Tests.csproj" />
-    <Project Path="test/CopilotFamily.UI.Tests/CopilotFamily.UI.Tests.csproj" />
+    <Project Path="test/CopilotNexus.App.Tests/CopilotNexus.App.Tests.csproj" />
+    <Project Path="test/CopilotNexus.Core.Tests/CopilotNexus.Core.Tests.csproj" />
+    <Project Path="test/CopilotNexus.Service.Tests/CopilotNexus.Service.Tests.csproj" />
+    <Project Path="test/CopilotNexus.UI.Tests/CopilotNexus.UI.Tests.csproj" />
   </Folder>
 </Solution>

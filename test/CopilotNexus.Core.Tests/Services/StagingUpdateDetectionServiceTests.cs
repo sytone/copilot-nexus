@@ -1,7 +1,7 @@
-namespace CopilotFamily.Core.Tests.Services;
+namespace CopilotNexus.Core.Tests.Services;
 
 using System.IO;
-using CopilotFamily.Core.Services;
+using CopilotNexus.Core.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -12,7 +12,7 @@ public class StagingUpdateDetectionServiceTests : IDisposable
 
     public StagingUpdateDetectionServiceTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"CopilotFamilyTest_{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"CopilotNexusTest_{Guid.NewGuid():N}");
         _stagingDir = Path.Combine(_tempDir, "staging");
         Directory.CreateDirectory(_tempDir);
     }

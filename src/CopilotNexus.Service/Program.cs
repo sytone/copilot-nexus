@@ -1,9 +1,9 @@
 using System.CommandLine;
 using System.Diagnostics;
 using System.Net.Http.Json;
-using CopilotFamily.Core;
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Nexus;
+using CopilotNexus.Core;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Service;
 using Serilog;
 using Spectre.Console;
 
@@ -89,7 +89,7 @@ publishCommand.SetAction(async (parseResult, _) =>
 var nexusUrlOption = new Option<string>("--nexus-url") { Description = "Nexus URL for the app to connect to", DefaultValueFactory = _ => "http://localhost:5280" };
 var testModeOption = new Option<bool>("--test-mode") { Description = "Run in test mode with mock services" };
 
-var winappStartCommand = new Command("start", "Launch the Copilot Family desktop application")
+var winappStartCommand = new Command("start", "Launch the Copilot Nexus desktop application")
 {
     nexusUrlOption, testModeOption
 };
@@ -105,7 +105,7 @@ var winappCommand = new Command("winapp", "Manage the desktop application");
 winappCommand.Subcommands.Add(winappStartCommand);
 
 // --- root ---
-var rootCommand = new RootCommand("CopilotFamily Nexus — Copilot session management service");
+var rootCommand = new RootCommand("CopilotNexus Nexus — Copilot session management service");
 rootCommand.Subcommands.Add(startCommand);
 rootCommand.Subcommands.Add(stopCommand);
 rootCommand.Subcommands.Add(statusCommand);
@@ -127,7 +127,7 @@ public partial class Program
     internal static void RunStartBackground(string url)
     {
         // Check if already running
-        var lockFile = CopilotFamilyPaths.NexusLockFile;
+        var lockFile = CopilotNexusPaths.NexusLockFile;
         if (File.Exists(lockFile))
         {
             var pidText = File.ReadAllText(lockFile).Trim();
@@ -182,7 +182,7 @@ public partial class Program
     // --- start (interactive/foreground) ---
     internal static async Task RunServerAsync(string url, CancellationToken ct)
     {
-        CopilotFamilyPaths.EnsureDirectories();
+        CopilotNexusPaths.EnsureDirectories();
         WriteLockFile();
 
         var builder = NexusHostBuilder.CreateBuilder();
@@ -207,7 +207,7 @@ public partial class Program
     // --- stop ---
     internal static void RunStop()
     {
-        var lockFile = CopilotFamilyPaths.NexusLockFile;
+        var lockFile = CopilotNexusPaths.NexusLockFile;
         if (!File.Exists(lockFile))
         {
             AnsiConsole.MarkupLine("[yellow]Nexus is not running[/] (no lock file found)");
@@ -248,7 +248,7 @@ public partial class Program
         // Gather process info
         string processStatus;
         string pidDisplay;
-        var lockFile = CopilotFamilyPaths.NexusLockFile;
+        var lockFile = CopilotNexusPaths.NexusLockFile;
         if (File.Exists(lockFile))
         {
             var pidText = File.ReadAllText(lockFile).Trim();
@@ -308,8 +308,8 @@ public partial class Program
         }
 
         // Check staging
-        var nexusStaging = CopilotFamilyPaths.NexusStaging;
-        var appStaging = CopilotFamilyPaths.AppStaging;
+        var nexusStaging = CopilotNexusPaths.NexusStaging;
+        var appStaging = CopilotNexusPaths.AppStaging;
         var nexusHasUpdate = Directory.Exists(nexusStaging) && Directory.EnumerateFiles(nexusStaging).Any();
         var appHasUpdate = Directory.Exists(appStaging) && Directory.EnumerateFiles(appStaging).Any();
 
@@ -334,8 +334,8 @@ public partial class Program
 
         // Paths
         table.AddEmptyRow();
-        table.AddRow("Install dir", Markup.Escape(CopilotFamilyPaths.Root));
-        table.AddRow("Log dir", Markup.Escape(CopilotFamilyPaths.Logs));
+        table.AddRow("Install dir", Markup.Escape(CopilotNexusPaths.Root));
+        table.AddRow("Log dir", Markup.Escape(CopilotNexusPaths.Logs));
 
         AnsiConsole.Write(table);
     }
@@ -351,9 +351,9 @@ public partial class Program
             return;
         }
 
-        var slnPath = Path.Combine(repoRoot, "CopilotFamily.slnx");
+        var slnPath = Path.Combine(repoRoot, "CopilotNexus.slnx");
 
-        var rule = new Rule($"[bold blue]Building CopilotFamily[/] [dim]({configuration})[/]").LeftJustified();
+        var rule = new Rule($"[bold blue]Building CopilotNexus[/] [dim]({configuration})[/]").LeftJustified();
         AnsiConsole.Write(rule);
         AnsiConsole.MarkupLine($"  Solution: [dim]{Markup.Escape(slnPath)}[/]");
         AnsiConsole.WriteLine();
@@ -411,7 +411,7 @@ public partial class Program
     // --- install ---
     internal static async Task RunInstallAsync()
     {
-        CopilotFamilyPaths.EnsureDirectories();
+        CopilotNexusPaths.EnsureDirectories();
 
         var repoRoot = FindRepoRoot(AppContext.BaseDirectory);
         if (repoRoot == null)
@@ -421,10 +421,10 @@ public partial class Program
             return;
         }
 
-        var rule = new Rule("[bold blue]Installing CopilotFamily[/]").LeftJustified();
+        var rule = new Rule("[bold blue]Installing CopilotNexus[/]").LeftJustified();
         AnsiConsole.Write(rule);
         AnsiConsole.MarkupLine($"  Repo:    [dim]{Markup.Escape(repoRoot)}[/]");
-        AnsiConsole.MarkupLine($"  Install: [dim]{Markup.Escape(CopilotFamilyPaths.Root)}[/]");
+        AnsiConsole.MarkupLine($"  Install: [dim]{Markup.Escape(CopilotNexusPaths.Root)}[/]");
         AnsiConsole.WriteLine();
 
         await AnsiConsole.Status()
@@ -432,16 +432,16 @@ public partial class Program
             .SpinnerStyle(Style.Parse("blue"))
             .StartAsync("Publishing Nexus...", async ctx =>
             {
-                await PublishComponent(repoRoot, "nexus", CopilotFamilyPaths.NexusInstall);
+                await PublishComponent(repoRoot, "nexus", CopilotNexusPaths.NexusInstall);
                 ctx.Status("Publishing App...");
-                await PublishComponent(repoRoot, "app", CopilotFamilyPaths.AppInstall);
+                await PublishComponent(repoRoot, "app", CopilotNexusPaths.AppInstall);
             });
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[green]✓ Installation complete.[/]");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("Set up the [blue]nexus[/] alias for easy access:");
-        AnsiConsole.MarkupLine($"  [dim]Set-Alias nexus \"{Markup.Escape(CopilotFamilyPaths.NexusExe)}\"[/]");
+        AnsiConsole.MarkupLine($"  [dim]Set-Alias nexus \"{Markup.Escape(CopilotNexusPaths.NexusExe)}\"[/]");
     }
 
     // --- update ---
@@ -451,8 +451,8 @@ public partial class Program
 
         foreach (var comp in components)
         {
-            var stagingPath = CopilotFamilyPaths.GetStagingPath(comp);
-            var installPath = CopilotFamilyPaths.GetInstallPath(comp);
+            var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
+            var installPath = CopilotNexusPaths.GetInstallPath(comp);
 
             if (!Directory.Exists(stagingPath) || !Directory.EnumerateFiles(stagingPath, "*", SearchOption.AllDirectories).Any())
             {
@@ -466,7 +466,7 @@ public partial class Program
                 .StartAsync($"Updating {comp}...", async ctx =>
                 {
                     // Stop Nexus if updating it
-                    if (comp == "nexus" && File.Exists(CopilotFamilyPaths.NexusLockFile))
+                    if (comp == "nexus" && File.Exists(CopilotNexusPaths.NexusLockFile))
                     {
                         ctx.Status("Stopping Nexus for update...");
                         RunStop();
@@ -490,7 +490,7 @@ public partial class Program
                         ctx.Status("Restarting Nexus...");
                         var psi = new ProcessStartInfo
                         {
-                            FileName = CopilotFamilyPaths.NexusExe,
+                            FileName = CopilotNexusPaths.NexusExe,
                             Arguments = "start",
                             UseShellExecute = false,
                         };
@@ -506,13 +506,13 @@ public partial class Program
     internal static async Task RunPublishAsync(string component)
     {
         // Check if the app has been installed
-        var nexusInstalled = File.Exists(CopilotFamilyPaths.NexusExe);
-        var appInstalled = File.Exists(CopilotFamilyPaths.AppExe);
+        var nexusInstalled = File.Exists(CopilotNexusPaths.NexusExe);
+        var appInstalled = File.Exists(CopilotNexusPaths.AppExe);
 
         if (!nexusInstalled && !appInstalled)
         {
-            AnsiConsole.MarkupLine("[red]CopilotFamily is not installed.[/]");
-            AnsiConsole.MarkupLine($"  Expected install at: [dim]{Markup.Escape(CopilotFamilyPaths.Root)}[/]");
+            AnsiConsole.MarkupLine("[red]CopilotNexus is not installed.[/]");
+            AnsiConsole.MarkupLine($"  Expected install at: [dim]{Markup.Escape(CopilotNexusPaths.Root)}[/]");
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("Run [blue]nexus install[/] first to perform the initial installation.");
             Environment.ExitCode = 1;
@@ -527,7 +527,7 @@ public partial class Program
             return;
         }
 
-        CopilotFamilyPaths.EnsureDirectories();
+        CopilotNexusPaths.EnsureDirectories();
 
         var components = component == "both" ? new[] { "nexus", "app" } : new[] { component };
 
@@ -539,7 +539,7 @@ public partial class Program
                 foreach (var comp in components)
                 {
                     ctx.Status($"Publishing {comp} to staging...");
-                    var stagingPath = CopilotFamilyPaths.GetStagingPath(comp);
+                    var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
                     await PublishComponent(repoRoot, comp, stagingPath);
                 }
             });
@@ -567,8 +567,8 @@ public partial class Program
 
         if (appExe == null)
         {
-            AnsiConsole.MarkupLine("[red]Could not find CopilotFamily.App.exe[/]");
-            AnsiConsole.MarkupLine($"  Install dir: [dim]{Markup.Escape(CopilotFamilyPaths.AppInstall)}[/]");
+            AnsiConsole.MarkupLine("[red]Could not find CopilotNexus.App.exe[/]");
+            AnsiConsole.MarkupLine($"  Install dir: [dim]{Markup.Escape(CopilotNexusPaths.AppInstall)}[/]");
             Environment.ExitCode = 1;
             return;
         }
@@ -596,20 +596,20 @@ public partial class Program
 
     private static void WriteLockFile()
     {
-        File.WriteAllText(CopilotFamilyPaths.NexusLockFile, Environment.ProcessId.ToString());
+        File.WriteAllText(CopilotNexusPaths.NexusLockFile, Environment.ProcessId.ToString());
     }
 
     private static void DeleteLockFile()
     {
-        try { File.Delete(CopilotFamilyPaths.NexusLockFile); } catch { /* best effort */ }
+        try { File.Delete(CopilotNexusPaths.NexusLockFile); } catch { /* best effort */ }
     }
 
     private static async Task PublishComponent(string repoRoot, string component, string outputPath)
     {
         var projectPath = component switch
         {
-            "nexus" => Path.Combine(repoRoot, "src", "CopilotFamily.Nexus", "CopilotFamily.Nexus.csproj"),
-            "app" => Path.Combine(repoRoot, "src", "CopilotFamily.App", "CopilotFamily.App.csproj"),
+            "nexus" => Path.Combine(repoRoot, "src", "CopilotNexus.Service", "CopilotNexus.Service.csproj"),
+            "app" => Path.Combine(repoRoot, "src", "CopilotNexus.App", "CopilotNexus.App.csproj"),
             _ => throw new ArgumentException($"Unknown component: {component}"),
         };
 
@@ -645,9 +645,9 @@ public partial class Program
     {
         string[] searchPaths =
         [
-            CopilotFamilyPaths.AppExe,
-            Path.Combine(AppContext.BaseDirectory, "CopilotFamily.App.exe"),
-            Path.Combine(AppContext.BaseDirectory, "..", "app", "CopilotFamily.App.exe"),
+            CopilotNexusPaths.AppExe,
+            Path.Combine(AppContext.BaseDirectory, "CopilotNexus.App.exe"),
+            Path.Combine(AppContext.BaseDirectory, "..", "app", "CopilotNexus.App.exe"),
         ];
 
         var repoRoot = FindRepoRoot(AppContext.BaseDirectory);
@@ -656,8 +656,8 @@ public partial class Program
             searchPaths =
             [
                 ..searchPaths,
-                Path.Combine(repoRoot, "dist", "CopilotFamily.App.exe"),
-                Path.Combine(repoRoot, "dist", "staging", "CopilotFamily.App.exe"),
+                Path.Combine(repoRoot, "dist", "CopilotNexus.App.exe"),
+                Path.Combine(repoRoot, "dist", "staging", "CopilotNexus.App.exe"),
             ];
         }
 
@@ -677,7 +677,7 @@ public partial class Program
         while (dir != null)
         {
             if (Directory.Exists(Path.Combine(dir, ".git")) ||
-                File.Exists(Path.Combine(dir, "CopilotFamily.slnx")))
+                File.Exists(Path.Combine(dir, "CopilotNexus.slnx")))
                 return dir;
             dir = Path.GetDirectoryName(dir);
         }

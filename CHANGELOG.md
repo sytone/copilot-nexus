@@ -9,34 +9,34 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Added
 
-- **CopilotFamily.Updater** — cross-platform C# console app replacing the PowerShell updater script
+- **CopilotNexus.Updater** — cross-platform C# console app replacing the PowerShell updater script
 - `UpdaterService` with testable logic: wait for process exit, copy staged files, clear staging, relaunch
 - 14 pure C# updater tests (no process spawning) replacing 12 PowerShell-dependent tests
-- `CopilotFamilyPaths.UpdaterExe` path constant for the updater shim location
+- `CopilotNexusPaths.UpdaterExe` path constant for the updater shim location
 - **Spectre.Console** rich CLI output for all Nexus commands — coloured markup, status spinners, tables, and panels
 - `nexus status` renders a formatted table with process, health, staging, and path info
 - `nexus install` and `nexus publish` show animated status spinners during `dotnet publish`
 - `nexus publish` shows a "Next steps" panel with available follow-up commands
-- `CopilotFamilyPaths` static class in Core — centralized path constants for the install layout (`%LOCALAPPDATA%\CopilotFamily\`)
+- `CopilotNexusPaths` static class in Core — centralized path constants for the install layout (`%LOCALAPPDATA%\CopilotNexus\`)
 - Nexus CLI commands: `stop`, `install`, `update [--component]`, `publish [--component]`
 - PID lock file (`nexus.lock`) — written on `start`, read by `stop`/`status`, cleaned on exit
 - `nexus status` now reports lock file PID and staged update status
 - `nexus publish` — builds and publishes Nexus and/or App to install directory
 - `nexus update` — applies staged updates with stop/copy/restart cycle
 - Installation & Operations Guide (`docs/installation-and-operations.md`)
-- 18 new tests for `CopilotFamilyPaths` (path correctness, case insensitivity, staging isolation)
+- 18 new tests for `CopilotNexusPaths` (path correctness, case insensitivity, staging isolation)
 
 ### Changed
 
-- **Hot restart** now launches `CopilotFamily.Updater.exe` instead of `powershell.exe` — no visible shell windows
-- App staging detection now uses `CopilotFamilyPaths.AppStaging` instead of `dist/staging/`
+- **Hot restart** now launches `CopilotNexus.Updater.exe` instead of `powershell.exe` — no visible shell windows
+- App staging detection now uses `CopilotNexusPaths.AppStaging` instead of `dist/staging/`
 - `README.md` rewritten to reflect Nexus + Avalonia architecture
 - CLI entry point uses `NEXUS_TEST_MODE` env var instead of arg-sniffing
-- `nexus winapp start` searches `CopilotFamilyPaths.AppInstall` first
+- `nexus winapp start` searches `CopilotNexusPaths.AppInstall` first
 
 ### Removed
 
-- `update.ps1` PowerShell updater script — replaced by `CopilotFamily.Updater` console app
+- `update.ps1` PowerShell updater script — replaced by `CopilotNexus.Updater` console app
 - `IsCliCommand` and `IsUserFacingArgs` methods — replaced by env var test mode detection
 
 ### Added (prior)
@@ -53,11 +53,11 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - `--nexus-url` startup argument to configure Nexus backend URL (default: `http://localhost:5280`)
 - `SessionInfo.FromRemote()` factory method for reconstructing session info from Nexus DTOs
 - 23 new unit tests for `NexusSessionProxy` (12 tests) and `NexusSessionManager` (11 tests) with mock HTTP handler
-- **CopilotFamily.Nexus** — standalone ASP.NET Core backend service for Copilot session management
+- **CopilotNexus.Service** — standalone ASP.NET Core backend service for Copilot session management
   - **SignalR Hub** (`/hubs/session`) — real-time streaming of session output to connected clients
   - **REST API** (`/api/sessions`, `/api/models`) — CRUD for sessions, model listing, input sending, reconfiguration
   - **Webhook API** (`/api/webhooks/sessions`) — automation endpoints for scripts/CI to create sessions and send messages with optional callback URLs
-- Shared DTOs and `ISessionHubClient` contract in `CopilotFamily.Core.Contracts`
+- Shared DTOs and `ISessionHubClient` contract in `CopilotNexus.Core.Contracts`
 - 20 Nexus integration tests (REST API + Webhooks) using `WebApplicationFactory` with mock SDK
 - **Model selector ComboBox** in session tab status bar — change models on a live session via dropdown
 - **Avalonia UI migration** — replaced WPF with Avalonia 11.3.12 for cross-platform support
@@ -69,20 +69,20 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - Streaming response support with word-by-word delta accumulation
 - Dark theme UI with VS Code-inspired color scheme
 - Keyboard shortcuts: Ctrl+T (new tab), Ctrl+W (close tab)
-- Serilog structured logging with rolling file sink (`%LOCALAPPDATA%\CopilotFamily\logs\`)
+- Serilog structured logging with rolling file sink (`%LOCALAPPDATA%\CopilotNexus\logs\`)
 - Global exception handlers for unhandled UI, domain, and task exceptions
 - `--test-mode` flag with mock services for development without Copilot CLI
 - `--reset-state` flag to clear persisted state on startup (clean slate for testing or troubleshooting)
 - `--minimized` flag to start the window minimized (for CI or automated test runs)
 - Mock services (`MockCopilotClientService`, `MockCopilotSessionWrapper`) for UI testing
-- FlaUI-based UI automation tests (`CopilotFamily.UI.Tests`)
+- FlaUI-based UI automation tests (`CopilotNexus.UI.Tests`)
 - AutomationIds on all interactive XAML elements
 - VS Code tasks for build, run, test, publish-dist, and stage-update workflows
 - Architecture documentation (`docs/architecture-overview.md`)
 - Testing guide (`docs/testing-guide.md`)
 - Status bar showing connection and tab creation progress
 - SDK native session persistence — sessions survive app restarts via `ResumeSessionAsync`
-- Structured session IDs (`copilot-family-{timestamp}-{guid}`) for auditable SDK session tracking
+- Structured session IDs (`copilot-nexus-{timestamp}-{guid}`) for auditable SDK session tracking
 - App state persistence — saves/restores open tabs and SDK session IDs on exit/launch
 - `JsonStatePersistenceService` with atomic file writes for crash-safe state saving
 - Distribution pipeline — `dotnet publish` to `dist/` folder for fast iteration

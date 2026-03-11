@@ -1,14 +1,14 @@
-namespace CopilotFamily.App;
+namespace CopilotNexus.App;
 
 using System.Diagnostics;
 using System.IO;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
-using CopilotFamily.App.Services;
-using CopilotFamily.App.ViewModels;
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Services;
+using CopilotNexus.App.Services;
+using CopilotNexus.App.ViewModels;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Services;
 using Microsoft.Extensions.Logging;
 
 public partial class MainWindow : Window
@@ -103,7 +103,7 @@ public partial class MainWindow : Window
 
     private void StartUpdateDetection()
     {
-        var stagingDir = CopilotFamily.Core.CopilotFamilyPaths.AppStaging;
+        var stagingDir = CopilotNexus.Core.CopilotNexusPaths.AppStaging;
 
         _updateService = new StagingUpdateDetectionService(stagingDir, _logger);
         _updateService.UpdateAvailable += (_, _) =>
@@ -124,8 +124,8 @@ public partial class MainWindow : Window
 
             var updaterExe = FindUpdaterExe();
             var appExePath = Environment.ProcessPath!;
-            var installDir = CopilotFamily.Core.CopilotFamilyPaths.AppInstall;
-            var stagingDir = CopilotFamily.Core.CopilotFamilyPaths.AppStaging;
+            var installDir = CopilotNexus.Core.CopilotNexusPaths.AppInstall;
+            var stagingDir = CopilotNexus.Core.CopilotNexusPaths.AppStaging;
             var pid = Environment.ProcessId;
 
             _logger.LogInformation("Launching updater: PID={Pid}, Install={Install}, Staging={Staging}", pid, installDir, stagingDir);
@@ -172,17 +172,17 @@ public partial class MainWindow : Window
     {
         // Check next to the running executable first (dev/debug scenario)
         var appDir = Path.GetDirectoryName(Environment.ProcessPath!)!;
-        var localUpdater = Path.Combine(appDir, "CopilotFamily.Updater.exe");
+        var localUpdater = Path.Combine(appDir, "CopilotNexus.Updater.exe");
         if (File.Exists(localUpdater))
             return localUpdater;
 
         // Fall back to the installed location
-        var installedUpdater = CopilotFamily.Core.CopilotFamilyPaths.UpdaterExe;
+        var installedUpdater = CopilotNexus.Core.CopilotNexusPaths.UpdaterExe;
         if (File.Exists(installedUpdater))
             return installedUpdater;
 
         throw new FileNotFoundException(
-            "CopilotFamily.Updater.exe not found. Ensure it is published alongside the app.");
+            "CopilotNexus.Updater.exe not found. Ensure it is published alongside the app.");
     }
 
     private void CloseTab_Click(object? sender, RoutedEventArgs e)

@@ -1,14 +1,14 @@
-namespace CopilotFamily.UI.Tests;
+namespace CopilotNexus.UI.Tests;
 
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
-using CopilotFamily.App;
-using CopilotFamily.App.Services;
-using CopilotFamily.App.ViewModels;
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Models;
-using CopilotFamily.Core.Services;
+using CopilotNexus.App;
+using CopilotNexus.App.Services;
+using CopilotNexus.App.ViewModels;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Models;
+using CopilotNexus.Core.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -31,7 +31,7 @@ public class MainWindowTests
     {
         var window = CreateTestWindow();
         Assert.NotNull(window);
-        Assert.Equal("Copilot Family", window.Title);
+        Assert.Equal("Copilot Nexus", window.Title);
     }
 
     [AvaloniaFact]

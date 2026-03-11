@@ -7,7 +7,7 @@
             "type": "process",
             "args": [
                 "build",
-                "${workspaceFolder}/CopilotFamily.slnx",
+                "${workspaceFolder}/CopilotNexus.slnx",
                 "--no-incremental"
             ],
             "problemMatcher": "$msCompile",
@@ -23,7 +23,7 @@
             "args": [
                 "run",
                 "--project",
-                "${workspaceFolder}/src/CopilotFamily.App/CopilotFamily.App.csproj"
+                "${workspaceFolder}/src/CopilotNexus.App/CopilotNexus.App.csproj"
             ],
             "dependsOn": "build",
             "problemMatcher": []
@@ -35,7 +35,7 @@
             "args": [
                 "run",
                 "--project",
-                "${workspaceFolder}/src/CopilotFamily.App/CopilotFamily.App.csproj",
+                "${workspaceFolder}/src/CopilotNexus.App/CopilotNexus.App.csproj",
                 "--",
                 "--test-mode"
             ],
@@ -48,7 +48,7 @@
             "type": "process",
             "args": [
                 "test",
-                "${workspaceFolder}/CopilotFamily.slnx",
+                "${workspaceFolder}/CopilotNexus.slnx",
                 "--verbosity",
                 "normal"
             ],
@@ -64,7 +64,7 @@
             "type": "process",
             "args": [
                 "test",
-                "${workspaceFolder}/test/CopilotFamily.Core.Tests/CopilotFamily.Core.Tests.csproj",
+                "${workspaceFolder}/test/CopilotNexus.Core.Tests/CopilotNexus.Core.Tests.csproj",
                 "--verbosity",
                 "normal"
             ],
@@ -76,7 +76,7 @@
             "type": "process",
             "args": [
                 "test",
-                "${workspaceFolder}/test/CopilotFamily.App.Tests/CopilotFamily.App.Tests.csproj",
+                "${workspaceFolder}/test/CopilotNexus.App.Tests/CopilotNexus.App.Tests.csproj",
                 "--verbosity",
                 "normal"
             ],
@@ -88,7 +88,7 @@
             "type": "process",
             "args": [
                 "test",
-                "${workspaceFolder}/test/CopilotFamily.UI.Tests/CopilotFamily.UI.Tests.csproj",
+                "${workspaceFolder}/test/CopilotNexus.UI.Tests/CopilotNexus.UI.Tests.csproj",
                 "--verbosity",
                 "normal"
             ],
@@ -101,7 +101,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/src/CopilotFamily.App/CopilotFamily.App.csproj",
+                "${workspaceFolder}/src/CopilotNexus.App/CopilotNexus.App.csproj",
                 "-c",
                 "Release",
                 "-o",
@@ -119,7 +119,7 @@
             "type": "process",
             "args": [
                 "publish",
-                "${workspaceFolder}/src/CopilotFamily.App/CopilotFamily.App.csproj",
+                "${workspaceFolder}/src/CopilotNexus.App/CopilotNexus.App.csproj",
                 "-c",
                 "Release",
                 "-o",

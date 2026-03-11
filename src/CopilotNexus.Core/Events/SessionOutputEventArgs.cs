@@ -1,6 +1,6 @@
-namespace CopilotFamily.Core.Events;
+namespace CopilotNexus.Core.Events;
 
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Models;
 
 public class SessionOutputEventArgs : EventArgs
 {

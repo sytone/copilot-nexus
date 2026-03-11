@@ -1,11 +1,11 @@
-# Copilot Family — GitHub Copilot Instructions
+# Copilot Nexus — GitHub Copilot Instructions
 
 ## Project Overview
 
-Copilot Family is a cross-platform desktop application (Avalonia 11.3.12 / .NET 8) that provides a tabbed
+Copilot Nexus is a cross-platform desktop application (Avalonia 11.3.12 / .NET 8) that provides a tabbed
 interface for managing multiple GitHub Copilot SDK sessions simultaneously. The app follows
 a client–service split: the Avalonia desktop app is a thin client that communicates with
-**CopilotFamily.Nexus**, an ASP.NET Core backend service that owns all SDK interactions.
+**CopilotNexus.Service**, an ASP.NET Core backend service that owns all SDK interactions.
 Nexus exposes sessions via SignalR (real-time streaming) and REST (CRUD), enabling future
 clients (web UI, CLI, webhook automation) to share the same backend. In test mode, the app
 bypasses Nexus and uses local mock services directly.
@@ -13,13 +13,13 @@ bypasses Nexus and uses local mock services directly.
 ## Solution Structure
 
 ```
-src/CopilotFamily.Core         — Core business logic, SDK abstractions, shared DTOs/contracts
-src/CopilotFamily.App          — Avalonia 11 desktop application (MVVM, thin SignalR client)
-src/CopilotFamily.Nexus        — ASP.NET Core backend — SignalR hub, REST API, webhooks
-test/CopilotFamily.Core.Tests  — Unit tests for Core (xUnit + Moq, 65 tests)
-test/CopilotFamily.App.Tests   — Unit tests for ViewModels and converters (xUnit + Moq, 47 tests)
-test/CopilotFamily.Nexus.Tests — Integration tests for Nexus (WebApplicationFactory, 20 tests)
-test/CopilotFamily.UI.Tests    — Headless UI tests (Avalonia.Headless.XUnit, 17 tests)
+src/CopilotNexus.Core         — Core business logic, SDK abstractions, shared DTOs/contracts
+src/CopilotNexus.App          — Avalonia 11 desktop application (MVVM, thin SignalR client)
+src/CopilotNexus.Service        — ASP.NET Core backend — SignalR hub, REST API, webhooks
+test/CopilotNexus.Core.Tests  — Unit tests for Core (xUnit + Moq, 65 tests)
+test/CopilotNexus.App.Tests   — Unit tests for ViewModels and converters (xUnit + Moq, 47 tests)
+test/CopilotNexus.Service.Tests — Integration tests for Nexus (WebApplicationFactory, 20 tests)
+test/CopilotNexus.UI.Tests    — Headless UI tests (Avalonia.Headless.XUnit, 17 tests)
 docs/                          — Project documentation
 .github/                       — GitHub configuration and Copilot instructions
 ```
@@ -52,36 +52,36 @@ docs/                          — Project documentation
 ## Building
 
 ```bash
-dotnet build CopilotFamily.slnx
+dotnet build CopilotNexus.slnx
 ```
 
 ## Testing
 
 ```bash
 # All tests
-dotnet test CopilotFamily.slnx
+dotnet test CopilotNexus.slnx
 
 # Core only
-dotnet test test/CopilotFamily.Core.Tests/
+dotnet test test/CopilotNexus.Core.Tests/
 
 # App (ViewModels + converters) only
-dotnet test test/CopilotFamily.App.Tests/
+dotnet test test/CopilotNexus.App.Tests/
 ```
 
 ## Code Style
 
 - Use C# 12 features (file-scoped namespaces, primary constructors where appropriate)
 - Follow MVVM pattern strictly for all UI-related code
-- All business logic belongs in `CopilotFamily.Core`, never in the App project
+- All business logic belongs in `CopilotNexus.Core`, never in the App project
 - Use interfaces for all services to enable testing and swappability
 - Use async/await for all I/O operations
 - Keep ViewModels free of direct UI framework dependencies (use `IUiDispatcher`)
 
 ## Build Discipline
 
-- **Always run `dotnet build CopilotFamily.slnx` after making changes** and fix all warnings and errors before considering work complete
+- **Always run `dotnet build CopilotNexus.slnx` after making changes** and fix all warnings and errors before considering work complete
 - Treat warnings as errors — do not leave warnings unresolved
-- Run `dotnet test CopilotFamily.slnx` after any code change to verify tests still pass
+- Run `dotnet test CopilotNexus.slnx` after any code change to verify tests still pass
 - If a change breaks the build or tests, fix it immediately before moving on
 
 ## Documentation Guidelines
@@ -201,8 +201,8 @@ Only after the design review passes:
 2. Implement services in `Core/Services/`
 3. Create ViewModels in `App/ViewModels/`
 4. Create Views (AXAML) in `App/Views/`
-5. Add unit tests in `test/CopilotFamily.Core.Tests/` and `test/CopilotFamily.App.Tests/`
-6. Add headless UI tests in `test/CopilotFamily.UI.Tests/` if the feature has visual elements
+5. Add unit tests in `test/CopilotNexus.Core.Tests/` and `test/CopilotNexus.App.Tests/`
+6. Add headless UI tests in `test/CopilotNexus.UI.Tests/` if the feature has visual elements
 7. Update documentation in `docs/` if the feature changes architecture or public API
 8. Update `CHANGELOG.md` under the `[Unreleased]` section (see changelog rules below)
 
@@ -211,8 +211,8 @@ Only after the design review passes:
 Run the full verification suite:
 
 ```bash
-dotnet build CopilotFamily.slnx        # must be 0 errors, 0 warnings
-dotnet test CopilotFamily.slnx         # all tests must pass
+dotnet build CopilotNexus.slnx        # must be 0 errors, 0 warnings
+dotnet test CopilotNexus.slnx         # all tests must pass
 ```
 
 - Walk through each BDD scenario and confirm it is satisfied by the implementation
@@ -265,7 +265,7 @@ After committing, **always publish to the staging folder** so the running applic
 
 ```bash
 # Publish a self-contained build to the staging folder inside dist
-dotnet publish src/CopilotFamily.App/CopilotFamily.App.csproj -c Release -o dist/staging --self-contained false --nologo -v q
+dotnet publish src/CopilotNexus.App/CopilotNexus.App.csproj -c Release -o dist/staging --self-contained false --nologo -v q
 ```
 
 - The running application monitors `dist/staging/` via `StagingUpdateDetectionService`

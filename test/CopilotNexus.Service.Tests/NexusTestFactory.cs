@@ -1,7 +1,7 @@
-namespace CopilotFamily.Nexus.Tests;
+namespace CopilotNexus.Service.Tests;
 
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Services;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Services;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;

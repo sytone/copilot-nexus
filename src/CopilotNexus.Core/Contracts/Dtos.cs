@@ -1,6 +1,6 @@
-namespace CopilotFamily.Core.Contracts;
+namespace CopilotNexus.Core.Contracts;
 
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Models;
 
 /// <summary>DTO for session output streamed via SignalR.</summary>
 public record SessionOutputDto(

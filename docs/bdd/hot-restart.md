@@ -10,7 +10,7 @@ restored.
 - **WPF process lifecycle**: The app must fully exit before files can be replaced.
   The Copilot CLI child process (spawned by the SDK) must also be terminated,
   otherwise `copilot.exe` will hold file locks.
-- **Updater must live outside the install dir**: `CopilotFamily.Updater.exe` is a
+- **Updater must live outside the install dir**: `CopilotNexus.Updater.exe` is a
   standalone console app that runs independently of the main app process. It is
   published alongside the app but does not overwrite itself during updates.
 - **FileSystemWatcher reliability**: On Windows, FSW can miss events under heavy
@@ -23,7 +23,7 @@ restored.
 ## Background
 
 ```gherkin
-Given the application is running from "dist/CopilotFamily.App.exe"
+Given the application is running from "dist/CopilotNexus.App.exe"
 And a staging folder exists at "dist/staging/"
 And the updater script is embedded as a resource and extracted to a temp path at runtime
 ```
@@ -53,7 +53,7 @@ And the application exits (including terminating the Copilot CLI child process)
 And the updater waits for the application process to exit (up to 30 seconds)
 And the updater copies all files from "dist/staging/" to "dist/"
 And the updater clears the "dist/staging/" folder
-And the updater launches "dist/CopilotFamily.App.exe"
+And the updater launches "dist/CopilotNexus.App.exe"
 And the updater exits
 And the new application instance starts and resumes SDK sessions via ResumeSessionAsync
 And all tabs and conversation history are fully restored

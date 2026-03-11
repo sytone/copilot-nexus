@@ -1,7 +1,7 @@
-namespace CopilotFamily.App.Tests.Converters;
+namespace CopilotNexus.App.Tests.Converters;
 
 using System.Globalization;
-using CopilotFamily.App.Converters;
+using CopilotNexus.App.Converters;
 using Xunit;
 
 public class EmptyToVisibleConverterTests

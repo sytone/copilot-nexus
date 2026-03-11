@@ -1,9 +1,9 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:views="clr-namespace:CopilotFamily.App.Views"
-        xmlns:converters="clr-namespace:CopilotFamily.App.Converters"
-        x:Class="CopilotFamily.App.MainWindow"
-        Title="Copilot Family"
+        xmlns:views="clr-namespace:CopilotNexus.App.Views"
+        xmlns:converters="clr-namespace:CopilotNexus.App.Converters"
+        x:Class="CopilotNexus.App.MainWindow"
+        Title="Copilot Nexus"
         Height="800" Width="1200"
         Background="{StaticResource BackgroundBrush}"
         WindowStartupLocation="CenterScreen">
@@ -106,7 +106,7 @@
                     VerticalAlignment="Center"
                     HorizontalAlignment="Center"
                     IsVisible="{Binding Tabs.Count, Converter={StaticResource EmptyToVisible}}">
-            <TextBlock Text="Copilot Family"
+            <TextBlock Text="Copilot Nexus"
                        FontSize="36"
                        FontWeight="Light"
                        Foreground="{StaticResource ForegroundBrush}"

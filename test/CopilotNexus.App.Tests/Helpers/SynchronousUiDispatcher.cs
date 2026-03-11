@@ -1,6 +1,6 @@
-namespace CopilotFamily.App.Tests.Helpers;
+namespace CopilotNexus.App.Tests.Helpers;
 
-using CopilotFamily.Core.Interfaces;
+using CopilotNexus.Core.Interfaces;
 
 /// <summary>
 /// Synchronous dispatcher for unit tests — executes actions immediately

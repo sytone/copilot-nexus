@@ -1,6 +1,6 @@
-namespace CopilotFamily.Core.Interfaces;
+namespace CopilotNexus.Core.Interfaces;
 
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Models;
 
 /// <summary>
 /// Manages the single CopilotClient connection to the Copilot CLI (via JSON-RPC).

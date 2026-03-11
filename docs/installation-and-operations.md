@@ -1,6 +1,6 @@
 # Installation & Operations Guide
 
-This guide covers how to install, run, update, and manage Copilot Family — both the
+This guide covers how to install, run, update, and manage Copilot Nexus — both the
 **Nexus backend service** and the **desktop application**.
 
 ---
@@ -10,16 +10,16 @@ This guide covers how to install, run, update, and manage Copilot Family — bot
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
 - Windows 10/11
 - [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli) installed and authenticated
-- Repository cloned locally (e.g., `C:\repos\copilot-family`)
+- Repository cloned locally (e.g., `C:\repos\copilot-nexus`)
 
 ---
 
 ## Directory Layout
 
-Everything installs under `%LOCALAPPDATA%\CopilotFamily\`:
+Everything installs under `%LOCALAPPDATA%\CopilotNexus\`:
 
 ```
-%LOCALAPPDATA%\CopilotFamily\
+%LOCALAPPDATA%\CopilotNexus\
 ├── nexus\              ← Nexus service binaries
 ├── app\                ← Desktop app binaries
 ├── staging\            ← Pending updates (not inside install dirs)
@@ -47,7 +47,7 @@ nexus build
 nexus build -c Debug
 
 # Or directly with dotnet
-dotnet build CopilotFamily.slnx
+dotnet build CopilotNexus.slnx
 ```
 
 This builds all projects: Core, App, Nexus, and test projects. On success it
@@ -61,14 +61,14 @@ The `install` command builds both components and publishes them to the install d
 
 ```powershell
 # From the repo root — run via dotnet
-dotnet run --project src/CopilotFamily.Nexus -- install
+dotnet run --project src/CopilotNexus.Service -- install
 ```
 
 This will:
 
-1. Create the `%LOCALAPPDATA%\CopilotFamily\` directory structure
-2. Run `dotnet publish` for **Nexus** → `%LOCALAPPDATA%\CopilotFamily\nexus\`
-3. Run `dotnet publish` for **App** → `%LOCALAPPDATA%\CopilotFamily\app\`
+1. Create the `%LOCALAPPDATA%\CopilotNexus\` directory structure
+2. Run `dotnet publish` for **Nexus** → `%LOCALAPPDATA%\CopilotNexus\nexus\`
+3. Run `dotnet publish` for **App** → `%LOCALAPPDATA%\CopilotNexus\app\`
 
 After installation, set up the `nexus` alias (see next section) so you can manage
 everything from any terminal.
@@ -82,7 +82,7 @@ To avoid typing the full executable path every time, create a `nexus` alias.
 ### Option A: PowerShell alias (current session only)
 
 ```powershell
-Set-Alias nexus "$env:LOCALAPPDATA\CopilotFamily\nexus\CopilotFamily.Nexus.exe"
+Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Service.exe"
 ```
 
 ### Option B: PowerShell profile (persistent across sessions)
@@ -98,7 +98,7 @@ notepad $PROFILE
 Add this line:
 
 ```powershell
-Set-Alias nexus "$env:LOCALAPPDATA\CopilotFamily\nexus\CopilotFamily.Nexus.exe"
+Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Service.exe"
 ```
 
 Save and reload:
@@ -111,7 +111,7 @@ Save and reload:
 
 ```powershell
 # Add the Nexus install directory to your user PATH
-$nexusDir = "$env:LOCALAPPDATA\CopilotFamily\nexus"
+$nexusDir = "$env:LOCALAPPDATA\CopilotNexus\nexus"
 $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
 if ($currentPath -notlike "*$nexusDir*") {
     [Environment]::SetEnvironmentVariable("PATH", "$currentPath;$nexusDir", "User")
@@ -119,7 +119,7 @@ if ($currentPath -notlike "*$nexusDir*") {
 ```
 
 > Restart your terminal after modifying PATH. The executable is named
-> `CopilotFamily.Nexus.exe` — you can rename it to `nexus.exe` after install if preferred.
+> `CopilotNexus.Service.exe` — you can rename it to `nexus.exe` after install if preferred.
 
 ### Verify
 
@@ -128,8 +128,8 @@ nexus --help
 ```
 
 All examples below use the `nexus` alias. If you haven't set it up, substitute
-`& "$env:LOCALAPPDATA\CopilotFamily\nexus\CopilotFamily.Nexus.exe"` or
-`dotnet run --project src/CopilotFamily.Nexus --`.
+`& "$env:LOCALAPPDATA\CopilotNexus\nexus\CopilotNexus.Service.exe"` or
+`dotnet run --project src/CopilotNexus.Service --`.
 
 ---
 
@@ -155,7 +155,7 @@ Use `--interactive` when you want to see log output in the terminal or when debu
 
 When Nexus starts, it:
 
-- Writes its PID to `%LOCALAPPDATA%\CopilotFamily\nexus.lock`
+- Writes its PID to `%LOCALAPPDATA%\CopilotNexus\nexus.lock`
 - Initializes the Copilot SDK session manager
 - Starts the SignalR hub and REST API
 - Cleans up the lock file on shutdown
@@ -202,9 +202,9 @@ nexus winapp start --test-mode
 nexus winapp start --nexus-url http://localhost:6000
 
 # Or launch the app directly
-& "$env:LOCALAPPDATA\CopilotFamily\app\CopilotFamily.App.exe"
-& "$env:LOCALAPPDATA\CopilotFamily\app\CopilotFamily.App.exe" --nexus-url http://localhost:5280
-& "$env:LOCALAPPDATA\CopilotFamily\app\CopilotFamily.App.exe" --test-mode
+& "$env:LOCALAPPDATA\CopilotNexus\app\CopilotNexus.App.exe"
+& "$env:LOCALAPPDATA\CopilotNexus\app\CopilotNexus.App.exe" --nexus-url http://localhost:5280
+& "$env:LOCALAPPDATA\CopilotNexus\app\CopilotNexus.App.exe" --test-mode
 ```
 
 ---
@@ -226,10 +226,10 @@ Or during development (foreground mode in one terminal):
 
 ```powershell
 # Terminal 1: Start Nexus interactively (see logs)
-dotnet run --project src/CopilotFamily.Nexus -- start --interactive
+dotnet run --project src/CopilotNexus.Service -- start --interactive
 
 # Terminal 2: Launch app
-dotnet run --project src/CopilotFamily.App
+dotnet run --project src/CopilotNexus.App
 ```
 
 ---
@@ -254,7 +254,7 @@ nexus publish --component app
 > **Note:** `nexus publish` requires a prior `nexus install`. If no installation is
 > detected it will tell you to run `nexus install` first.
 
-`publish` outputs to the **staging** directory (`%LOCALAPPDATA%\CopilotFamily\staging\`),
+`publish` outputs to the **staging** directory (`%LOCALAPPDATA%\CopilotNexus\staging\`),
 not directly to the install directory. This keeps the running service untouched until
 you explicitly apply the update.
 
@@ -326,10 +326,10 @@ The `update` command:
 nexus status
 
 # Check for stale lock file
-Get-Content "$env:LOCALAPPDATA\CopilotFamily\nexus.lock"
+Get-Content "$env:LOCALAPPDATA\CopilotNexus\nexus.lock"
 
 # Remove stale lock file if the PID is dead
-Remove-Item "$env:LOCALAPPDATA\CopilotFamily\nexus.lock"
+Remove-Item "$env:LOCALAPPDATA\CopilotNexus\nexus.lock"
 ```
 
 ### App can't connect to Nexus
@@ -340,19 +340,19 @@ Remove-Item "$env:LOCALAPPDATA\CopilotFamily\nexus.lock"
 
 ### Logs
 
-All logs are written to `%LOCALAPPDATA%\CopilotFamily\logs\`:
+All logs are written to `%LOCALAPPDATA%\CopilotNexus\logs\`:
 
 ```powershell
 # View recent log entries
-Get-Content "$env:LOCALAPPDATA\CopilotFamily\logs\*.log" -Tail 50
+Get-Content "$env:LOCALAPPDATA\CopilotNexus\logs\*.log" -Tail 50
 ```
 
 ### Clean reinstall
 
 ```powershell
 nexus stop
-Remove-Item -Recurse -Force "$env:LOCALAPPDATA\CopilotFamily"
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\CopilotNexus"
 
 # Reinstall from repo
-dotnet run --project src/CopilotFamily.Nexus -- install
+dotnet run --project src/CopilotNexus.Service -- install
 ```

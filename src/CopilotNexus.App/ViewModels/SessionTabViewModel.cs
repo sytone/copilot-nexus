@@ -1,10 +1,10 @@
-namespace CopilotFamily.App.ViewModels;
+namespace CopilotNexus.App.ViewModels;
 
 using System.Collections.ObjectModel;
 using System.Windows.Input;
-using CopilotFamily.Core.Events;
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Events;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Models;
 using Microsoft.Extensions.Logging;
 
 public class SessionTabViewModel : ViewModelBase, IDisposable

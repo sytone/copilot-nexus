@@ -1,9 +1,9 @@
-namespace CopilotFamily.Nexus.Controllers;
+namespace CopilotNexus.Service.Controllers;
 
-using CopilotFamily.Core.Contracts;
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Models;
-using CopilotFamily.Nexus.Hubs;
+using CopilotNexus.Core.Contracts;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Models;
+using CopilotNexus.Service.Hubs;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 

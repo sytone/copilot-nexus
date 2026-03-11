@@ -1,4 +1,4 @@
-namespace CopilotFamily.Core.Models;
+namespace CopilotNexus.Core.Models;
 
 public class SessionInfo
 {

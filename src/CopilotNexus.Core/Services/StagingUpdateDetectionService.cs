@@ -1,7 +1,7 @@
-namespace CopilotFamily.Core.Services;
+namespace CopilotNexus.Core.Services;
 
 using System.IO;
-using CopilotFamily.Core.Interfaces;
+using CopilotNexus.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 
 /// <summary>

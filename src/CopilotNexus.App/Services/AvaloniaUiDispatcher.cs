@@ -1,7 +1,7 @@
-namespace CopilotFamily.App.Services;
+namespace CopilotNexus.App.Services;
 
 using Avalonia.Threading;
-using CopilotFamily.Core.Interfaces;
+using CopilotNexus.Core.Interfaces;
 
 public class AvaloniaUiDispatcher : IUiDispatcher
 {

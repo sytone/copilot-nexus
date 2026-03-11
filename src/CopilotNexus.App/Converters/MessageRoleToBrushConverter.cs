@@ -1,9 +1,9 @@
-namespace CopilotFamily.App.Converters;
+namespace CopilotNexus.App.Converters;
 
 using System.Globalization;
 using Avalonia.Data.Converters;
 using Avalonia.Media;
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Models;
 
 public class MessageRoleToBrushConverter : IValueConverter
 {

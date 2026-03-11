@@ -1,6 +1,6 @@
-[assembly: Avalonia.Headless.AvaloniaTestApplication(typeof(CopilotFamily.UI.Tests.TestAppBuilder))]
+[assembly: Avalonia.Headless.AvaloniaTestApplication(typeof(CopilotNexus.UI.Tests.TestAppBuilder))]
 
-namespace CopilotFamily.UI.Tests;
+namespace CopilotNexus.UI.Tests;
 
 using Avalonia;
 using Avalonia.Headless;

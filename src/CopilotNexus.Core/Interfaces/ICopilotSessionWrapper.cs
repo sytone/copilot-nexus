@@ -1,6 +1,6 @@
-namespace CopilotFamily.Core.Interfaces;
+namespace CopilotNexus.Core.Interfaces;
 
-using CopilotFamily.Core.Events;
+using CopilotNexus.Core.Events;
 
 /// <summary>
 /// Wraps a single CopilotSession (one per tab) with event-based streaming output.

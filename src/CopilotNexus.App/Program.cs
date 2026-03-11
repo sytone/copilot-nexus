@@ -1,7 +1,7 @@
 using Avalonia;
-using CopilotFamily.App;
+using CopilotNexus.App;
 
-namespace CopilotFamily.App;
+namespace CopilotNexus.App;
 
 internal static class Program
 {

@@ -15,7 +15,7 @@ launch. The user returns to exactly where they left off.
   https://github.com/github/copilot-sdk/blob/main/docs/features/session-persistence.md
 
 - **Session ID strategy**: Use structured IDs for auditability:
-  `copilot-family-{counter}-{timestamp}` (e.g., `copilot-family-3-1706932800`).
+  `copilot-nexus-{counter}-{timestamp}` (e.g., `copilot-nexus-3-1706932800`).
   These are deterministic, unique, and easy to clean up.
 
 - **Disconnect vs Dispose**: On app exit, call `session.Disconnect()` (not
@@ -53,7 +53,7 @@ launch. The user returns to exactly where they left off.
 ## Background
 
 ```gherkin
-Given the state file is stored at "%LOCALAPPDATA%/CopilotFamily/state/session-state.json"
+Given the state file is stored at "%LOCALAPPDATA%/CopilotNexus/state/session-state.json"
 And the state file contains tab metadata: name, model, SDK session ID, and tab order
 And SDK session data is stored at "~/.copilot/session-state/{sessionId}/"
 And the state file includes a schema version for forward compatibility
@@ -66,7 +66,7 @@ And the state file includes a schema version for forward compatibility
 ```gherkin
 Given the application is running
 When the user creates a new session tab
-Then the SDK session is created with a structured SessionId (e.g., "copilot-family-1-1706932800")
+Then the SDK session is created with a structured SessionId (e.g., "copilot-nexus-1-1706932800")
 And the SessionId is stored in the tab metadata
 And the SDK automatically persists conversation state to disk
 ```
@@ -75,12 +75,12 @@ And the SDK automatically persists conversation state to disk
 
 ```gherkin
 Given the application is running
-And "Session 1" is open with SDK session ID "copilot-family-1-1706932800"
-And "Session 2" is open with SDK session ID "copilot-family-2-1706932801"
+And "Session 1" is open with SDK session ID "copilot-nexus-1-1706932800"
+And "Session 2" is open with SDK session ID "copilot-nexus-2-1706932801"
 And "Session 1" is the selected tab
 When the user closes the application
 Then each SDK session is disconnected (not disposed) to preserve state on disk
-And a state file is written to "%LOCALAPPDATA%/CopilotFamily/state/session-state.json"
+And a state file is written to "%LOCALAPPDATA%/CopilotNexus/state/session-state.json"
 And the state file contains tab metadata for 2 tabs (name, model, SDK session ID)
 And the selected tab index is 0
 And the session counter is preserved
@@ -112,7 +112,7 @@ And a system message is appended: "Session resumed"
 ### Scenario: Resume failure falls back to new session
 
 ```gherkin
-Given a state file exists with a tab referencing SDK session ID "copilot-family-old-123"
+Given a state file exists with a tab referencing SDK session ID "copilot-nexus-old-123"
 And the SDK session data has been deleted or expired
 When the application starts and tries to resume
 Then ResumeSessionAsync fails for that session
@@ -125,9 +125,9 @@ And the tab retains its saved name and model
 
 ```gherkin
 Given the application is running
-And "Session 1" is open with SDK session ID "copilot-family-1-1706932800"
+And "Session 1" is open with SDK session ID "copilot-nexus-1-1706932800"
 When the user closes the "Session 1" tab
-Then DeleteSessionAsync is called with "copilot-family-1-1706932800"
+Then DeleteSessionAsync is called with "copilot-nexus-1-1706932800"
 And the SDK session data is permanently removed from disk
 And the session cannot be resumed later
 ```

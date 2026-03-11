@@ -1,16 +1,16 @@
-using CopilotFamily.Updater;
+using CopilotNexus.Updater;
 
-// CopilotFamily.Updater — Cross-platform update shim
+// CopilotNexus.Updater — Cross-platform update shim
 // Waits for the host app to exit, copies staged files, relaunches.
 //
-// Usage: CopilotFamily.Updater --app-pid <PID> --install-path <path>
+// Usage: CopilotNexus.Updater --app-pid <PID> --install-path <path>
 //        --staging-path <path> --app-exe <path> [--timeout <seconds>]
 
 var options = ParseArgs(args);
 if (options is null)
 {
     Console.Error.WriteLine(
-        "Usage: CopilotFamily.Updater --app-pid <PID> --install-path <path> " +
+        "Usage: CopilotNexus.Updater --app-pid <PID> --install-path <path> " +
         "--staging-path <path> --app-exe <path> [--timeout <seconds>]");
     return 1;
 }

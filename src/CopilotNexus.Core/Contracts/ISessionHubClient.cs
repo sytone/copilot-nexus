@@ -1,4 +1,4 @@
-namespace CopilotFamily.Core.Contracts;
+namespace CopilotNexus.Core.Contracts;
 
 /// <summary>
 /// SignalR client interface — methods the server can invoke on connected clients.

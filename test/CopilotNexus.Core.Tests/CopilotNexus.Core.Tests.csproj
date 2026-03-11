@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
-    <RootNamespace>CopilotFamily.Core.Tests</RootNamespace>
+    <RootNamespace>CopilotNexus.Core.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,8 +17,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\CopilotFamily.Core\CopilotFamily.Core.csproj" />
-    <ProjectReference Include="..\..\src\CopilotFamily.Updater\CopilotFamily.Updater.csproj" />
+    <ProjectReference Include="..\..\src\CopilotNexus.Core\CopilotNexus.Core.csproj" />
+    <ProjectReference Include="..\..\src\CopilotNexus.Updater\CopilotNexus.Updater.csproj" />
   </ItemGroup>
 
 </Project>

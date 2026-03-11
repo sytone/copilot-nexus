@@ -29,7 +29,7 @@ And the staging folder is at "dist/staging/"
 Given the solution builds successfully
 When I run the "publish-dist" VS Code task
 Then the application is published to "dist/"
-And the executable "dist/CopilotFamily.App.exe" exists
+And the executable "dist/CopilotNexus.App.exe" exists
 And all runtime dependencies are in "dist/"
 And the "dist/staging/" folder exists but is empty
 ```
@@ -63,7 +63,7 @@ And the existing dist files are not modified
 ## Integration Test Coverage
 
 The following scenarios are verified by automated integration tests
-in `test/CopilotFamily.Core.Tests/Integration/DistStagingUpdateTests.cs`:
+in `test/CopilotNexus.Core.Tests/Integration/DistStagingUpdateTests.cs`:
 
 ### Scenario: Updater script copies staged files to dist
 

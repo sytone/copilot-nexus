@@ -1,15 +1,15 @@
-namespace CopilotFamily.Core;
+namespace CopilotNexus.Core;
 
 /// <summary>
-/// Centralized path definitions for the CopilotFamily installation layout.
-/// All paths are rooted at %LOCALAPPDATA%\CopilotFamily\.
+/// Centralized path definitions for the CopilotNexus installation layout.
+/// All paths are rooted at %LOCALAPPDATA%\CopilotNexus\.
 /// </summary>
-public static class CopilotFamilyPaths
+public static class CopilotNexusPaths
 {
-    /// <summary>Root directory: %LOCALAPPDATA%\CopilotFamily\</summary>
+    /// <summary>Root directory: %LOCALAPPDATA%\CopilotNexus\</summary>
     public static string Root { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "CopilotFamily");
+        "CopilotNexus");
 
     /// <summary>Nexus service install directory.</summary>
     public static string NexusInstall { get; } = Path.Combine(Root, "nexus");
@@ -36,13 +36,13 @@ public static class CopilotFamilyPaths
     public static string AppStateFile { get; } = Path.Combine(Root, "app-state.json");
 
     /// <summary>Nexus executable path in the install directory.</summary>
-    public static string NexusExe { get; } = Path.Combine(NexusInstall, "CopilotFamily.Nexus.exe");
+    public static string NexusExe { get; } = Path.Combine(NexusInstall, "CopilotNexus.Service.exe");
 
     /// <summary>App executable path in the install directory.</summary>
-    public static string AppExe { get; } = Path.Combine(AppInstall, "CopilotFamily.App.exe");
+    public static string AppExe { get; } = Path.Combine(AppInstall, "CopilotNexus.App.exe");
 
     /// <summary>Updater shim executable path (lives alongside the app).</summary>
-    public static string UpdaterExe { get; } = Path.Combine(AppInstall, "CopilotFamily.Updater.exe");
+    public static string UpdaterExe { get; } = Path.Combine(AppInstall, "CopilotNexus.Updater.exe");
 
     /// <summary>Ensures all required directories exist.</summary>
     public static void EnsureDirectories()

@@ -1,8 +1,8 @@
-namespace CopilotFamily.App.Tests.Services;
+namespace CopilotNexus.App.Tests.Services;
 
-using CopilotFamily.App.Services;
-using CopilotFamily.Core.Events;
-using CopilotFamily.Core.Models;
+using CopilotNexus.App.Services;
+using CopilotNexus.Core.Events;
+using CopilotNexus.Core.Models;
 using Xunit;
 
 public class NexusSessionProxyTests

@@ -1,6 +1,6 @@
-namespace CopilotFamily.Core.Tests;
+namespace CopilotNexus.Core.Tests;
 
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Models;
 using Xunit;
 
 public class SessionInfoTests

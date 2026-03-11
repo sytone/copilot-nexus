@@ -2,14 +2,14 @@
 
 ## Overview
 
-Copilot Family has three test projects covering unit tests, ViewModel tests, and
+Copilot Nexus has three test projects covering unit tests, ViewModel tests, and
 UI automation tests. All tests use **xUnit 2.7** as the test framework.
 
 | Project | Type | Tests | What It Covers |
 |---|---|---|---|
-| `CopilotFamily.Core.Tests` | Unit | 65 | Models, SessionManager, persistence, integration |
-| `CopilotFamily.App.Tests` | Unit | 47 | ViewModels, XAML value converters |
-| `CopilotFamily.UI.Tests` | UI Automation | 12 | App launch, tab management, user interactions |
+| `CopilotNexus.Core.Tests` | Unit | 65 | Models, SessionManager, persistence, integration |
+| `CopilotNexus.App.Tests` | Unit | 47 | ViewModels, XAML value converters |
+| `CopilotNexus.UI.Tests` | UI Automation | 12 | App launch, tab management, user interactions |
 
 ## Prerequisites
 
@@ -22,20 +22,20 @@ UI automation tests. All tests use **xUnit 2.7** as the test framework.
 ### All Unit Tests
 
 ```bash
-dotnet test CopilotFamily.slnx
+dotnet test CopilotNexus.slnx
 ```
 
 ### Individual Test Projects
 
 ```bash
 # Core business logic tests (fastest, no WPF dependency)
-dotnet test test/CopilotFamily.Core.Tests
+dotnet test test/CopilotNexus.Core.Tests
 
 # App ViewModel and converter tests
-dotnet test test/CopilotFamily.App.Tests
+dotnet test test/CopilotNexus.App.Tests
 
 # UI automation tests (launches the app — requires a display)
-dotnet test test/CopilotFamily.UI.Tests
+dotnet test test/CopilotNexus.UI.Tests
 ```
 
 ### Filtered by Test Name
@@ -59,7 +59,7 @@ dotnet test --verbosity normal
 
 ## Test Projects in Detail
 
-### CopilotFamily.Core.Tests
+### CopilotNexus.Core.Tests
 
 Pure unit tests with no UI or WPF dependencies. Target framework: `net8.0`.
 
@@ -96,7 +96,7 @@ mockClientService
 var manager = new SessionManager(mockClientService.Object, NullLogger<SessionManager>.Instance);
 ```
 
-### CopilotFamily.App.Tests
+### CopilotNexus.App.Tests
 
 ViewModel and converter tests. Target framework: `net8.0-windows` (WPF types needed
 for converters).
@@ -114,7 +114,7 @@ for converters).
 **Key patterns:**
 
 - **`SynchronousUiDispatcher`** — test helper at
-  `test/CopilotFamily.App.Tests/Helpers/SynchronousUiDispatcher.cs` that implements
+  `test/CopilotNexus.App.Tests/Helpers/SynchronousUiDispatcher.cs` that implements
   `IUiDispatcher` by executing actions inline on the calling thread. This avoids
   needing a WPF Dispatcher in unit tests.
 - Moq's `Raise()` is used to simulate SDK output events:
@@ -130,7 +130,7 @@ mockSession.Raise(
 - `NullLogger.Instance` and `NullLogger<T>.Instance` are passed to all constructors
   that require `ILogger`
 
-### CopilotFamily.UI.Tests
+### CopilotNexus.UI.Tests
 
 FlaUI-based UI automation tests that launch the actual application. Target framework:
 `net8.0-windows`.
@@ -147,8 +147,8 @@ No Copilot CLI installation is needed.
 **Important:** The app must be built before running UI tests:
 
 ```bash
-dotnet build src/CopilotFamily.App
-dotnet test test/CopilotFamily.UI.Tests
+dotnet build src/CopilotNexus.App
+dotnet test test/CopilotNexus.UI.Tests
 ```
 
 **Test classes:**
@@ -201,13 +201,13 @@ The application supports several command-line flags useful for testing and devel
 
 ```bash
 # Run with mock services and no saved state (testing)
-CopilotFamily.App.exe --test-mode --reset-state
+CopilotNexus.App.exe --test-mode --reset-state
 
 # Clear leftover sessions and start fresh (troubleshooting)
-CopilotFamily.App.exe --reset-state
+CopilotNexus.App.exe --reset-state
 
 # All flags combined (UI test runner uses this)
-CopilotFamily.App.exe --test-mode --reset-state
+CopilotNexus.App.exe --test-mode --reset-state
 ```
 
 ## Adding New Tests
@@ -215,8 +215,8 @@ CopilotFamily.App.exe --test-mode --reset-state
 ### Adding a Unit Test
 
 1. Create a test class in the appropriate project:
-   - Business logic → `CopilotFamily.Core.Tests`
-   - ViewModel or UI logic → `CopilotFamily.App.Tests`
+   - Business logic → `CopilotNexus.Core.Tests`
+   - ViewModel or UI logic → `CopilotNexus.App.Tests`
 
 2. Follow the existing patterns — mock interfaces with Moq, use `NullLogger`:
 
@@ -243,7 +243,7 @@ public class MyNewFeatureTests
 
 ### Adding a UI Test
 
-1. Add a new test class in `CopilotFamily.UI.Tests` inheriting from `UITestBase`:
+1. Add a new test class in `CopilotNexus.UI.Tests` inheriting from `UITestBase`:
 
 ```csharp
 [Collection("UI")]
@@ -268,7 +268,7 @@ public class MyNewUITests : UITestBase
 <Button AutomationProperties.AutomationId="MyNewButton" Content="Click Me"/>
 ```
 
-3. Build the app, then run: `dotnet test test/CopilotFamily.UI.Tests`
+3. Build the app, then run: `dotnet test test/CopilotNexus.UI.Tests`
 
 ## Debugging Tests
 
@@ -290,7 +290,7 @@ var manager = new SessionManager(mockClientService.Object, logger);
 When UI tests fail, check the app's log file:
 
 ```
-%LOCALAPPDATA%\CopilotFamily\logs\copilot-family-YYYYMMDD.log
+%LOCALAPPDATA%\CopilotNexus\logs\copilot-nexus-YYYYMMDD.log
 ```
 
 The app logs all lifecycle events — session creation, input sends, errors, and disposal —
@@ -298,7 +298,7 @@ which helps diagnose why a UI interaction may have failed.
 
 ### Running Tests in Visual Studio
 
-Open `CopilotFamily.slnx` in Visual Studio. Tests appear in Test Explorer and can be
+Open `CopilotNexus.slnx` in Visual Studio. Tests appear in Test Explorer and can be
 run/debugged individually with breakpoints.
 
 ### CI/CD Considerations

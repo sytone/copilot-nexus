@@ -1,4 +1,4 @@
-namespace CopilotFamily.App.ViewModels;
+namespace CopilotNexus.App.ViewModels;
 
 using System.Windows.Input;
 

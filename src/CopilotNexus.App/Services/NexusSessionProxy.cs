@@ -1,7 +1,7 @@
-namespace CopilotFamily.App.Services;
+namespace CopilotNexus.App.Services;
 
-using CopilotFamily.Core.Events;
-using CopilotFamily.Core.Interfaces;
+using CopilotNexus.Core.Events;
+using CopilotNexus.Core.Interfaces;
 
 /// <summary>
 /// Proxy session wrapper for Nexus-backed sessions.

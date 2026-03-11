@@ -1,4 +1,4 @@
-namespace CopilotFamily.Core.Interfaces;
+namespace CopilotNexus.Core.Interfaces;
 
 /// <summary>
 /// Abstracts UI thread dispatching so ViewModels can be tested

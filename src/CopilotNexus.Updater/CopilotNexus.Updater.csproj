@@ -5,12 +5,12 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>CopilotFamily.Updater</RootNamespace>
-    <AssemblyName>CopilotFamily.Updater</AssemblyName>
+    <RootNamespace>CopilotNexus.Updater</RootNamespace>
+    <AssemblyName>CopilotNexus.Updater</AssemblyName>
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="CopilotFamily.Core.Tests" />
+    <InternalsVisibleTo Include="CopilotNexus.Core.Tests" />
   </ItemGroup>
 
 </Project>

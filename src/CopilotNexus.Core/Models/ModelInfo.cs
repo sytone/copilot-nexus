@@ -1,4 +1,4 @@
-namespace CopilotFamily.Core.Models;
+namespace CopilotNexus.Core.Models;
 
 /// <summary>
 /// Represents an available LLM model that can be selected for a session.

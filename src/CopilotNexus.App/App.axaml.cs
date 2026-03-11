@@ -1,4 +1,4 @@
-namespace CopilotFamily.App;
+namespace CopilotNexus.App;
 
 using System.IO;
 using Avalonia;
@@ -15,7 +15,7 @@ public partial class App : Application
 
     public static string LogDirectory { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "CopilotFamily", "logs");
+        "CopilotNexus", "logs");
 
     public static bool IsTestMode { get; internal set; }
 
@@ -38,7 +38,7 @@ public partial class App : Application
 
         ConfigureLogging();
 
-        _appLogger!.LogInformation("=== Copilot Family starting (TestMode={TestMode}, ResetState={ResetState}, Minimized={Minimized}) ===",
+        _appLogger!.LogInformation("=== Copilot Nexus starting (TestMode={TestMode}, ResetState={ResetState}, Minimized={Minimized}) ===",
             IsTestMode, ResetState, StartMinimized);
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
@@ -56,7 +56,7 @@ public partial class App : Application
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.File(
-                Path.Combine(LogDirectory, "copilot-family-.log"),
+                Path.Combine(LogDirectory, "copilot-nexus-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 14,
                 outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
@@ -65,7 +65,7 @@ public partial class App : Application
             .CreateLogger();
 
         var factory = new LoggerFactory().AddSerilog(Log.Logger);
-        _appLogger = factory.CreateLogger("CopilotFamily.App");
+        _appLogger = factory.CreateLogger("CopilotNexus.App");
 
         // Store factory for MainWindow to access
         LoggerFactoryInstance = factory;

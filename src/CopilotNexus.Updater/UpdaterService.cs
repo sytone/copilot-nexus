@@ -1,4 +1,4 @@
-namespace CopilotFamily.Updater;
+namespace CopilotNexus.Updater;
 
 using System.Diagnostics;
 

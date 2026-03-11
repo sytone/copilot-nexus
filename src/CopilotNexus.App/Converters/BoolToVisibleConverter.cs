@@ -1,4 +1,4 @@
-namespace CopilotFamily.App.Converters;
+namespace CopilotNexus.App.Converters;
 
 using System.Globalization;
 using Avalonia.Data.Converters;

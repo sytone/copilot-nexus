@@ -1,9 +1,9 @@
-namespace CopilotFamily.Core.Services;
+namespace CopilotNexus.Core.Services;
 
 using GitHub.Copilot.SDK;
-using CopilotFamily.Core.Events;
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Events;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Models;
 using Microsoft.Extensions.Logging;
 
 public class CopilotSessionWrapper : ICopilotSessionWrapper

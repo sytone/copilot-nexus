@@ -1,7 +1,7 @@
-namespace CopilotFamily.Core.Tests.Integration;
+namespace CopilotNexus.Core.Tests.Integration;
 
 using System.Diagnostics;
-using CopilotFamily.Updater;
+using CopilotNexus.Updater;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -20,7 +20,7 @@ public class UpdaterServiceTests : IDisposable
     public UpdaterServiceTests(ITestOutputHelper output)
     {
         _output = output;
-        _testRoot = Path.Combine(Path.GetTempPath(), $"CopilotFamilyUpdaterTest_{Guid.NewGuid():N}");
+        _testRoot = Path.Combine(Path.GetTempPath(), $"CopilotNexusUpdaterTest_{Guid.NewGuid():N}");
         _installDir = Path.Combine(_testRoot, "app");
         _stagingDir = Path.Combine(_testRoot, "staging", "app");
         Directory.CreateDirectory(_installDir);

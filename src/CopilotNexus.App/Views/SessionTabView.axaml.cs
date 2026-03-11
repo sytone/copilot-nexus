@@ -1,4 +1,4 @@
-namespace CopilotFamily.App.Views;
+namespace CopilotNexus.App.Views;
 
 using System.Collections.Specialized;
 using Avalonia.Controls;

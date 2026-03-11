@@ -1,8 +1,8 @@
-namespace CopilotFamily.Nexus.Controllers;
+namespace CopilotNexus.Service.Controllers;
 
-using CopilotFamily.Core.Contracts;
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Contracts;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Models;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]

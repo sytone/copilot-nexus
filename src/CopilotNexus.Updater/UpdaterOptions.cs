@@ -1,4 +1,4 @@
-namespace CopilotFamily.Updater;
+namespace CopilotNexus.Updater;
 
 /// <summary>
 /// Options for the updater process.

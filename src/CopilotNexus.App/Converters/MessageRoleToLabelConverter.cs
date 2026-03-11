@@ -1,8 +1,8 @@
-namespace CopilotFamily.App.Converters;
+namespace CopilotNexus.App.Converters;
 
 using System.Globalization;
 using Avalonia.Data.Converters;
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Models;
 
 public class MessageRoleToLabelConverter : IValueConverter
 {

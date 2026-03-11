@@ -1,12 +1,12 @@
-namespace CopilotFamily.UI.Tests;
+namespace CopilotNexus.UI.Tests;
 
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
-using CopilotFamily.App;
-using CopilotFamily.App.ViewModels;
-using CopilotFamily.App.Views;
-using CopilotFamily.Core.Models;
+using CopilotNexus.App;
+using CopilotNexus.App.ViewModels;
+using CopilotNexus.App.Views;
+using CopilotNexus.Core.Models;
 using Xunit;
 
 /// <summary>

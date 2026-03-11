@@ -1,4 +1,4 @@
-namespace CopilotFamily.Core.Models;
+namespace CopilotNexus.Core.Models;
 
 /// <summary>
 /// Represents a permission request from the agent to use a tool.

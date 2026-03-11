@@ -1,4 +1,4 @@
-namespace CopilotFamily.Core.Interfaces;
+namespace CopilotNexus.Core.Interfaces;
 
 /// <summary>
 /// Watches for staged updates and notifies when a new version is available.

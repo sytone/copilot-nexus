@@ -1,8 +1,8 @@
-namespace CopilotFamily.Nexus.Tests;
+namespace CopilotNexus.Service.Tests;
 
 using System.Net;
 using System.Net.Http.Json;
-using CopilotFamily.Core.Contracts;
+using CopilotNexus.Core.Contracts;
 using Xunit;
 
 /// <summary>

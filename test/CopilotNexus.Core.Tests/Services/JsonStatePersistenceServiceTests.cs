@@ -1,8 +1,8 @@
-namespace CopilotFamily.Core.Tests.Services;
+namespace CopilotNexus.Core.Tests.Services;
 
 using System.IO;
-using CopilotFamily.Core.Models;
-using CopilotFamily.Core.Services;
+using CopilotNexus.Core.Models;
+using CopilotNexus.Core.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
 
@@ -14,7 +14,7 @@ public class JsonStatePersistenceServiceTests : IDisposable
 
     public JsonStatePersistenceServiceTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"CopilotFamilyTest_{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"CopilotNexusTest_{Guid.NewGuid():N}");
         Directory.CreateDirectory(_tempDir);
         _stateFile = Path.Combine(_tempDir, "session-state.json");
         _service = new JsonStatePersistenceService(
@@ -57,8 +57,8 @@ public class JsonStatePersistenceServiceTests : IDisposable
         var loaded = await _service.LoadAsync();
 
         Assert.NotNull(loaded);
-        Assert.Equal("copilot-family-1-1706932800", loaded!.Tabs[0].SdkSessionId);
-        Assert.Equal("copilot-family-2-1706932801", loaded.Tabs[1].SdkSessionId);
+        Assert.Equal("copilot-nexus-1-1706932800", loaded!.Tabs[0].SdkSessionId);
+        Assert.Equal("copilot-nexus-2-1706932801", loaded.Tabs[1].SdkSessionId);
     }
 
     [Fact]
@@ -164,12 +164,12 @@ public class JsonStatePersistenceServiceTests : IDisposable
                 {
                     Name = "Session 1",
                     Model = "gpt-4.1",
-                    SdkSessionId = "copilot-family-1-1706932800",
+                    SdkSessionId = "copilot-nexus-1-1706932800",
                 },
                 new()
                 {
                     Name = "Session 2",
-                    SdkSessionId = "copilot-family-2-1706932801",
+                    SdkSessionId = "copilot-nexus-2-1706932801",
                 }
             }
         };

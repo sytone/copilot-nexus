@@ -1,4 +1,4 @@
-namespace CopilotFamily.Nexus.Tests;
+namespace CopilotNexus.Service.Tests;
 
 using System.Net;
 using System.Net.Http.Json;
@@ -65,7 +65,7 @@ public class HealthAndCliTests : IClassFixture<NexusTestFactory>
         var result = Program.FindRepoRootFrom(AppContext.BaseDirectory);
 
         Assert.NotNull(result);
-        Assert.True(File.Exists(Path.Combine(result!, "CopilotFamily.slnx")));
+        Assert.True(File.Exists(Path.Combine(result!, "CopilotNexus.slnx")));
     }
 
     [Fact]

@@ -1,8 +1,8 @@
-namespace CopilotFamily.Core.Services;
+namespace CopilotNexus.Core.Services;
 
 using System.Text.Json;
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Models;
 using Microsoft.Extensions.Logging;
 
 /// <summary>
@@ -133,6 +133,6 @@ public class JsonStatePersistenceService : IStatePersistenceService
     {
         return Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "CopilotFamily", "state", "session-state.json");
+            "CopilotNexus", "state", "session-state.json");
     }
 }

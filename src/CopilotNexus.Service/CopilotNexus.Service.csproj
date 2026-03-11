@@ -4,15 +4,15 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>CopilotFamily.Nexus</RootNamespace>
+    <RootNamespace>CopilotNexus.Service</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="CopilotFamily.Nexus.Tests" />
+    <InternalsVisibleTo Include="CopilotNexus.Service.Tests" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CopilotFamily.Core\CopilotFamily.Core.csproj" />
+    <ProjectReference Include="..\CopilotNexus.Core\CopilotNexus.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>

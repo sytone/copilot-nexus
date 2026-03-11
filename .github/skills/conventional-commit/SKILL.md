@@ -52,8 +52,8 @@ type(scope): description
 
 Use one of these scopes when relevant:
 
-- `core` — CopilotFamily.Core project (models, services, interfaces)
-- `app` — CopilotFamily.App project (UI, ViewModels, XAML)
+- `core` — CopilotNexus.Core project (models, services, interfaces)
+- `app` — CopilotNexus.App project (UI, ViewModels, XAML)
 - `ui` — Visual/styling changes
 - `tests` — Test projects
 - `docs` — Documentation

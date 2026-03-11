@@ -1,8 +1,8 @@
-namespace CopilotFamily.UI.Tests;
+namespace CopilotNexus.UI.Tests;
 
 using Avalonia;
 using Avalonia.Themes.Fluent;
-using CopilotFamily.App;
+using CopilotNexus.App;
 using Microsoft.Extensions.Logging;
 
 /// <summary>

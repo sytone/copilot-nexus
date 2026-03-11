@@ -1,8 +1,8 @@
-namespace CopilotFamily.Core.Tests;
+namespace CopilotNexus.Core.Tests;
 
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Models;
-using CopilotFamily.Core.Services;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Models;
+using CopilotNexus.Core.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;

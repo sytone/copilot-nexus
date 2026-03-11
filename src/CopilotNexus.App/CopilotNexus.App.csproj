@@ -5,18 +5,18 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <RootNamespace>CopilotFamily.App</RootNamespace>
+    <RootNamespace>CopilotNexus.App</RootNamespace>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <AvaloniaUseCompiledBindingsByDefault>false</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CopilotFamily.Core\CopilotFamily.Core.csproj" />
+    <ProjectReference Include="..\CopilotNexus.Core\CopilotNexus.Core.csproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="CopilotFamily.UI.Tests" />
-    <InternalsVisibleTo Include="CopilotFamily.App.Tests" />
+    <InternalsVisibleTo Include="CopilotNexus.UI.Tests" />
+    <InternalsVisibleTo Include="CopilotNexus.App.Tests" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,8 +1,8 @@
-namespace CopilotFamily.Core.Services;
+namespace CopilotNexus.Core.Services;
 
 using System.Collections.Concurrent;
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Models;
 using Microsoft.Extensions.Logging;
 
 public class SessionManager : ISessionManager
@@ -56,7 +56,7 @@ public class SessionManager : ISessionManager
         config ??= new SessionConfiguration();
 
         // Generate a structured SDK session ID for persistence
-        var sdkSessionId = $"copilot-family-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}-{Guid.NewGuid().ToString("N")[..6]}";
+        var sdkSessionId = $"copilot-nexus-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}-{Guid.NewGuid().ToString("N")[..6]}";
 
         _logger.LogInformation("Creating session '{Name}' with model {Model}, autopilot={Autopilot}, workDir={WorkDir}, SDK ID {SdkId}",
             name, config.Model ?? "default", config.IsAutopilot, config.WorkingDirectory ?? "(default)", sdkSessionId);

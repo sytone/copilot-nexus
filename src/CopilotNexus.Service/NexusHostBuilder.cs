@@ -1,8 +1,8 @@
-namespace CopilotFamily.Nexus;
+namespace CopilotNexus.Service;
 
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Services;
-using CopilotFamily.Nexus.Hubs;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Services;
+using CopilotNexus.Service.Hubs;
 using Serilog;
 
 /// <summary>
@@ -24,7 +24,7 @@ public static class NexusHostBuilder
             .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
             .WriteTo.File(
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "CopilotFamily", "logs", "nexus-.log"),
+                    "CopilotNexus", "logs", "nexus-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 14)
             .CreateLogger();

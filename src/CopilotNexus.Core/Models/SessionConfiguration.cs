@@ -1,4 +1,4 @@
-namespace CopilotFamily.Core.Models;
+namespace CopilotNexus.Core.Models;
 
 /// <summary>
 /// Configuration for creating or resuming a Copilot session.

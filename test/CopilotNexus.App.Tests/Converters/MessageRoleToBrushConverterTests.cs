@@ -1,9 +1,9 @@
-namespace CopilotFamily.App.Tests.Converters;
+namespace CopilotNexus.App.Tests.Converters;
 
 using System.Globalization;
 using Avalonia.Media;
-using CopilotFamily.App.Converters;
-using CopilotFamily.Core.Models;
+using CopilotNexus.App.Converters;
+using CopilotNexus.Core.Models;
 using Xunit;
 
 public class MessageRoleToBrushConverterTests

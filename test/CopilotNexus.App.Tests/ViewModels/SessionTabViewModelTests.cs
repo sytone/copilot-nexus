@@ -1,11 +1,11 @@
-namespace CopilotFamily.App.Tests.ViewModels;
+namespace CopilotNexus.App.Tests.ViewModels;
 
 using System.ComponentModel;
-using CopilotFamily.App.Tests.Helpers;
-using CopilotFamily.App.ViewModels;
-using CopilotFamily.Core.Events;
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Models;
+using CopilotNexus.App.Tests.Helpers;
+using CopilotNexus.App.ViewModels;
+using CopilotNexus.Core.Events;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Models;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using Xunit;

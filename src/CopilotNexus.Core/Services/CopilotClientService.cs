@@ -1,9 +1,9 @@
-namespace CopilotFamily.Core.Services;
+namespace CopilotNexus.Core.Services;
 
 using GitHub.Copilot.SDK;
-using CopilotFamily.Core.Interfaces;
+using CopilotNexus.Core.Interfaces;
 using Microsoft.Extensions.Logging;
-using CoreModels = CopilotFamily.Core.Models;
+using CoreModels = CopilotNexus.Core.Models;
 
 public class CopilotClientService : ICopilotClientService
 {

@@ -1,9 +1,9 @@
-namespace CopilotFamily.Nexus.Hubs;
+namespace CopilotNexus.Service.Hubs;
 
-using CopilotFamily.Core.Contracts;
-using CopilotFamily.Core.Events;
-using CopilotFamily.Core.Interfaces;
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Contracts;
+using CopilotNexus.Core.Events;
+using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Models;
 using Microsoft.AspNetCore.SignalR;
 
 /// <summary>

@@ -1,4 +1,4 @@
-# Copilot Family
+# Copilot Nexus
 
 A Windows desktop application (Avalonia 11 / .NET 8) with a backend service for
 managing multiple GitHub Copilot SDK sessions simultaneously.
@@ -6,7 +6,7 @@ managing multiple GitHub Copilot SDK sessions simultaneously.
 ## Why?
 
 Running multiple Copilot CLI sessions in separate terminal windows is hard to manage.
-Copilot Family gives you a single window with tabs — each tab is an independent
+Copilot Nexus gives you a single window with tabs — each tab is an independent
 Copilot SDK session with real-time streaming output, powered by the
 [GitHub Copilot SDK](https://github.com/github/copilot-sdk).
 
@@ -49,19 +49,19 @@ The application is split into two processes:
 
 ```powershell
 # Build
-dotnet build CopilotFamily.slnx
+dotnet build CopilotNexus.slnx
 
-# Install to %LOCALAPPDATA%\CopilotFamily\
-dotnet run --project src/CopilotFamily.Nexus -- install
+# Install to %LOCALAPPDATA%\CopilotNexus\
+dotnet run --project src/CopilotNexus.Service -- install
 
 # Start the Nexus service
-dotnet run --project src/CopilotFamily.Nexus -- start
+dotnet run --project src/CopilotNexus.Service -- start
 
 # In a second terminal — launch the desktop app
-dotnet run --project src/CopilotFamily.App
+dotnet run --project src/CopilotNexus.App
 
 # Or use the Nexus CLI to launch it
-dotnet run --project src/CopilotFamily.Nexus -- winapp start
+dotnet run --project src/CopilotNexus.Service -- winapp start
 ```
 
 See [Installation & Operations Guide](docs/installation-and-operations.md) for full
@@ -70,22 +70,22 @@ setup, update, and troubleshooting instructions.
 ## Testing
 
 ```powershell
-dotnet test CopilotFamily.slnx
+dotnet test CopilotNexus.slnx
 ```
 
 ## Solution Structure
 
 ```
 src/
-├── CopilotFamily.Core/       Core business logic, SDK abstractions, shared contracts
-├── CopilotFamily.App/        Avalonia desktop application (MVVM, thin SignalR client)
-└── CopilotFamily.Nexus/      ASP.NET Core backend — SignalR hub, REST API, CLI commands
+├── CopilotNexus.Core/       Core business logic, SDK abstractions, shared contracts
+├── CopilotNexus.App/        Avalonia desktop application (MVVM, thin SignalR client)
+└── CopilotNexus.Service/      ASP.NET Core backend — SignalR hub, REST API, CLI commands
 
 test/
-├── CopilotFamily.Core.Tests/    Unit tests for Core (xUnit + Moq)
-├── CopilotFamily.App.Tests/     ViewModel and converter tests (xUnit + Moq)
-├── CopilotFamily.Nexus.Tests/   Integration tests for Nexus (WebApplicationFactory)
-└── CopilotFamily.UI.Tests/      Headless UI tests (Avalonia.Headless.XUnit)
+├── CopilotNexus.Core.Tests/    Unit tests for Core (xUnit + Moq)
+├── CopilotNexus.App.Tests/     ViewModel and converter tests (xUnit + Moq)
+├── CopilotNexus.Service.Tests/   Integration tests for Nexus (WebApplicationFactory)
+└── CopilotNexus.UI.Tests/      Headless UI tests (Avalonia.Headless.XUnit)
 
 docs/                             Project documentation
 ```

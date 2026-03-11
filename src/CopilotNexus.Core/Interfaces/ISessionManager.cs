@@ -1,6 +1,6 @@
-namespace CopilotFamily.Core.Interfaces;
+namespace CopilotNexus.Core.Interfaces;
 
-using CopilotFamily.Core.Models;
+using CopilotNexus.Core.Models;
 
 /// <summary>
 /// Manages the lifecycle of multiple Copilot SDK sessions.
