@@ -28,6 +28,10 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Changed
 
+- **Project renamed** from `CopilotFamily` to `CopilotNexus` — all namespaces, paths, docs, and file names updated
+- `CopilotFamily.Nexus` backend project renamed to `CopilotNexus.Service` (avoids redundant `CopilotNexus.Nexus`)
+- Install path changed from `%LOCALAPPDATA%\CopilotFamily\` to `%LOCALAPPDATA%\CopilotNexus\`
+- Solution file renamed to `CopilotNexus.slnx`
 - **Hot restart** now launches `CopilotNexus.Updater.exe` instead of `powershell.exe` — no visible shell windows
 - App staging detection now uses `CopilotNexusPaths.AppStaging` instead of `dist/staging/`
 - `README.md` rewritten to reflect Nexus + Avalonia architecture
