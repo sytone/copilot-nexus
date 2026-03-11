@@ -99,5 +99,43 @@ public class HealthAndCliTests : IClassFixture<NexusTestFactory>
         Assert.False(Program.IsCliCommand(["--urls", "http://localhost:5280"]));
     }
 
+    [Fact]
+    public void FindRepoRootFrom_FindsRepoFromSubdirectory()
+    {
+        // The test itself runs from within the repo — bin/Debug/net8.0
+        var result = Program.FindRepoRootFrom(AppContext.BaseDirectory);
+
+        Assert.NotNull(result);
+        Assert.True(File.Exists(Path.Combine(result!, "CopilotFamily.slnx")));
+    }
+
+    [Fact]
+    public void FindRepoRootFrom_ReturnsNull_ForUnrelatedPath()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var result = Program.FindRepoRootFrom(tempDir);
+            Assert.Null(result);
+        }
+        finally
+        {
+            Directory.Delete(tempDir);
+        }
+    }
+
+    [Fact]
+    public void FindRepoRootFrom_FindsRepoFromRepoRoot()
+    {
+        // Walk up from test output to find the repo root, then verify
+        // FindRepoRootFrom works when given the root directly
+        var repoRoot = Program.FindRepoRootFrom(AppContext.BaseDirectory);
+        Assert.NotNull(repoRoot);
+
+        var result = Program.FindRepoRootFrom(repoRoot!);
+        Assert.Equal(repoRoot, result);
+    }
+
     private record HealthPayload(string? Status, int Sessions, int Models, string? Uptime);
 }

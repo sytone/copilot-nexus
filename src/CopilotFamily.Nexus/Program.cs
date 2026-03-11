@@ -594,6 +594,13 @@ public partial class Program
 
     private static string? FindRepoRoot(string startDir)
     {
+        // Search from startDir (AppContext.BaseDirectory) first,
+        // then fall back to the current working directory.
+        return FindRepoRootFrom(startDir) ?? FindRepoRootFrom(Environment.CurrentDirectory);
+    }
+
+    internal static string? FindRepoRootFrom(string startDir)
+    {
         var dir = startDir;
         while (dir != null)
         {
