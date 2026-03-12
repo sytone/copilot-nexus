@@ -11,7 +11,7 @@ public interface ICopilotSessionWrapper : IAsyncDisposable
     bool IsActive { get; }
 
     /// <summary>
-    /// Fired for each output event: full messages, streaming deltas, and idle notifications.
+    /// Fired for each output event: messages, streaming deltas, reasoning, activity updates, and idle notifications.
     /// </summary>
     event EventHandler<SessionOutputEventArgs>? OutputReceived;
 

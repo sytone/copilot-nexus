@@ -282,6 +282,30 @@ public class SessionTabViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ReasoningDeltaOutput_CreatesStreamingThinkingMessage()
+    {
+        _mockSession.Raise(s => s.OutputReceived += null, _mockSession.Object,
+            new SessionOutputEventArgs("test", "Considering options...", MessageRole.System, OutputKind.ReasoningDelta));
+
+        Assert.Equal(2, _viewModel.Messages.Count);
+        var thinking = _viewModel.Messages[1];
+        Assert.Equal(MessageRole.System, thinking.Role);
+        Assert.Contains("[thinking]", thinking.Content);
+        Assert.Contains("Considering options...", thinking.Content);
+        Assert.True(thinking.IsStreaming);
+    }
+
+    [Fact]
+    public void ActivityOutput_AppendsActivityMessage()
+    {
+        _mockSession.Raise(s => s.OutputReceived += null, _mockSession.Object,
+            new SessionOutputEventArgs("test", "Tool started: rg", MessageRole.System, OutputKind.Activity));
+
+        Assert.Equal(2, _viewModel.Messages.Count);
+        Assert.Equal("[activity] Tool started: rg", _viewModel.Messages[1].Content);
+    }
+
+    [Fact]
     public void IdleOutput_CompletesStreamingMessage()
     {
         _mockSession.Raise(s => s.OutputReceived += null, _mockSession.Object,

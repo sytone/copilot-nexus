@@ -5,6 +5,7 @@
              Background="{StaticResource BackgroundBrush}">
 
     <UserControl.Resources>
+        <converters:BoolToVisibleConverter x:Key="BoolToVisible"/>
         <converters:MessageRoleToBrushConverter x:Key="RoleToBrushConverter"/>
         <converters:MessageRoleToLabelConverter x:Key="RoleToLabelConverter"/>
         <converters:NullToCollapsedConverter x:Key="NullToVisible"/>
@@ -82,9 +83,16 @@
                                            Foreground="{Binding Role, Converter={StaticResource RoleToBrushConverter}}"
                                            Margin="0,0,8,2"/>
                                 <TextBlock DockPanel.Dock="Right"
-                                           Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}"
+                                            Text="{Binding Timestamp, StringFormat='{}{0:HH:mm:ss}'}"
+                                            FontSize="10"
+                                            Foreground="{StaticResource SystemMessageBrush}"
+                                            HorizontalAlignment="Right"/>
+                                <TextBlock DockPanel.Dock="Right"
+                                           Text="live"
                                            FontSize="10"
-                                           Foreground="{StaticResource SystemMessageBrush}"
+                                           Foreground="{StaticResource RunningIndicatorBrush}"
+                                           Margin="0,0,8,0"
+                                           IsVisible="{Binding IsStreaming, Converter={StaticResource BoolToVisible}}"
                                            HorizontalAlignment="Right"/>
                                 <TextBlock/>
                             </DockPanel>

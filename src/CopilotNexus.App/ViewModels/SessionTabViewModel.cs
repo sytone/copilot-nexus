@@ -15,6 +15,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     private readonly IUiDispatcher _dispatcher;
     private readonly ILogger _logger;
     private SessionMessage? _currentStreamingMessage;
+    private SessionMessage? _currentReasoningMessage;
     private string _inputText = string.Empty;
     private string _title;
     private string _editableTitle;
@@ -419,6 +420,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     {
         Messages.Clear();
         _currentStreamingMessage = null;
+        _currentReasoningMessage = null;
     }
 
     public void RequestClose()
@@ -458,8 +460,16 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
                 }
                 break;
 
+            case OutputKind.ReasoningDelta:
+                HandleReasoningDelta(e.Content);
+                break;
+
+            case OutputKind.Reasoning:
+                HandleReasoningMessage(e.Content);
+                break;
+
             case OutputKind.Message:
-                if (_currentStreamingMessage != null)
+                if (_currentStreamingMessage != null && e.Role == MessageRole.Assistant)
                 {
                     _logger.LogDebug("Tab '{Title}': skipping duplicate full message (already streamed)", Title);
                     break;
@@ -467,6 +477,13 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
                 if (!string.IsNullOrEmpty(e.Content))
                 {
                     AppendMessage(new SessionMessage(e.Role, e.Content));
+                }
+                break;
+
+            case OutputKind.Activity:
+                if (!string.IsNullOrWhiteSpace(e.Content))
+                {
+                    AppendActivityMessage(e.Content);
                 }
                 break;
 
@@ -483,6 +500,49 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
             _currentStreamingMessage.CompleteStreaming();
             _currentStreamingMessage = null;
         }
+
+        if (_currentReasoningMessage != null)
+        {
+            _currentReasoningMessage.CompleteStreaming();
+            _currentReasoningMessage = null;
+        }
+    }
+
+    private void HandleReasoningDelta(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return;
+
+        if (_currentReasoningMessage == null)
+        {
+            _currentReasoningMessage = new SessionMessage(
+                MessageRole.System,
+                "[thinking] ",
+                isStreaming: true);
+            AppendMessage(_currentReasoningMessage);
+        }
+
+        _currentReasoningMessage.AppendContent(content);
+    }
+
+    private void HandleReasoningMessage(string content)
+    {
+        if (_currentReasoningMessage != null)
+        {
+            _currentReasoningMessage.CompleteStreaming();
+            _currentReasoningMessage = null;
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            AppendMessage(new SessionMessage(MessageRole.System, $"[thinking] {content}"));
+        }
+    }
+
+    private void AppendActivityMessage(string content)
+    {
+        AppendMessage(new SessionMessage(MessageRole.System, $"[activity] {content}"));
     }
 
     private void AppendMessage(SessionMessage message)

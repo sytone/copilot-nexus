@@ -56,35 +56,12 @@ public class CopilotSessionWrapper : ICopilotSessionWrapper
 
         foreach (var evt in events)
         {
-            switch (evt)
-            {
-                case UserMessageEvent user when !string.IsNullOrWhiteSpace(user.Data?.Content):
-                    history.Add(new SessionOutputEventArgs(
-                        SessionId,
-                        user.Data.Content,
-                        MessageRole.User,
-                        OutputKind.Message));
-                    break;
-
-                case AssistantMessageEvent assistant when !string.IsNullOrWhiteSpace(assistant.Data?.Content):
-                    history.Add(new SessionOutputEventArgs(
-                        SessionId,
-                        assistant.Data.Content,
-                        MessageRole.Assistant,
-                        OutputKind.Message));
-                    break;
-
-                case SystemMessageEvent system when !string.IsNullOrWhiteSpace(system.Data?.Content):
-                    history.Add(new SessionOutputEventArgs(
-                        SessionId,
-                        system.Data.Content,
-                        MessageRole.System,
-                        OutputKind.Message));
-                    break;
-            }
+            var mapped = MapSessionEvent(evt, includeStreamingEvents: false);
+            if (mapped != null)
+                history.Add(mapped);
         }
 
-        _logger.LogDebug("Session {SessionId}: loaded {Count} history messages", SessionId, history.Count);
+        _logger.LogDebug("Session {SessionId}: loaded {Count} history outputs", SessionId, history.Count);
         return history;
     }
 
@@ -92,29 +69,131 @@ public class CopilotSessionWrapper : ICopilotSessionWrapper
     {
         try
         {
-            switch (evt)
-            {
-                case AssistantMessageDeltaEvent delta:
-                    RaiseOutput(delta.Data.DeltaContent, MessageRole.Assistant, OutputKind.Delta);
-                    break;
+            var mapped = MapSessionEvent(evt, includeStreamingEvents: true);
+            if (mapped == null)
+                return;
 
-                case AssistantMessageEvent msg:
-                    _logger.LogDebug("Session {SessionId}: received full message ({Length} chars)",
-                        SessionId, msg.Data.Content?.Length ?? 0);
-                    RaiseOutput(msg.Data.Content ?? string.Empty, MessageRole.Assistant, OutputKind.Message);
-                    break;
-
-                case SessionIdleEvent:
-                    _logger.LogDebug("Session {SessionId}: idle", SessionId);
-                    RaiseOutput(string.Empty, MessageRole.System, OutputKind.Idle);
-                    break;
-            }
+            RaiseOutput(mapped.Content, mapped.Role, mapped.Kind);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Session {SessionId}: error handling event {EventType}",
                 SessionId, evt.GetType().Name);
         }
+    }
+
+    private SessionOutputEventArgs? MapSessionEvent(SessionEvent evt, bool includeStreamingEvents)
+    {
+        switch (evt)
+        {
+            case UserMessageEvent user when !string.IsNullOrWhiteSpace(user.Data?.Content):
+                return new SessionOutputEventArgs(SessionId, user.Data.Content, MessageRole.User, OutputKind.Message);
+
+            case AssistantMessageDeltaEvent delta when includeStreamingEvents &&
+                                                       !string.IsNullOrWhiteSpace(delta.Data?.DeltaContent):
+                return new SessionOutputEventArgs(SessionId, delta.Data.DeltaContent, MessageRole.Assistant, OutputKind.Delta);
+
+            case AssistantMessageEvent assistant when !string.IsNullOrWhiteSpace(assistant.Data?.Content):
+                return new SessionOutputEventArgs(SessionId, assistant.Data.Content, MessageRole.Assistant, OutputKind.Message);
+
+            case AssistantReasoningDeltaEvent reasoningDelta when includeStreamingEvents &&
+                                                                 !string.IsNullOrWhiteSpace(reasoningDelta.Data?.DeltaContent):
+                return new SessionOutputEventArgs(SessionId, reasoningDelta.Data.DeltaContent, MessageRole.System, OutputKind.ReasoningDelta);
+
+            case AssistantReasoningEvent reasoning when !string.IsNullOrWhiteSpace(reasoning.Data?.Content):
+                return new SessionOutputEventArgs(SessionId, reasoning.Data.Content, MessageRole.System, OutputKind.Reasoning);
+
+            case SystemMessageEvent system when !string.IsNullOrWhiteSpace(system.Data?.Content):
+                return new SessionOutputEventArgs(SessionId, system.Data.Content, MessageRole.System, OutputKind.Message);
+
+            case AssistantIntentEvent intent when !string.IsNullOrWhiteSpace(intent.Data?.Intent):
+                return BuildActivity($"Intent: {intent.Data.Intent}");
+
+            case SessionInfoEvent info when !string.IsNullOrWhiteSpace(info.Data?.Message):
+                return BuildActivity(info.Data.Message);
+
+            case SessionWarningEvent warning when !string.IsNullOrWhiteSpace(warning.Data?.Message):
+                return BuildActivity($"Warning: {warning.Data.Message}");
+
+            case SessionErrorEvent error when !string.IsNullOrWhiteSpace(error.Data?.Message):
+                return BuildActivity($"Error: {error.Data.Message}");
+
+            case ToolExecutionStartEvent toolStart:
+            {
+                var toolName = toolStart.Data?.ToolName;
+                if (string.IsNullOrWhiteSpace(toolName))
+                    toolName = toolStart.Data?.McpToolName;
+                var message = string.IsNullOrWhiteSpace(toolName)
+                    ? "Tool execution started"
+                    : $"Tool started: {toolName}";
+                return BuildActivity(message);
+            }
+
+            case ToolExecutionProgressEvent toolProgress when !string.IsNullOrWhiteSpace(toolProgress.Data?.ProgressMessage):
+                return BuildActivity($"Tool progress: {toolProgress.Data.ProgressMessage}");
+
+            case ToolExecutionPartialResultEvent partial when !string.IsNullOrWhiteSpace(partial.Data?.PartialOutput):
+                return BuildActivity($"Tool partial result: {partial.Data.PartialOutput}");
+
+            case ToolExecutionCompleteEvent toolComplete:
+            {
+                var status = toolComplete.Data?.Success == true ? "completed" : "failed";
+                var detail = toolComplete.Data?.Error?.Message;
+                var message = detail is { Length: > 0 }
+                    ? $"Tool {status}: {detail}"
+                    : $"Tool {status}";
+                return BuildActivity(message);
+            }
+
+            case SkillInvokedEvent skill when !string.IsNullOrWhiteSpace(skill.Data?.Name):
+                return BuildActivity($"Skill invoked: {skill.Data.Name}");
+
+            case SubagentStartedEvent subagentStarted:
+            {
+                var name = subagentStarted.Data?.AgentDisplayName ?? subagentStarted.Data?.AgentName;
+                return !string.IsNullOrWhiteSpace(name)
+                    ? BuildActivity($"Subagent started: {name}")
+                    : BuildActivity("Subagent started");
+            }
+
+            case SubagentCompletedEvent subagentCompleted:
+            {
+                var name = subagentCompleted.Data?.AgentDisplayName ?? subagentCompleted.Data?.AgentName;
+                return !string.IsNullOrWhiteSpace(name)
+                    ? BuildActivity($"Subagent completed: {name}")
+                    : BuildActivity("Subagent completed");
+            }
+
+            case SubagentFailedEvent subagentFailed:
+            {
+                var name = subagentFailed.Data?.AgentDisplayName ?? subagentFailed.Data?.AgentName;
+                var errorMessage = subagentFailed.Data?.Error;
+                if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(errorMessage))
+                    return BuildActivity($"Subagent failed: {name} ({errorMessage})");
+                if (!string.IsNullOrWhiteSpace(name))
+                    return BuildActivity($"Subagent failed: {name}");
+                if (!string.IsNullOrWhiteSpace(errorMessage))
+                    return BuildActivity($"Subagent failed: {errorMessage}");
+                return BuildActivity("Subagent failed");
+            }
+
+            case CommandQueuedEvent queued when !string.IsNullOrWhiteSpace(queued.Data?.Command):
+                return BuildActivity($"Command queued: {queued.Data.Command}");
+
+            case CommandCompletedEvent:
+                return BuildActivity("Command completed");
+
+            case SessionIdleEvent when includeStreamingEvents:
+                return new SessionOutputEventArgs(SessionId, string.Empty, MessageRole.System, OutputKind.Idle);
+
+            default:
+                return null;
+        }
+    }
+
+    private SessionOutputEventArgs BuildActivity(string content)
+    {
+        return new SessionOutputEventArgs(SessionId, content, MessageRole.System, OutputKind.Activity);
     }
 
     private void RaiseOutput(string content, MessageRole role, OutputKind kind)

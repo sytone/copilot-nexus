@@ -358,7 +358,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                     try
                     {
                         history = (await session.GetHistoryAsync())
-                            .Where(item => item.Kind == OutputKind.Message)
+                            .Where(item => item.Kind != OutputKind.Idle)
                             .Where(item => !string.IsNullOrWhiteSpace(item.Content))
                             .ToArray();
                         _logger.LogInformation("Loaded {Count} history messages for resumed tab '{Name}'", history.Length, tabState.Name);
@@ -383,7 +383,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 tabViewModel.Messages.Clear();
                 foreach (var item in history)
                 {
-                    tabViewModel.Messages.Add(new SessionMessage(item.Role, item.Content));
+                    tabViewModel.Messages.Add(new SessionMessage(item.Role, FormatRestoredOutputContent(item)));
                 }
                 foreach (var item in nexusSystemMessages)
                 {
@@ -611,6 +611,16 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             return "Normal";
 
         return isAutopilot ? "Autopilot" : "Normal";
+    }
+
+    private static string FormatRestoredOutputContent(SessionOutputEventArgs item)
+    {
+        return item.Kind switch
+        {
+            OutputKind.Activity => $"[activity] {item.Content}",
+            OutputKind.Reasoning or OutputKind.ReasoningDelta => $"[thinking] {item.Content}",
+            _ => item.Content,
+        };
     }
 
     private Func<ToolPermissionRequest, Task<PermissionDecision>>? GetPermissionHandler()

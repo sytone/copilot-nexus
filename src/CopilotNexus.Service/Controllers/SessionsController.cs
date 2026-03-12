@@ -46,7 +46,7 @@ public class SessionsController : ControllerBase
         return Ok(SessionInfoDto.FromSessionInfo(info));
     }
 
-    /// <summary>Get persisted message history for a session.</summary>
+    /// <summary>Get persisted session output history for a session.</summary>
     [HttpGet("{id}/history")]
     public async Task<ActionResult<List<SessionOutputDto>>> GetSessionHistory(
         string id,
@@ -58,7 +58,7 @@ public class SessionsController : ControllerBase
 
         var history = await session.GetHistoryAsync(cancellationToken);
         var output = history
-            .Where(item => item.Kind == OutputKind.Message)
+            .Where(item => item.Kind != OutputKind.Idle)
             .Where(item => !string.IsNullOrWhiteSpace(item.Content))
             .Select(item => new SessionOutputDto(
                 id,

@@ -306,7 +306,7 @@ public class NexusSessionManager : ISessionManager
         var history = new List<SessionOutputEventArgs>(items.Count);
         foreach (var item in items)
         {
-            if (!Enum.TryParse<OutputKind>(item.Kind, ignoreCase: true, out var kind) || kind != OutputKind.Message)
+            if (!Enum.TryParse<OutputKind>(item.Kind, ignoreCase: true, out var kind) || kind == OutputKind.Idle)
                 continue;
             if (string.IsNullOrWhiteSpace(item.Content))
                 continue;
@@ -315,7 +315,7 @@ public class NexusSessionManager : ISessionManager
                 ? parsedRole
                 : MessageRole.Assistant;
 
-            history.Add(new SessionOutputEventArgs(sessionId, item.Content, role, OutputKind.Message));
+            history.Add(new SessionOutputEventArgs(sessionId, item.Content, role, kind));
         }
 
         return history;
