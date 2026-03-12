@@ -319,7 +319,10 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 {
                     Model = tabState.Model,
                     WorkingDirectory = tabState.WorkingDirectory,
-                    IsAutopilot = tabState.IsAutopilot,
+                    IsAutopilot = string.Equals(
+                        NormalizeSessionMode(tabState.SessionMode, tabState.IsAutopilot),
+                        "Autopilot",
+                        StringComparison.Ordinal),
                     ProfileId = tabState.ProfileId,
                     AgentFilePath = tabState.AgentFilePath,
                     IncludeWellKnownMcpConfigs = tabState.IncludeWellKnownMcpConfigs,
@@ -375,6 +378,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 tabViewModel.CloseRequested += (_, _) => _ = CloseSpecificTabAsync(tabViewModel);
                 tabViewModel.ReconfigureRequested += OnTabReconfigureRequested;
                 tabViewModel.RenameRequested += OnTabRenameRequested;
+                tabViewModel.RestoreMode(NormalizeSessionMode(tabState.SessionMode, tabState.IsAutopilot));
 
                 tabViewModel.Messages.Clear();
                 foreach (var item in history)
@@ -451,6 +455,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 SdkSessionId = tab.Info.SdkSessionId,
                 WorkingDirectory = tab.Info.WorkingDirectory,
                 IsAutopilot = tab.Info.IsAutopilot,
+                SessionMode = tab.SelectedMode,
                 ProfileId = tab.Info.ProfileId,
                 AgentFilePath = tab.Info.AgentFilePath,
                 IncludeWellKnownMcpConfigs = tab.Info.IncludeWellKnownMcpConfigs,
@@ -594,6 +599,18 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    private static string NormalizeSessionMode(string? mode, bool isAutopilot)
+    {
+        if (string.Equals(mode, "autopilot", StringComparison.OrdinalIgnoreCase))
+            return "Autopilot";
+        if (string.Equals(mode, "plan", StringComparison.OrdinalIgnoreCase))
+            return "Plan";
+        if (string.Equals(mode, "normal", StringComparison.OrdinalIgnoreCase))
+            return "Normal";
+
+        return isAutopilot ? "Autopilot" : "Normal";
     }
 
     private Func<ToolPermissionRequest, Task<PermissionDecision>>? GetPermissionHandler()

@@ -9,6 +9,8 @@ using Microsoft.Extensions.Logging;
 
 public class SessionTabViewModel : ViewModelBase, IDisposable
 {
+    private static readonly IReadOnlyList<string> SessionModes = ["Normal", "Plan", "Autopilot"];
+
     private ICopilotSessionWrapper _session;
     private readonly IUiDispatcher _dispatcher;
     private readonly ILogger _logger;
@@ -16,10 +18,13 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     private string _inputText = string.Empty;
     private string _title;
     private string _editableTitle;
+    private string _selectedMode;
+    private bool _isInlineRenaming;
     private bool _isRunning;
     private bool _isProcessing;
     private bool _isAutopilot;
     private string? _workingDirectory;
+    private string? _gitBranch;
     private ModelInfo? _selectedModel;
     private bool _disposed;
 
@@ -45,6 +50,28 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     {
         get => _editableTitle;
         set => SetProperty(ref _editableTitle, value);
+    }
+
+    public bool IsInlineRenaming
+    {
+        get => _isInlineRenaming;
+        set => SetProperty(ref _isInlineRenaming, value);
+    }
+
+    public IReadOnlyList<string> AvailableModes => SessionModes;
+
+    /// <summary>Session mode shown in the footer: Normal, Plan, or Autopilot.</summary>
+    public string SelectedMode
+    {
+        get => _selectedMode;
+        set
+        {
+            var normalized = NormalizeMode(value, _isAutopilot);
+            if (!SetProperty(ref _selectedMode, normalized))
+                return;
+
+            ApplySelectedMode(normalized);
+        }
     }
 
     public bool IsRunning
@@ -78,6 +105,17 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
                 {
                     AppendSystemMessage("Switched to autopilot mode — all tool calls will be auto-approved.");
                 }
+
+                if (value)
+                {
+                    _selectedMode = "Autopilot";
+                }
+                else if (string.Equals(_selectedMode, "Autopilot", StringComparison.Ordinal))
+                {
+                    _selectedMode = "Normal";
+                }
+
+                OnPropertyChanged(nameof(SelectedMode));
             }
         }
     }
@@ -91,9 +129,15 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
             if (SetProperty(ref _workingDirectory, value))
             {
                 Info.WorkingDirectory = value;
+                RefreshWorkingDirectoryMetadata();
             }
         }
     }
+
+    public string WorkingDirectoryDisplay =>
+        string.IsNullOrWhiteSpace(_workingDirectory) ? "(default working directory)" : _workingDirectory;
+
+    public string? GitBranchDisplay => string.IsNullOrWhiteSpace(_gitBranch) ? null : _gitBranch;
 
     /// <summary>Currently selected model for this session.</summary>
     public ModelInfo? SelectedModel
@@ -105,8 +149,16 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
             {
                 RequestReconfigure(model: value.ModelId);
             }
+
+            NotifyModelMetadataChanged();
         }
     }
+
+    public string CurrentModelDisplay => SelectedModel?.Name ?? Info.Model ?? "default";
+
+    public string ReasoningLevelDisplay => ResolveReasoningLevel(SelectedModel);
+
+    public string? ModelCostDisplay => ResolveModelCost(SelectedModel);
 
     public ICommand SendCommand { get; }
     public ICommand AbortCommand { get; }
@@ -137,6 +189,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         _logger = logger;
         _title = info.Name;
         _editableTitle = info.Name;
+        _selectedMode = info.IsAutopilot ? "Autopilot" : "Normal";
         _isAutopilot = info.IsAutopilot;
         _workingDirectory = info.WorkingDirectory;
         IsRunning = true;
@@ -145,6 +198,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
 
         // Set selected model from info without triggering reconfigure
         _selectedModel = AvailableModels.FirstOrDefault(m => m.ModelId == info.Model);
+        RefreshWorkingDirectoryMetadata();
 
         SendCommand = new AsyncRelayCommand(SendInputAsync, () => IsRunning && !IsProcessing && !string.IsNullOrWhiteSpace(InputText));
         AbortCommand = new AsyncRelayCommand(AbortAsync, () => IsProcessing);
@@ -178,10 +232,23 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         _workingDirectory = newInfo.WorkingDirectory;
         _editableTitle = newInfo.Name;
         Title = newInfo.Name;
+        IsInlineRenaming = false;
 
         // Update selected model without triggering reconfigure
         _selectedModel = AvailableModels.FirstOrDefault(m => m.ModelId == newInfo.Model);
+        if (_isAutopilot)
+        {
+            _selectedMode = "Autopilot";
+        }
+        else if (string.Equals(_selectedMode, "Autopilot", StringComparison.Ordinal))
+        {
+            _selectedMode = "Normal";
+        }
+
+        RefreshWorkingDirectoryMetadata();
+        NotifyModelMetadataChanged();
         OnPropertyChanged(nameof(SelectedModel));
+        OnPropertyChanged(nameof(SelectedMode));
         OnPropertyChanged(nameof(IsAutopilot));
         OnPropertyChanged(nameof(WorkingDirectory));
         OnPropertyChanged(nameof(EditableTitle));
@@ -194,6 +261,16 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         AppendSystemMessage(msg);
 
         _logger.LogInformation("Tab '{Title}' reconfigured with new session {SessionId}", Title, newInfo.Id);
+    }
+
+    public void RestoreMode(string? mode)
+    {
+        var normalized = NormalizeMode(mode, _isAutopilot);
+        if (string.Equals(_selectedMode, normalized, StringComparison.Ordinal))
+            return;
+
+        _selectedMode = normalized;
+        OnPropertyChanged(nameof(SelectedMode));
     }
 
     private void RequestReconfigure(string? model = null, string? workDir = null)
@@ -222,11 +299,30 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         var candidate = EditableTitle?.Trim();
         if (string.IsNullOrWhiteSpace(candidate) || string.Equals(candidate, Title, StringComparison.Ordinal))
         {
+            IsInlineRenaming = false;
             EditableTitle = Title;
             return;
         }
 
+        IsInlineRenaming = false;
         RenameRequested?.Invoke(this, candidate);
+    }
+
+    public void BeginInlineRename()
+    {
+        EditableTitle = Title;
+        IsInlineRenaming = true;
+    }
+
+    public void CommitInlineRename()
+    {
+        RequestRename();
+    }
+
+    public void CancelInlineRename()
+    {
+        EditableTitle = Title;
+        IsInlineRenaming = false;
     }
 
     public void ApplyRename(string newName)
@@ -235,6 +331,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         Info.Name = value;
         Title = value;
         EditableTitle = value;
+        IsInlineRenaming = false;
         _logger.LogInformation("Tab renamed to '{Title}'", value);
     }
 
@@ -391,6 +488,146 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     private void AppendMessage(SessionMessage message)
     {
         Messages.Add(message);
+    }
+
+    private void NotifyModelMetadataChanged()
+    {
+        OnPropertyChanged(nameof(CurrentModelDisplay));
+        OnPropertyChanged(nameof(ReasoningLevelDisplay));
+        OnPropertyChanged(nameof(ModelCostDisplay));
+    }
+
+    private void RefreshWorkingDirectoryMetadata()
+    {
+        _gitBranch = ResolveGitBranch(_workingDirectory);
+        OnPropertyChanged(nameof(WorkingDirectoryDisplay));
+        OnPropertyChanged(nameof(GitBranchDisplay));
+    }
+
+    private static string NormalizeMode(string? mode, bool autopilotFallback)
+    {
+        if (string.Equals(mode, "autopilot", StringComparison.OrdinalIgnoreCase))
+            return "Autopilot";
+        if (string.Equals(mode, "plan", StringComparison.OrdinalIgnoreCase))
+            return "Plan";
+        if (string.Equals(mode, "normal", StringComparison.OrdinalIgnoreCase))
+            return "Normal";
+
+        return autopilotFallback ? "Autopilot" : "Normal";
+    }
+
+    private void ApplySelectedMode(string mode)
+    {
+        var shouldAutopilot = string.Equals(mode, "Autopilot", StringComparison.Ordinal);
+        if (_isAutopilot != shouldAutopilot)
+        {
+            _isAutopilot = shouldAutopilot;
+            Info.IsAutopilot = shouldAutopilot;
+            OnPropertyChanged(nameof(IsAutopilot));
+            RequestReconfigure();
+        }
+
+        switch (mode)
+        {
+            case "Plan":
+                AppendSystemMessage("Switched to plan mode — interactive approvals remain enabled.");
+                break;
+            case "Normal":
+                AppendSystemMessage("Switched to normal mode — interactive approvals remain enabled.");
+                break;
+            default:
+                AppendSystemMessage("Switched to autopilot mode — all tool calls will be auto-approved.");
+                break;
+        }
+    }
+
+    private static string ResolveReasoningLevel(ModelInfo? model)
+    {
+        if (model == null)
+            return "standard";
+
+        var explicitLevel = model.Capabilities
+            .FirstOrDefault(capability => capability.StartsWith("reasoning:", StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(explicitLevel))
+            return explicitLevel.Split(':', 2)[1].Trim();
+
+        var hasReasoning = model.Capabilities.Any(capability =>
+            capability.Contains("reasoning", StringComparison.OrdinalIgnoreCase));
+        return hasReasoning ? "supported" : "standard";
+    }
+
+    private static string? ResolveModelCost(ModelInfo? model)
+    {
+        if (model == null)
+            return null;
+
+        var costCapability = model.Capabilities
+            .FirstOrDefault(capability => capability.StartsWith("cost:", StringComparison.OrdinalIgnoreCase));
+        if (string.IsNullOrWhiteSpace(costCapability))
+            return null;
+
+        var parts = costCapability.Split(':', 2);
+        return parts.Length == 2 ? parts[1].Trim() : null;
+    }
+
+    private static string? ResolveGitBranch(string? workingDirectory)
+    {
+        if (string.IsNullOrWhiteSpace(workingDirectory) || !Directory.Exists(workingDirectory))
+            return null;
+
+        try
+        {
+            var gitDirectory = FindGitDirectory(workingDirectory);
+            if (string.IsNullOrWhiteSpace(gitDirectory))
+                return null;
+
+            var headPath = Path.Combine(gitDirectory, "HEAD");
+            if (!File.Exists(headPath))
+                return null;
+
+            var head = File.ReadAllText(headPath).Trim();
+            const string refPrefix = "ref: ";
+            if (head.StartsWith(refPrefix, StringComparison.OrdinalIgnoreCase))
+            {
+                var reference = head[refPrefix.Length..].Trim();
+                var segments = reference.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                return segments.Length > 0 ? segments[^1] : reference;
+            }
+
+            return string.IsNullOrWhiteSpace(head) ? null : "detached";
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static string? FindGitDirectory(string workingDirectory)
+    {
+        var current = new DirectoryInfo(workingDirectory);
+        while (current != null)
+        {
+            var dotGitPath = Path.Combine(current.FullName, ".git");
+            if (Directory.Exists(dotGitPath))
+                return dotGitPath;
+
+            if (File.Exists(dotGitPath))
+            {
+                var pointer = File.ReadAllText(dotGitPath).Trim();
+                const string gitDirPrefix = "gitdir:";
+                if (!pointer.StartsWith(gitDirPrefix, StringComparison.OrdinalIgnoreCase))
+                    return null;
+
+                var relativeGitDir = pointer[gitDirPrefix.Length..].Trim();
+                return Path.IsPathRooted(relativeGitDir)
+                    ? relativeGitDir
+                    : Path.GetFullPath(Path.Combine(current.FullName, relativeGitDir));
+            }
+
+            current = current.Parent;
+        }
+
+        return null;
     }
 
     public void Dispose()

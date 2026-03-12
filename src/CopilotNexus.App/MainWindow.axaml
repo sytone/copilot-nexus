@@ -10,6 +10,7 @@
 
     <Window.Resources>
         <converters:BoolToVisibleConverter x:Key="BoolToVisible"/>
+        <converters:InverseBoolToVisibleConverter x:Key="InverseBoolToVisible"/>
         <converters:EmptyToVisibleConverter x:Key="EmptyToVisible"/>
         <converters:NullToCollapsedConverter x:Key="NullToVisible"/>
     </Window.Resources>
@@ -110,7 +111,23 @@
                                 <TextBlock Text="{Binding Title}"
                                            Foreground="{StaticResource ForegroundBrush}"
                                            VerticalAlignment="Center"
-                                           Margin="0,0,8,0"/>
+                                           Margin="0,0,8,0"
+                                           IsVisible="{Binding IsInlineRenaming, Converter={StaticResource InverseBoolToVisible}}"
+                                           Cursor="Hand"
+                                           PointerPressed="TabHeaderTitle_PointerPressed"
+                                           ToolTip.Tip="Double-click to rename session"/>
+                                <TextBox Text="{Binding EditableTitle}"
+                                         Name="TabHeaderRenameTextBox"
+                                         Foreground="{StaticResource ForegroundBrush}"
+                                         Background="{StaticResource InputBackgroundBrush}"
+                                         BorderBrush="{StaticResource BorderBrush}"
+                                         VerticalAlignment="Center"
+                                         MinWidth="150"
+                                         MaxWidth="260"
+                                         Margin="0,0,8,0"
+                                         IsVisible="{Binding IsInlineRenaming}"
+                                         KeyDown="TabHeaderRenameTextBox_KeyDown"
+                                         LostFocus="TabHeaderRenameTextBox_LostFocus"/>
                                 <Button Content="✕"
                                         Name="CloseTabButton"
                                         FontSize="10"

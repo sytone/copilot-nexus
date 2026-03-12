@@ -317,11 +317,60 @@ public class MainWindowViewModelTests : IDisposable
         await _viewModel.CreateNewTabAsync();
         var tab = Assert.Single(_viewModel.Tabs);
         tab.AppendSystemMessage("Nexus runtime message");
+        tab.RestoreMode("Plan");
 
         var state = _viewModel.CaptureState();
 
         var tabState = Assert.Single(state.Tabs);
         Assert.Contains(tabState.NexusSystemMessages, m => m.Content == "Nexus runtime message");
+        Assert.Equal("Plan", tabState.SessionMode);
+    }
+
+    [Fact]
+    public async Task RestoreStateAsync_UsesPersistedSessionMode()
+    {
+        var resumedSession = SessionInfo.FromRemote(
+            id: "tab-1",
+            name: "Session 1",
+            model: "gpt-4.1",
+            sdkSessionId: "sdk-123",
+            isAutopilot: false);
+
+        _mockSessionManager
+            .Setup(m => m.ResumeSessionAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<SessionConfiguration?>(),
+                It.IsAny<Func<ToolPermissionRequest, Task<PermissionDecision>>?>(),
+                It.IsAny<Func<AgentUserInputRequest, Task<AgentUserInputResponse>>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(resumedSession);
+
+        _mockSessionManager
+            .Setup(m => m.GetSession("tab-1"))
+            .Returns(_mockSession.Object);
+
+        var state = new AppState
+        {
+            SessionCounter = 1,
+            SelectedTabIndex = 0,
+            Tabs =
+            {
+                new TabState
+                {
+                    Name = "Session 1",
+                    SdkSessionId = "sdk-123",
+                    Model = "gpt-4.1",
+                    IsAutopilot = false,
+                    SessionMode = "Plan",
+                },
+            },
+        };
+
+        await _viewModel.RestoreStateAsync(state);
+
+        var tab = Assert.Single(_viewModel.Tabs);
+        Assert.Equal("Plan", tab.SelectedMode);
     }
 
     [Fact]

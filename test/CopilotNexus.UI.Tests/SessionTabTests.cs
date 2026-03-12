@@ -147,11 +147,30 @@ public class SessionTabTests
 
         var layoutGrid = sessionView.Content as Grid;
         Assert.NotNull(layoutGrid);
-        Assert.Equal(3, layoutGrid.RowDefinitions.Count);
+        Assert.Equal(4, layoutGrid.RowDefinitions.Count);
         Assert.True(layoutGrid.RowDefinitions[1].Height.IsStar);
 
         var inputContainer = sessionView.FindControl<Border>("InputContainer");
         Assert.NotNull(inputContainer);
         Assert.Equal(2, Grid.GetRow(inputContainer));
+
+        var contextBar = sessionView.FindControl<Border>("SessionContextBar");
+        Assert.NotNull(contextBar);
+        Assert.Equal(3, Grid.GetRow(contextBar));
+    }
+
+    [AvaloniaFact]
+    public async Task SessionTabView_HasModeAndModelFooterControls()
+    {
+        var (window, vm) = await CreateWindowWithTabAsync();
+
+        var sessionView = window.GetVisualDescendants().OfType<SessionTabView>().FirstOrDefault();
+        Assert.NotNull(sessionView);
+
+        var modeSelector = sessionView.FindControl<ComboBox>("ModeSelector");
+        var modelSelector = sessionView.FindControl<ComboBox>("FooterModelSelector");
+
+        Assert.NotNull(modeSelector);
+        Assert.NotNull(modelSelector);
     }
 }

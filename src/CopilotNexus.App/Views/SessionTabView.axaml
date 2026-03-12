@@ -7,9 +7,10 @@
     <UserControl.Resources>
         <converters:MessageRoleToBrushConverter x:Key="RoleToBrushConverter"/>
         <converters:MessageRoleToLabelConverter x:Key="RoleToLabelConverter"/>
+        <converters:NullToCollapsedConverter x:Key="NullToVisible"/>
     </UserControl.Resources>
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,*,Auto,Auto">
 
         <!-- Session status bar -->
         <Border Grid.Row="0"
@@ -37,51 +38,10 @@
                             BorderBrush="{StaticResource BorderBrush}"
                             ToolTip.Tip="Cancel current request"/>
                 </StackPanel>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Foreground="{StaticResource SystemMessageBrush}"
-                               VerticalAlignment="Center"
-                               Text="Name:"
-                               Margin="0,0,6,0"/>
-                    <TextBox Text="{Binding EditableTitle}"
-                             Name="SessionNameTextBox"
-                             MinWidth="150"
-                             MaxWidth="260"
-                             Height="26"
-                             FontSize="12"
-                             Background="{StaticResource InputBackgroundBrush}"
-                             Foreground="{StaticResource ForegroundBrush}"
-                             BorderBrush="{StaticResource BorderBrush}"/>
-                    <Button Content="Rename"
-                            Command="{Binding RenameSessionCommand}"
-                            Name="RenameSessionButton"
-                            Margin="6,0,12,0"
-                            Padding="8,2"
-                            Background="Transparent"
-                            Foreground="{StaticResource ForegroundBrush}"
-                            BorderBrush="{StaticResource BorderBrush}"/>
-                    <TextBlock Foreground="{StaticResource SystemMessageBrush}"
-                               VerticalAlignment="Center"
-                               Text="Model:"
-                               Margin="0,0,6,0"/>
-                    <ComboBox ItemsSource="{Binding AvailableModels}"
-                              SelectedItem="{Binding SelectedModel}"
-                              Name="ModelSelector"
-                              MinWidth="180"
-                              MaxWidth="300"
-                              Height="26"
-                              FontSize="12"
-                              Background="{StaticResource InputBackgroundBrush}"
-                              Foreground="{StaticResource ForegroundBrush}"
-                              BorderBrush="{StaticResource BorderBrush}"
-                              ToolTip.Tip="Change model for this session">
-                        <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                                <TextBlock Text="{Binding Name}"
-                                           Foreground="{StaticResource ForegroundBrush}"/>
-                            </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                    </ComboBox>
-                </StackPanel>
+                <TextBlock Text="{Binding Title}"
+                           Foreground="{StaticResource ForegroundBrush}"
+                           VerticalAlignment="Center"
+                           FontWeight="SemiBold"/>
             </DockPanel>
         </Border>
 
@@ -163,6 +123,76 @@
                         BorderThickness="0"
                         Cursor="Hand"/>
             </Grid>
+        </Border>
+
+        <!-- Session context footer -->
+        <Border Grid.Row="3"
+                Name="SessionContextBar"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="8,6">
+            <StackPanel Spacing="6">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="Path:"
+                               Foreground="{StaticResource SystemMessageBrush}"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding WorkingDirectoryDisplay}"
+                               Foreground="{StaticResource ForegroundBrush}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               MaxWidth="700"/>
+                    <TextBlock Text="{Binding GitBranchDisplay, StringFormat='(branch: {0})'}"
+                               Foreground="{StaticResource RunningIndicatorBrush}"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding GitBranchDisplay, Converter={StaticResource NullToVisible}}"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="Mode:"
+                               Foreground="{StaticResource SystemMessageBrush}"
+                               VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding AvailableModes}"
+                              SelectedItem="{Binding SelectedMode}"
+                              Name="ModeSelector"
+                              MinWidth="120"
+                              Height="26"
+                              Background="{StaticResource InputBackgroundBrush}"
+                              Foreground="{StaticResource ForegroundBrush}"
+                              BorderBrush="{StaticResource BorderBrush}"/>
+
+                    <TextBlock Text="Model:"
+                               Foreground="{StaticResource SystemMessageBrush}"
+                               VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding AvailableModels}"
+                              SelectedItem="{Binding SelectedModel}"
+                              Name="FooterModelSelector"
+                              MinWidth="220"
+                              MaxWidth="340"
+                              Height="26"
+                              Background="{StaticResource InputBackgroundBrush}"
+                              Foreground="{StaticResource ForegroundBrush}"
+                              BorderBrush="{StaticResource BorderBrush}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="{StaticResource ForegroundBrush}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <TextBlock Text="Reasoning:"
+                               Foreground="{StaticResource SystemMessageBrush}"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ReasoningLevelDisplay}"
+                               Foreground="{StaticResource ForegroundBrush}"
+                               VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding ModelCostDisplay, StringFormat='Cost: {0}'}"
+                               Foreground="{StaticResource SystemMessageBrush}"
+                               VerticalAlignment="Center"
+                               IsVisible="{Binding ModelCostDisplay, Converter={StaticResource NullToVisible}}"/>
+                </StackPanel>
+            </StackPanel>
         </Border>
 
     </Grid>

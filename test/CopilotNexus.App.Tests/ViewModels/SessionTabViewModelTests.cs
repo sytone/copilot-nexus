@@ -1,6 +1,8 @@
 namespace CopilotNexus.App.Tests.ViewModels;
 
 using System.ComponentModel;
+using System.Collections.ObjectModel;
+using System.IO;
 using CopilotNexus.App.Tests.Helpers;
 using CopilotNexus.App.ViewModels;
 using CopilotNexus.Core.Events;
@@ -30,6 +32,7 @@ public class SessionTabViewModelTests : IDisposable
     {
         Assert.Equal("Test Session", _viewModel.Title);
         Assert.Equal("Test Session", _viewModel.EditableTitle);
+        Assert.Equal("Autopilot", _viewModel.SelectedMode);
     }
 
     [Fact]
@@ -150,13 +153,105 @@ public class SessionTabViewModelTests : IDisposable
     }
 
     [Fact]
+    public void BeginInlineRename_EnablesInlineEditState()
+    {
+        _viewModel.BeginInlineRename();
+
+        Assert.True(_viewModel.IsInlineRenaming);
+        Assert.Equal("Test Session", _viewModel.EditableTitle);
+    }
+
+    [Fact]
+    public void CommitInlineRename_RaisesRenameRequestedAndExitsInlineEdit()
+    {
+        string? renamed = null;
+        _viewModel.RenameRequested += (_, value) => renamed = value;
+
+        _viewModel.BeginInlineRename();
+        _viewModel.EditableTitle = "Header Rename";
+        _viewModel.CommitInlineRename();
+
+        Assert.False(_viewModel.IsInlineRenaming);
+        Assert.Equal("Header Rename", renamed);
+    }
+
+    [Fact]
     public void ApplyRename_UpdatesTitleAndEditableTitle()
     {
+        _viewModel.BeginInlineRename();
         _viewModel.ApplyRename("New Name");
 
         Assert.Equal("New Name", _viewModel.Title);
         Assert.Equal("New Name", _viewModel.EditableTitle);
         Assert.Equal("New Name", _viewModel.Info.Name);
+        Assert.False(_viewModel.IsInlineRenaming);
+    }
+
+    [Fact]
+    public void SelectedMode_SetToPlan_KeepsInteractiveMode()
+    {
+        _viewModel.SelectedMode = "Plan";
+
+        Assert.Equal("Plan", _viewModel.SelectedMode);
+        Assert.False(_viewModel.Info.IsAutopilot);
+    }
+
+    [Fact]
+    public void SelectedMode_SetToAutopilot_RaisesReconfigureRequest()
+    {
+        var info = new SessionInfo("Mode Test", "gpt-4.1")
+        {
+            IsAutopilot = false,
+        };
+        var vm = new SessionTabViewModel(info, _mockSession.Object, _dispatcher, NullLogger.Instance);
+        SessionConfiguration? requestedConfig = null;
+        vm.ReconfigureRequested += (_, cfg) => requestedConfig = cfg;
+
+        vm.SelectedMode = "Autopilot";
+
+        Assert.NotNull(requestedConfig);
+        Assert.True(requestedConfig!.IsAutopilot);
+        Assert.True(vm.Info.IsAutopilot);
+    }
+
+    [Fact]
+    public void SelectedModel_WithReasoningAndCost_UpdatesMetadataDisplay()
+    {
+        var model = new ModelInfo
+        {
+            ModelId = "gpt-5",
+            Name = "GPT-5",
+            Capabilities = new List<string> { "reasoning:high", "cost:$0.25/1K tok" },
+        };
+        var models = new ObservableCollection<ModelInfo> { model };
+        var vm = new SessionTabViewModel(_sessionInfo, _mockSession.Object, _dispatcher, NullLogger.Instance, models);
+
+        vm.SelectedModel = model;
+
+        Assert.Equal("GPT-5", vm.CurrentModelDisplay);
+        Assert.Equal("high", vm.ReasoningLevelDisplay);
+        Assert.Equal("$0.25/1K tok", vm.ModelCostDisplay);
+    }
+
+    [Fact]
+    public void WorkingDirectory_WhenGitRepository_ShowsBranch()
+    {
+        var tempRoot = Path.Combine(Path.GetTempPath(), $"nexus-git-test-{Guid.NewGuid():N}");
+        var gitDir = Path.Combine(tempRoot, ".git");
+        Directory.CreateDirectory(gitDir);
+        File.WriteAllText(Path.Combine(gitDir, "HEAD"), "ref: refs/heads/feature/test-footer");
+
+        try
+        {
+            _viewModel.WorkingDirectory = tempRoot;
+
+            Assert.Equal(tempRoot, _viewModel.WorkingDirectoryDisplay);
+            Assert.Equal("test-footer", _viewModel.GitBranchDisplay);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
     }
 
     [Fact]

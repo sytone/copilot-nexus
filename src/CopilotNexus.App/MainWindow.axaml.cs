@@ -3,8 +3,10 @@ namespace CopilotNexus.App;
 using System.Diagnostics;
 using System.IO;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using CopilotNexus.App.Services;
 using CopilotNexus.App.ViewModels;
 using CopilotNexus.Core.Interfaces;
@@ -217,6 +219,54 @@ public partial class MainWindow : Window
         if (sender is Button button && button.DataContext is SessionTabViewModel tab)
         {
             tab.RequestClose();
+        }
+    }
+
+    private void TabHeaderTitle_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (e.ClickCount < 2 || sender is not Control source || source.DataContext is not SessionTabViewModel tab)
+            return;
+
+        tab.BeginInlineRename();
+        e.Handled = true;
+
+        Dispatcher.UIThread.Post(() =>
+        {
+            var editor = source.GetVisualParent()?
+                .GetVisualDescendants()
+                .OfType<TextBox>()
+                .FirstOrDefault(textBox => string.Equals(textBox.Name, "TabHeaderRenameTextBox", StringComparison.Ordinal));
+
+            if (editor != null)
+            {
+                editor.Focus();
+                editor.SelectAll();
+            }
+        }, DispatcherPriority.Background);
+    }
+
+    private void TabHeaderRenameTextBox_KeyDown(object? sender, KeyEventArgs e)
+    {
+        if (sender is not TextBox textBox || textBox.DataContext is not SessionTabViewModel tab)
+            return;
+
+        if (e.Key == Key.Enter)
+        {
+            tab.CommitInlineRename();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            tab.CancelInlineRename();
+            e.Handled = true;
+        }
+    }
+
+    private void TabHeaderRenameTextBox_LostFocus(object? sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox textBox && textBox.DataContext is SessionTabViewModel tab && tab.IsInlineRenaming)
+        {
+            tab.CancelInlineRename();
         }
     }
 

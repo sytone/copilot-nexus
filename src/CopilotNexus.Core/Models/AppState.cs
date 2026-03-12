@@ -49,6 +49,11 @@ public class TabState
     /// </summary>
     public bool IsAutopilot { get; set; } = true;
 
+    /// <summary>
+    /// Session mode label used by the desktop UI (Normal, Plan, Autopilot).
+    /// </summary>
+    public string? SessionMode { get; set; }
+
     /// <summary>Optional profile used when creating this session.</summary>
     public string? ProfileId { get; set; }
 
