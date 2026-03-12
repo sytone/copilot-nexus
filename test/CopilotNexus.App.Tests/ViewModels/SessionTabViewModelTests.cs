@@ -113,6 +113,40 @@ public class SessionTabViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task TryNavigateInputHistory_UpAndDownNavigatePerSessionInputs()
+    {
+        _viewModel.InputText = "first";
+        _viewModel.SendCommand.Execute(null);
+        await Task.Delay(100);
+
+        _viewModel.InputText = "second";
+        _viewModel.SendCommand.Execute(null);
+        await Task.Delay(100);
+
+        _viewModel.InputText = "draft";
+
+        Assert.True(_viewModel.TryNavigateInputHistory(-1));
+        Assert.Equal("second", _viewModel.InputText);
+
+        Assert.True(_viewModel.TryNavigateInputHistory(-1));
+        Assert.Equal("first", _viewModel.InputText);
+
+        Assert.True(_viewModel.TryNavigateInputHistory(1));
+        Assert.Equal("second", _viewModel.InputText);
+
+        Assert.True(_viewModel.TryNavigateInputHistory(1));
+        Assert.Equal("draft", _viewModel.InputText);
+    }
+
+    [Fact]
+    public void TryNavigateInputHistory_WithNoHistory_ReturnsFalse()
+    {
+        var moved = _viewModel.TryNavigateInputHistory(-1);
+
+        Assert.False(moved);
+    }
+
+    [Fact]
     public void AbortCommand_WhenNotProcessing_CannotExecute()
     {
         Assert.False(_viewModel.AbortCommand.CanExecute(null));

@@ -115,7 +115,24 @@ public partial class SessionTabView : UserControl
 
     private void InputTextBox_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter && DataContext is ViewModels.SessionTabViewModel vm)
+        if (DataContext is not ViewModels.SessionTabViewModel vm)
+            return;
+
+        if (e.Key == Key.Up)
+        {
+            if (vm.TryNavigateInputHistory(-1))
+                e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Down)
+        {
+            if (vm.TryNavigateInputHistory(1))
+                e.Handled = true;
+            return;
+        }
+
+        if (e.Key == Key.Enter)
         {
             if (vm.SendCommand.CanExecute(null))
             {

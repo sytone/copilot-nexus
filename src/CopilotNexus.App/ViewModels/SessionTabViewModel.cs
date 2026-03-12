@@ -19,6 +19,10 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     private string? _currentReasoningCorrelationId;
     private readonly Dictionary<string, SessionMessage> _activityMessagesByCorrelation =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<string> _inputHistory = [];
+    private int _inputHistoryIndex = -1;
+    private string _historyDraftInput = string.Empty;
+    private bool _suppressHistoryReset;
     private string _inputText = string.Empty;
     private string _title;
     private string _editableTitle;
@@ -41,7 +45,14 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     public string InputText
     {
         get => _inputText;
-        set => SetProperty(ref _inputText, value);
+        set
+        {
+            if (SetProperty(ref _inputText, value) && !_suppressHistoryReset && _inputHistoryIndex >= 0)
+            {
+                _inputHistoryIndex = -1;
+                _historyDraftInput = string.Empty;
+            }
+        }
     }
 
     public string Title
@@ -365,11 +376,51 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         RequestReconfigure(workDir: path);
     }
 
+    public bool TryNavigateInputHistory(int direction)
+    {
+        if (_inputHistory.Count == 0 || direction == 0)
+            return false;
+
+        if (direction < 0)
+        {
+            if (_inputHistoryIndex == -1)
+            {
+                _historyDraftInput = InputText;
+                _inputHistoryIndex = _inputHistory.Count - 1;
+            }
+            else if (_inputHistoryIndex > 0)
+            {
+                _inputHistoryIndex--;
+            }
+
+            SetInputTextFromHistory(_inputHistory[_inputHistoryIndex]);
+            return true;
+        }
+
+        if (_inputHistoryIndex == -1)
+            return false;
+
+        if (_inputHistoryIndex < _inputHistory.Count - 1)
+        {
+            _inputHistoryIndex++;
+            SetInputTextFromHistory(_inputHistory[_inputHistoryIndex]);
+        }
+        else
+        {
+            _inputHistoryIndex = -1;
+            SetInputTextFromHistory(_historyDraftInput);
+            _historyDraftInput = string.Empty;
+        }
+
+        return true;
+    }
+
     private async Task SendInputAsync()
     {
         if (string.IsNullOrWhiteSpace(InputText)) return;
 
         var input = InputText;
+        RecordInputHistory(input);
         InputText = string.Empty;
 
         AppendMessage(new SessionMessage(MessageRole.User, input));
@@ -583,6 +634,32 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     private void AppendMessage(SessionMessage message)
     {
         Messages.Add(message);
+    }
+
+    private void SetInputTextFromHistory(string value)
+    {
+        _suppressHistoryReset = true;
+        try
+        {
+            InputText = value;
+        }
+        finally
+        {
+            _suppressHistoryReset = false;
+        }
+    }
+
+    private void RecordInputHistory(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return;
+
+        _inputHistory.Add(input);
+        if (_inputHistory.Count > 200)
+            _inputHistory.RemoveAt(0);
+
+        _inputHistoryIndex = -1;
+        _historyDraftInput = string.Empty;
     }
 
     private void NotifyModelMetadataChanged()
