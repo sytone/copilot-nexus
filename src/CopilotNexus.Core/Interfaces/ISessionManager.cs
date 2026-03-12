@@ -46,4 +46,7 @@ public interface ISessionManager : IAsyncDisposable
         Func<ToolPermissionRequest, Task<PermissionDecision>>? permissionHandler = null,
         Func<AgentUserInputRequest, Task<AgentUserInputResponse>>? userInputHandler = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Renames an existing session.</summary>
+    Task<SessionInfo> RenameSessionAsync(string sessionId, string name, CancellationToken cancellationToken = default);
 }

@@ -1,5 +1,6 @@
 namespace CopilotNexus.Core.Services;
 
+using System.Text.Json;
 using GitHub.Copilot.SDK;
 using CopilotNexus.Core.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -104,6 +105,18 @@ public class CopilotClientService : ICopilotClientService
             if (config.WorkingDirectory != null)
                 sessionConfig.WorkingDirectory = config.WorkingDirectory;
 
+            var mcpServers = ResolveMcpServers(config);
+            if (mcpServers.Count > 0)
+                sessionConfig.McpServers = mcpServers;
+
+            var customAgents = ResolveCustomAgents(config);
+            if (customAgents.Count > 0)
+                sessionConfig.CustomAgents = customAgents;
+
+            var skillDirectories = ResolveSkillDirectories(config);
+            if (skillDirectories.Count > 0)
+                sessionConfig.SkillDirectories = skillDirectories;
+
             if (!isAutopilot && userInputHandler != null)
             {
                 sessionConfig.OnUserInputRequest = BuildUserInputHandler(userInputHandler);
@@ -150,6 +163,18 @@ public class CopilotClientService : ICopilotClientService
             if (config.WorkingDirectory != null)
                 resumeConfig.WorkingDirectory = config.WorkingDirectory;
 
+            var mcpServers = ResolveMcpServers(config);
+            if (mcpServers.Count > 0)
+                resumeConfig.McpServers = mcpServers;
+
+            var customAgents = ResolveCustomAgents(config);
+            if (customAgents.Count > 0)
+                resumeConfig.CustomAgents = customAgents;
+
+            var skillDirectories = ResolveSkillDirectories(config);
+            if (skillDirectories.Count > 0)
+                resumeConfig.SkillDirectories = skillDirectories;
+
             if (!isAutopilot && userInputHandler != null)
             {
                 resumeConfig.OnUserInputRequest = BuildUserInputHandler(userInputHandler);
@@ -165,6 +190,276 @@ public class CopilotClientService : ICopilotClientService
             _logger.LogError(ex, "Failed to resume session {SessionId}", sessionId);
             throw;
         }
+    }
+
+    private Dictionary<string, object> ResolveMcpServers(CoreModels.SessionConfiguration config)
+    {
+        var configPaths = new List<string>();
+        if (config.IncludeWellKnownMcpConfigs)
+            configPaths.AddRange(GetWellKnownMcpConfigPaths(config.WorkingDirectory));
+
+        configPaths.AddRange((config.AdditionalMcpConfigPaths ?? [])
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => NormalizePath(path, config.WorkingDirectory)));
+
+        var merged = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in configPaths
+                     .Where(path => !string.IsNullOrWhiteSpace(path))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (!File.Exists(path))
+                continue;
+
+            try
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(path));
+                if (!document.RootElement.TryGetProperty("mcpServers", out var mcpServersElement) ||
+                    mcpServersElement.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                foreach (var server in mcpServersElement.EnumerateObject())
+                {
+                    if (TryParseMcpServer(server.Value, out var parsedServer))
+                    {
+                        merged[server.Name] = parsedServer;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse MCP config at {Path}", path);
+            }
+        }
+
+        if ((config.EnabledMcpServers ?? []).Count == 0)
+            return merged;
+
+        var allowed = (config.EnabledMcpServers ?? [])
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name.Trim())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (allowed.Count == 0)
+            return merged;
+
+        return merged
+            .Where(kvp => allowed.Contains(kvp.Key))
+            .ToDictionary(kvp => kvp.Key, kvp => kvp.Value, StringComparer.OrdinalIgnoreCase);
+    }
+
+    private List<CustomAgentConfig> ResolveCustomAgents(CoreModels.SessionConfiguration config)
+    {
+        if (string.IsNullOrWhiteSpace(config.AgentFilePath))
+            return [];
+
+        var agentPath = NormalizePath(config.AgentFilePath, config.WorkingDirectory);
+        if (!File.Exists(agentPath))
+        {
+            _logger.LogWarning("Custom agent file not found: {Path}", agentPath);
+            return [];
+        }
+
+        try
+        {
+            var prompt = File.ReadAllText(agentPath);
+            if (string.IsNullOrWhiteSpace(prompt))
+            {
+                _logger.LogWarning("Custom agent file is empty: {Path}", agentPath);
+                return [];
+            }
+
+            var name = Path.GetFileNameWithoutExtension(agentPath).Trim();
+            if (string.IsNullOrWhiteSpace(name))
+                name = "custom-agent";
+
+            return
+            [
+                new CustomAgentConfig
+                {
+                    Name = name,
+                    DisplayName = name,
+                    Description = $"Loaded from {agentPath}",
+                    Prompt = prompt,
+                    Infer = true,
+                },
+            ];
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load custom agent from {Path}", agentPath);
+            return [];
+        }
+    }
+
+    private static List<string> ResolveSkillDirectories(CoreModels.SessionConfiguration config)
+    {
+        var skillDirectories = new List<string>();
+
+        skillDirectories.AddRange((config.SkillDirectories ?? [])
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => NormalizePath(path, config.WorkingDirectory)));
+
+        if (!string.IsNullOrWhiteSpace(config.WorkingDirectory))
+        {
+            var repoSkills = Path.Combine(config.WorkingDirectory, ".github", "skills");
+            if (Directory.Exists(repoSkills))
+                skillDirectories.Add(repoSkills);
+        }
+
+        return skillDirectories
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    private static IEnumerable<string> GetWellKnownMcpConfigPaths(string? workingDirectory)
+    {
+        var copilotHome = Environment.GetEnvironmentVariable("COPILOT_HOME");
+        if (string.IsNullOrWhiteSpace(copilotHome))
+        {
+            copilotHome = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".copilot");
+        }
+
+        yield return Path.Combine(copilotHome, "mcp-config.json");
+        yield return Path.Combine(copilotHome, "mcp.json");
+
+        if (!string.IsNullOrWhiteSpace(workingDirectory))
+        {
+            yield return Path.Combine(workingDirectory, ".vscode", "mcp.json");
+            yield return Path.Combine(workingDirectory, ".copilot", "mcp-config.json");
+            yield return Path.Combine(workingDirectory, ".copilot", "mcp.json");
+        }
+    }
+
+    private static string NormalizePath(string path, string? workingDirectory)
+    {
+        if (Path.IsPathRooted(path))
+            return path;
+
+        return string.IsNullOrWhiteSpace(workingDirectory)
+            ? Path.GetFullPath(path)
+            : Path.GetFullPath(Path.Combine(workingDirectory, path));
+    }
+
+    private static bool TryParseMcpServer(JsonElement element, out object server)
+    {
+        server = null!;
+
+        if (!element.TryGetProperty("type", out var typeElement))
+            return false;
+
+        var type = typeElement.GetString()?.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(type))
+            return false;
+
+        var timeout = element.TryGetProperty("timeout", out var timeoutElement) &&
+                      timeoutElement.ValueKind == JsonValueKind.Number &&
+                      timeoutElement.TryGetInt32(out var parsedTimeout)
+            ? parsedTimeout
+            : (int?)null;
+
+        var tools = ParseStringList(element, "tools");
+        if (tools.Count == 0)
+            tools.Add("*");
+
+        if (type is "local" or "stdio")
+        {
+            if (!element.TryGetProperty("command", out var commandElement))
+                return false;
+
+            var command = commandElement.GetString();
+            if (string.IsNullOrWhiteSpace(command))
+                return false;
+
+            server = new McpLocalServerConfig
+            {
+                Type = type,
+                Command = command,
+                Args = ParseStringList(element, "args"),
+                Env = ParseStringMap(element, "env"),
+                Cwd = ParseOptionalString(element, "cwd"),
+                Timeout = timeout,
+                Tools = tools,
+            };
+            return true;
+        }
+
+        if (type is "http" or "sse")
+        {
+            if (!element.TryGetProperty("url", out var urlElement))
+                return false;
+
+            var url = urlElement.GetString();
+            if (string.IsNullOrWhiteSpace(url))
+                return false;
+
+            server = new McpRemoteServerConfig
+            {
+                Type = type,
+                Url = url,
+                Headers = ParseStringMap(element, "headers"),
+                Timeout = timeout,
+                Tools = tools,
+            };
+            return true;
+        }
+
+        return false;
+    }
+
+    private static string? ParseOptionalString(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.String)
+            return null;
+        return value.GetString();
+    }
+
+    private static List<string> ParseStringList(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var value))
+            return [];
+
+        if (value.ValueKind == JsonValueKind.String)
+        {
+            var single = value.GetString();
+            return string.IsNullOrWhiteSpace(single) ? [] : [single];
+        }
+
+        if (value.ValueKind != JsonValueKind.Array)
+            return [];
+
+        var items = new List<string>();
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(item.GetString()))
+                items.Add(item.GetString()!);
+        }
+        return items;
+    }
+
+    private static Dictionary<string, string> ParseStringMap(JsonElement element, string propertyName)
+    {
+        if (!element.TryGetProperty(propertyName, out var value) || value.ValueKind != JsonValueKind.Object)
+            return [];
+
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in value.EnumerateObject())
+        {
+            switch (property.Value.ValueKind)
+            {
+                case JsonValueKind.String:
+                    map[property.Name] = property.Value.GetString() ?? string.Empty;
+                    break;
+                case JsonValueKind.Number:
+                case JsonValueKind.True:
+                case JsonValueKind.False:
+                    map[property.Name] = property.Value.ToString();
+                    break;
+            }
+        }
+        return map;
     }
 
     private static PermissionRequestHandler BuildPermissionHandler(

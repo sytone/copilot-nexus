@@ -56,6 +56,12 @@ public static class NexusHostBuilder
             return new JsonStatePersistenceService(logger, GetServiceStatePath());
         });
 
+        builder.Services.AddSingleton<ISessionProfileService>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<JsonSessionProfileService>>();
+            return new JsonSessionProfileService(logger, GetServiceProfilesPath());
+        });
+
         // CORS for local development
         builder.Services.AddCors(options =>
         {
@@ -80,6 +86,19 @@ public static class NexusHostBuilder
         }
 
         return CopilotNexusPaths.NexusAppStateFile;
+    }
+
+    private static string GetServiceProfilesPath()
+    {
+        var isTestMode = Environment.GetEnvironmentVariable("NEXUS_TEST_MODE") == "1";
+        if (isTestMode)
+        {
+            var testStateRoot = Path.Combine(Path.GetTempPath(), "CopilotNexus", "test-state");
+            Directory.CreateDirectory(testStateRoot);
+            return Path.Combine(testStateRoot, $"session-profiles-{Environment.ProcessId}.json");
+        }
+
+        return CopilotNexusPaths.NexusSessionProfilesFile;
     }
 
     /// <summary>

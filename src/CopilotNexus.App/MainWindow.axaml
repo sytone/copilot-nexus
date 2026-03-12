@@ -19,7 +19,7 @@
         <KeyBinding Gesture="Ctrl+W" Command="{Binding CloseTabCommand}"/>
     </Window.KeyBindings>
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
 
         <!-- Update notification bar -->
         <Border Grid.Row="0"
@@ -50,76 +50,247 @@
             </DockPanel>
         </Border>
 
+        <!-- Workspace mode toolbar -->
+        <Border Grid.Row="1"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="8,6">
+            <DockPanel>
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Left" Spacing="6">
+                    <Button Content="Sessions"
+                            Command="{Binding ShowSessionsViewCommand}"
+                            Background="Transparent"
+                            Foreground="{StaticResource ForegroundBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"/>
+                    <Button Content="Profiles"
+                            Command="{Binding ShowProfilesViewCommand}"
+                            Background="Transparent"
+                            Foreground="{StaticResource ForegroundBrush}"
+                            BorderBrush="{StaticResource BorderBrush}"/>
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" Spacing="8">
+                    <TextBlock Text="Profile for new sessions:"
+                               Foreground="{StaticResource SystemMessageBrush}"
+                               VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding Profiles}"
+                              SelectedItem="{Binding SelectedProfile}"
+                              MinWidth="220"
+                              MaxWidth="320"
+                              Height="28"
+                              Background="{StaticResource InputBackgroundBrush}"
+                              Foreground="{StaticResource ForegroundBrush}"
+                              BorderBrush="{StaticResource BorderBrush}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="{StaticResource ForegroundBrush}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
         <!-- Main content area -->
-        <Grid Grid.Row="1">
-            <TabControl ItemsSource="{Binding Tabs}"
-                        SelectedItem="{Binding SelectedTab}"
-                        Name="SessionTabControl"
+        <Grid Grid.Row="2">
+            <Grid IsVisible="{Binding IsSessionEditorVisible}">
+                <TabControl ItemsSource="{Binding Tabs}"
+                            SelectedItem="{Binding SelectedTab}"
+                            Name="SessionTabControl"
+                            Background="Transparent"
+                            Padding="0">
+
+                    <TabControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Margin="4,2">
+                                <Ellipse Width="8" Height="8" Margin="0,0,6,0"
+                                         Fill="{StaticResource RunningIndicatorBrush}"/>
+                                <TextBlock Text="{Binding Title}"
+                                           Foreground="{StaticResource ForegroundBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,8,0"/>
+                                <Button Content="✕"
+                                        Name="CloseTabButton"
+                                        FontSize="10"
+                                        Background="Transparent"
+                                        Foreground="{StaticResource SystemMessageBrush}"
+                                        BorderThickness="0"
+                                        Cursor="Hand"
+                                        Padding="4,0"
+                                        Click="CloseTab_Click"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </TabControl.ItemTemplate>
+
+                    <TabControl.ContentTemplate>
+                        <DataTemplate>
+                            <views:SessionTabView/>
+                        </DataTemplate>
+                    </TabControl.ContentTemplate>
+                </TabControl>
+
+                <Button Content="＋ New Session"
+                        Command="{Binding NewTabCommand}"
+                        Name="NewSessionButton"
+                        FontSize="12"
+                        Padding="12,6"
+                        Margin="8"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
                         Background="Transparent"
-                        Padding="0">
+                        Foreground="{StaticResource ForegroundBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        Cursor="Hand"
+                        ToolTip.Tip="New Session (Ctrl+T)"/>
 
-                <TabControl.ItemTemplate>
-                    <DataTemplate>
-                        <StackPanel Orientation="Horizontal" Margin="4,2">
-                            <Ellipse Width="8" Height="8" Margin="0,0,6,0"
-                                     Fill="{StaticResource RunningIndicatorBrush}"/>
-                            <TextBlock Text="{Binding Title}"
+                <!-- Welcome message when no tabs are open -->
+                <StackPanel VerticalAlignment="Center"
+                            HorizontalAlignment="Center"
+                            IsVisible="{Binding Tabs.Count, Converter={StaticResource EmptyToVisible}}">
+                    <TextBlock Text="Copilot Nexus"
+                               FontSize="36"
+                               FontWeight="Light"
+                               Foreground="{StaticResource ForegroundBrush}"
+                               HorizontalAlignment="Center"
+                               Margin="0,0,0,12"/>
+                    <TextBlock Text="Press Ctrl+T or click ＋ New Session to get started"
+                               FontSize="14"
+                               Foreground="{StaticResource SystemMessageBrush}"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+
+            <Grid IsVisible="{Binding IsProfileEditorVisible}" Margin="12"
+                  ColumnDefinitions="280,*"
+                  ColumnSpacing="12">
+                <Border Grid.Column="0"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        Padding="8">
+                    <Grid RowDefinitions="Auto,*,Auto" RowSpacing="8">
+                        <TextBlock Text="Session Profiles"
+                                   Foreground="{StaticResource ForegroundBrush}"
+                                   FontSize="14"
+                                   FontWeight="SemiBold"/>
+                        <ListBox Grid.Row="1"
+                                 ItemsSource="{Binding Profiles}"
+                                 SelectedItem="{Binding SelectedProfile}"
+                                 Background="{StaticResource InputBackgroundBrush}"
+                                 BorderBrush="{StaticResource BorderBrush}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}"
+                                               Foreground="{StaticResource ForegroundBrush}"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                        <Button Grid.Row="2"
+                                Content="＋ New Profile"
+                                Command="{Binding NewProfileCommand}"
+                                Background="Transparent"
+                                Foreground="{StaticResource ForegroundBrush}"
+                                BorderBrush="{StaticResource BorderBrush}"/>
+                    </Grid>
+                </Border>
+
+                <Border Grid.Column="1"
+                        Background="{StaticResource SurfaceBrush}"
+                        BorderBrush="{StaticResource BorderBrush}"
+                        BorderThickness="1"
+                        Padding="12">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="Profile Details"
                                        Foreground="{StaticResource ForegroundBrush}"
-                                       VerticalAlignment="Center"
-                                       Margin="0,0,8,0"/>
-                            <Button Content="✕"
-                                    Name="CloseTabButton"
-                                    FontSize="10"
-                                    Background="Transparent"
-                                    Foreground="{StaticResource SystemMessageBrush}"
-                                    BorderThickness="0"
-                                    Cursor="Hand"
-                                    Padding="4,0"
-                                    Click="CloseTab_Click"/>
+                                       FontSize="14"
+                                       FontWeight="SemiBold"/>
+
+                            <TextBlock Text="Name" Foreground="{StaticResource SystemMessageBrush}"/>
+                            <TextBox Text="{Binding SelectedProfile.Name}"
+                                     Background="{StaticResource InputBackgroundBrush}"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}"/>
+
+                            <TextBlock Text="Description" Foreground="{StaticResource SystemMessageBrush}"/>
+                            <TextBox Text="{Binding SelectedProfile.Description}"
+                                     Background="{StaticResource InputBackgroundBrush}"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}"/>
+
+                            <TextBlock Text="Model" Foreground="{StaticResource SystemMessageBrush}"/>
+                            <TextBox Text="{Binding SelectedProfile.Model}"
+                                     Background="{StaticResource InputBackgroundBrush}"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}"/>
+
+                            <CheckBox Content="Autopilot mode"
+                                      IsChecked="{Binding SelectedProfile.IsAutopilot}"
+                                      Foreground="{StaticResource ForegroundBrush}"/>
+
+                            <TextBlock Text="Working Directory" Foreground="{StaticResource SystemMessageBrush}"/>
+                            <TextBox Text="{Binding SelectedProfile.WorkingDirectory}"
+                                     Background="{StaticResource InputBackgroundBrush}"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}"/>
+
+                            <TextBlock Text="Agent File Path" Foreground="{StaticResource SystemMessageBrush}"/>
+                            <TextBox Text="{Binding SelectedProfile.AgentFilePath}"
+                                     Background="{StaticResource InputBackgroundBrush}"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}"/>
+
+                            <CheckBox Content="Include well-known MCP config locations"
+                                      IsChecked="{Binding SelectedProfile.IncludeWellKnownMcpConfigs}"
+                                      Foreground="{StaticResource ForegroundBrush}"/>
+
+                            <TextBlock Text="Additional MCP Config Paths (comma/semicolon/newline)"
+                                       Foreground="{StaticResource SystemMessageBrush}"/>
+                            <TextBox Text="{Binding SelectedProfile.AdditionalMcpConfigPaths}"
+                                     AcceptsReturn="True"
+                                     MinHeight="52"
+                                     Background="{StaticResource InputBackgroundBrush}"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}"/>
+
+                            <TextBlock Text="Enabled MCP Server Names (comma/semicolon/newline)"
+                                       Foreground="{StaticResource SystemMessageBrush}"/>
+                            <TextBox Text="{Binding SelectedProfile.EnabledMcpServers}"
+                                     Background="{StaticResource InputBackgroundBrush}"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}"/>
+
+                            <TextBlock Text="Additional Skill Directories (comma/semicolon/newline)"
+                                       Foreground="{StaticResource SystemMessageBrush}"/>
+                            <TextBox Text="{Binding SelectedProfile.AdditionalSkillDirectories}"
+                                     AcceptsReturn="True"
+                                     MinHeight="52"
+                                     Background="{StaticResource InputBackgroundBrush}"
+                                     Foreground="{StaticResource ForegroundBrush}"
+                                     BorderBrush="{StaticResource BorderBrush}"/>
+
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Content="Save Profile"
+                                        Command="{Binding SaveProfileCommand}"
+                                        Background="{StaticResource AccentBrush}"
+                                        Foreground="White"
+                                        BorderThickness="0"/>
+                                <Button Content="Delete Profile"
+                                        Command="{Binding DeleteProfileCommand}"
+                                        Background="Transparent"
+                                        Foreground="#F44747"
+                                        BorderBrush="{StaticResource BorderBrush}"/>
+                            </StackPanel>
                         </StackPanel>
-                    </DataTemplate>
-                </TabControl.ItemTemplate>
-
-                <TabControl.ContentTemplate>
-                    <DataTemplate>
-                        <views:SessionTabView/>
-                    </DataTemplate>
-                </TabControl.ContentTemplate>
-            </TabControl>
-
-            <Button Content="＋ New Session"
-                    Command="{Binding NewTabCommand}"
-                    Name="NewSessionButton"
-                    FontSize="12"
-                    Padding="12,6"
-                    Margin="8"
-                    HorizontalAlignment="Right"
-                    VerticalAlignment="Top"
-                    Background="Transparent"
-                    Foreground="{StaticResource ForegroundBrush}"
-                    BorderBrush="{StaticResource BorderBrush}"
-                    Cursor="Hand"
-                    ToolTip.Tip="New Session (Ctrl+T)"/>
-
-            <!-- Welcome message when no tabs are open -->
-            <StackPanel VerticalAlignment="Center"
-                        HorizontalAlignment="Center"
-                        IsVisible="{Binding Tabs.Count, Converter={StaticResource EmptyToVisible}}">
-                <TextBlock Text="Copilot Nexus"
-                           FontSize="36"
-                           FontWeight="Light"
-                           Foreground="{StaticResource ForegroundBrush}"
-                           HorizontalAlignment="Center"
-                           Margin="0,0,0,12"/>
-                <TextBlock Text="Press Ctrl+T or click ＋ New Session to get started"
-                           FontSize="14"
-                           Foreground="{StaticResource SystemMessageBrush}"
-                           HorizontalAlignment="Center"/>
-            </StackPanel>
+                    </ScrollViewer>
+                </Border>
+            </Grid>
         </Grid>
 
         <!-- Status bar -->
-        <Border Grid.Row="2"
+        <Border Grid.Row="3"
                 Background="{StaticResource SurfaceBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
                 BorderThickness="0,1,0,0"

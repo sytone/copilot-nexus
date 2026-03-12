@@ -54,6 +54,9 @@ public static class CopilotNexusPaths
     /// <summary>Nexus-owned application state file used by service APIs.</summary>
     public static string NexusAppStateFile { get; } = Path.Combine(StateRoot, "session-state.json");
 
+    /// <summary>Nexus-owned session profiles file used by service APIs.</summary>
+    public static string NexusSessionProfilesFile { get; } = Path.Combine(StateRoot, "session-profiles.json");
+
     /// <summary>CLI executable — the 'nexus' command users interact with.</summary>
     public static string CliExe { get; } = Path.Combine(CliInstall, "CopilotNexus.Cli.exe");
 

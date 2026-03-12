@@ -186,6 +186,31 @@ public class NexusSessionManagerTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task RenameSessionAsync_SendsPutRequest_UpdatesName()
+    {
+        var createDto = new SessionInfoDto
+        {
+            Id = "s1",
+            Name = "Original",
+            SdkSessionId = "sdk-s1",
+            State = "Running",
+        };
+        _mockHandler.SetResponse("/api/sessions", HttpMethod.Post, HttpStatusCode.OK,
+            JsonSerializer.Serialize(createDto));
+        await _manager.CreateSessionAsync("Original");
+
+        var renameDto = createDto with { Name = "Renamed Session" };
+        _mockHandler.SetResponse("/api/sessions/s1/name", HttpMethod.Put, HttpStatusCode.OK,
+            JsonSerializer.Serialize(renameDto));
+
+        var updated = await _manager.RenameSessionAsync("s1", "Renamed Session");
+
+        Assert.Equal("Renamed Session", updated.Name);
+        Assert.Equal("Renamed Session", _manager.Sessions.Single().Name);
+        Assert.Equal("/api/sessions/s1/name", _mockHandler.LastRequest!.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
     public async Task SendInputAsync_FallsToRest_WhenNoHubConnection()
     {
         // Without calling InitializeAsync, there's no hub connection — should use REST fallback

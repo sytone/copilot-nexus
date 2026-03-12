@@ -61,6 +61,12 @@ public class SessionManager : ISessionManager
             Model = resolvedModel,
             WorkingDirectory = config.WorkingDirectory,
             IsAutopilot = config.IsAutopilot,
+            ProfileId = config.ProfileId,
+            AgentFilePath = config.AgentFilePath,
+            IncludeWellKnownMcpConfigs = config.IncludeWellKnownMcpConfigs,
+            AdditionalMcpConfigPaths = (config.AdditionalMcpConfigPaths ?? []).ToList(),
+            EnabledMcpServers = (config.EnabledMcpServers ?? []).ToList(),
+            SkillDirectories = (config.SkillDirectories ?? []).ToList(),
         };
 
         // Generate a structured SDK session ID for persistence
@@ -75,6 +81,12 @@ public class SessionManager : ISessionManager
             State = SessionState.Running,
             WorkingDirectory = effectiveConfig.WorkingDirectory,
             IsAutopilot = effectiveConfig.IsAutopilot,
+            ProfileId = effectiveConfig.ProfileId,
+            AgentFilePath = effectiveConfig.AgentFilePath,
+            IncludeWellKnownMcpConfigs = effectiveConfig.IncludeWellKnownMcpConfigs,
+            AdditionalMcpConfigPaths = effectiveConfig.AdditionalMcpConfigPaths.ToList(),
+            EnabledMcpServers = effectiveConfig.EnabledMcpServers.ToList(),
+            SkillDirectories = effectiveConfig.SkillDirectories.ToList(),
         };
 
         _sessions[info.Id] = info;
@@ -104,6 +116,12 @@ public class SessionManager : ISessionManager
             State = SessionState.Running,
             WorkingDirectory = config.WorkingDirectory,
             IsAutopilot = config.IsAutopilot,
+            ProfileId = config.ProfileId,
+            AgentFilePath = config.AgentFilePath,
+            IncludeWellKnownMcpConfigs = config.IncludeWellKnownMcpConfigs,
+            AdditionalMcpConfigPaths = (config.AdditionalMcpConfigPaths ?? []).ToList(),
+            EnabledMcpServers = (config.EnabledMcpServers ?? []).ToList(),
+            SkillDirectories = (config.SkillDirectories ?? []).ToList(),
         };
 
         _sessions[info.Id] = info;
@@ -154,13 +172,32 @@ public class SessionManager : ISessionManager
             resolvedModel,
             wrapper.SessionId,
             config.IsAutopilot,
-            config.WorkingDirectory);
+            config.WorkingDirectory,
+            config.ProfileId,
+            config.AgentFilePath,
+            config.IncludeWellKnownMcpConfigs,
+            config.AdditionalMcpConfigPaths ?? [],
+            config.EnabledMcpServers ?? [],
+            config.SkillDirectories ?? []);
 
         _sessions[newInfo.Id] = newInfo;
         _wrappers[newInfo.Id] = wrapper;
 
         _logger.LogInformation("Session '{Name}' reconfigured with ID {SessionId}", name, newInfo.Id);
         return newInfo;
+    }
+
+    public Task<SessionInfo> RenameSessionAsync(string sessionId, string name, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Session name cannot be empty.", nameof(name));
+
+        if (!_sessions.TryGetValue(sessionId, out var info))
+            throw new KeyNotFoundException($"Session '{sessionId}' not found.");
+
+        info.Name = name.Trim();
+        _logger.LogInformation("Session {SessionId} renamed to '{Name}'", sessionId, info.Name);
+        return Task.FromResult(info);
     }
 
     public async Task SendInputAsync(string sessionId, string input, CancellationToken cancellationToken = default)

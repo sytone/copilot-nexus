@@ -15,6 +15,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     private SessionMessage? _currentStreamingMessage;
     private string _inputText = string.Empty;
     private string _title;
+    private string _editableTitle;
     private bool _isRunning;
     private bool _isProcessing;
     private bool _isAutopilot;
@@ -38,6 +39,12 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     {
         get => _title;
         set => SetProperty(ref _title, value);
+    }
+
+    public string EditableTitle
+    {
+        get => _editableTitle;
+        set => SetProperty(ref _editableTitle, value);
     }
 
     public bool IsRunning
@@ -104,6 +111,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     public ICommand SendCommand { get; }
     public ICommand AbortCommand { get; }
     public ICommand ClearCommand { get; }
+    public ICommand RenameSessionCommand { get; }
     public ICommand BrowseWorkingDirectoryCommand { get; }
     public ICommand ToggleAutopilotCommand { get; }
 
@@ -114,6 +122,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     /// The MainWindowViewModel handles the disconnect + resume.
     /// </summary>
     public event EventHandler<SessionConfiguration>? ReconfigureRequested;
+    public event EventHandler<string>? RenameRequested;
 
     public SessionTabViewModel(
         SessionInfo info,
@@ -127,6 +136,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         _dispatcher = dispatcher;
         _logger = logger;
         _title = info.Name;
+        _editableTitle = info.Name;
         _isAutopilot = info.IsAutopilot;
         _workingDirectory = info.WorkingDirectory;
         IsRunning = true;
@@ -139,6 +149,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         SendCommand = new AsyncRelayCommand(SendInputAsync, () => IsRunning && !IsProcessing && !string.IsNullOrWhiteSpace(InputText));
         AbortCommand = new AsyncRelayCommand(AbortAsync, () => IsProcessing);
         ClearCommand = new RelayCommand(ClearMessages);
+        RenameSessionCommand = new RelayCommand(RequestRename);
         BrowseWorkingDirectoryCommand = new RelayCommand(BrowseWorkingDirectory);
         ToggleAutopilotCommand = new RelayCommand(() => IsAutopilot = !IsAutopilot);
 
@@ -165,12 +176,15 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         _session = newSession;
         _isAutopilot = newInfo.IsAutopilot;
         _workingDirectory = newInfo.WorkingDirectory;
+        _editableTitle = newInfo.Name;
+        Title = newInfo.Name;
 
         // Update selected model without triggering reconfigure
         _selectedModel = AvailableModels.FirstOrDefault(m => m.ModelId == newInfo.Model);
         OnPropertyChanged(nameof(SelectedModel));
         OnPropertyChanged(nameof(IsAutopilot));
         OnPropertyChanged(nameof(WorkingDirectory));
+        OnPropertyChanged(nameof(EditableTitle));
 
         _session.OutputReceived += OnOutputReceived;
 
@@ -189,12 +203,39 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
             Model = model ?? Info.Model,
             WorkingDirectory = workDir ?? Info.WorkingDirectory,
             IsAutopilot = Info.IsAutopilot,
+            ProfileId = Info.ProfileId,
+            AgentFilePath = Info.AgentFilePath,
+            IncludeWellKnownMcpConfigs = Info.IncludeWellKnownMcpConfigs,
+            AdditionalMcpConfigPaths = Info.AdditionalMcpConfigPaths.ToList(),
+            EnabledMcpServers = Info.EnabledMcpServers.ToList(),
+            SkillDirectories = Info.SkillDirectories.ToList(),
         };
 
         _logger.LogInformation("Tab '{Title}': requesting reconfigure — model={Model}, workDir={WorkDir}",
             Title, config.Model, config.WorkingDirectory);
 
         ReconfigureRequested?.Invoke(this, config);
+    }
+
+    private void RequestRename()
+    {
+        var candidate = EditableTitle?.Trim();
+        if (string.IsNullOrWhiteSpace(candidate) || string.Equals(candidate, Title, StringComparison.Ordinal))
+        {
+            EditableTitle = Title;
+            return;
+        }
+
+        RenameRequested?.Invoke(this, candidate);
+    }
+
+    public void ApplyRename(string newName)
+    {
+        var value = newName.Trim();
+        Info.Name = value;
+        Title = value;
+        EditableTitle = value;
+        _logger.LogInformation("Tab renamed to '{Title}'", value);
     }
 
     public void AppendSystemMessage(string text)

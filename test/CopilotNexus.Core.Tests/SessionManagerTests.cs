@@ -138,6 +138,17 @@ public class SessionManagerTests
     }
 
     [Fact]
+    public async Task RenameSessionAsync_UpdatesName()
+    {
+        var info = await _manager.CreateSessionAsync("Old Name");
+
+        var updated = await _manager.RenameSessionAsync(info.Id, "New Name");
+
+        Assert.Equal("New Name", updated.Name);
+        Assert.Equal("New Name", _manager.Sessions.Single(s => s.Id == info.Id).Name);
+    }
+
+    [Fact]
     public async Task SendInputAsync_CallsSessionSend()
     {
         var info = await _manager.CreateSessionAsync("Test");

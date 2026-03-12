@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     private readonly MainWindowViewModel _viewModel;
     private readonly ISessionManager _sessionManager;
     private readonly IStatePersistenceService _stateService;
+    private readonly ISessionProfileService _profileService;
     private readonly ILogger _logger;
     private StagingUpdateDetectionService? _updateService;
     private DispatcherTimer? _redisplayTimer;
@@ -43,6 +44,7 @@ public partial class MainWindow : Window
             var mockClient = new MockCopilotClientService(factory.CreateLogger<MockCopilotClientService>());
             _sessionManager = new SessionManager(mockClient, factory.CreateLogger<SessionManager>());
             _stateService = new JsonStatePersistenceService(factory.CreateLogger<JsonStatePersistenceService>());
+            _profileService = new InMemorySessionProfileService();
         }
         else
         {
@@ -52,9 +54,16 @@ public partial class MainWindow : Window
             _stateService = new NexusStatePersistenceService(
                 nexusUrl,
                 factory.CreateLogger<NexusStatePersistenceService>());
+            _profileService = new NexusSessionProfileService(
+                nexusUrl,
+                factory.CreateLogger<NexusSessionProfileService>());
         }
 
-        _viewModel = new MainWindowViewModel(_sessionManager, dispatcher, factory.CreateLogger<MainWindowViewModel>());
+        _viewModel = new MainWindowViewModel(
+            _sessionManager,
+            dispatcher,
+            factory.CreateLogger<MainWindowViewModel>(),
+            _profileService);
         _viewModel.RestartRequested += OnRestartRequested;
         _viewModel.UpdateDismissed += OnUpdateDismissed;
         DataContext = _viewModel;
@@ -241,6 +250,10 @@ public partial class MainWindow : Window
         if (_stateService is IDisposable disposableState)
         {
             disposableState.Dispose();
+        }
+        if (_profileService is IDisposable disposableProfiles)
+        {
+            disposableProfiles.Dispose();
         }
         base.OnClosed(e);
     }

@@ -85,6 +85,12 @@ public class SessionsController : ControllerBase
                 Model = request.Model,
                 WorkingDirectory = request.WorkingDirectory,
                 IsAutopilot = request.IsAutopilot,
+                ProfileId = request.ProfileId,
+                AgentFilePath = request.AgentFilePath,
+                IncludeWellKnownMcpConfigs = request.IncludeWellKnownMcpConfigs,
+                AdditionalMcpConfigPaths = request.AdditionalMcpConfigPaths ?? [],
+                EnabledMcpServers = request.EnabledMcpServers ?? [],
+                SkillDirectories = request.SkillDirectories ?? [],
             }
             : null;
 
@@ -157,6 +163,12 @@ public class SessionsController : ControllerBase
             Model = request.Model ?? info.Model,
             WorkingDirectory = request.WorkingDirectory ?? info.WorkingDirectory,
             IsAutopilot = request.IsAutopilot ?? info.IsAutopilot,
+            ProfileId = request.ProfileId ?? info.ProfileId,
+            AgentFilePath = request.AgentFilePath ?? info.AgentFilePath,
+            IncludeWellKnownMcpConfigs = request.IncludeWellKnownMcpConfigs ?? info.IncludeWellKnownMcpConfigs,
+            AdditionalMcpConfigPaths = request.AdditionalMcpConfigPaths ?? info.AdditionalMcpConfigPaths,
+            EnabledMcpServers = request.EnabledMcpServers ?? info.EnabledMcpServers,
+            SkillDirectories = request.SkillDirectories ?? info.SkillDirectories,
         };
 
         var newInfo = await _sessionManager.ReconfigureSessionAsync(
@@ -168,6 +180,26 @@ public class SessionsController : ControllerBase
         // Re-wire output forwarding with new session wrapper
         WireSessionOutputForwarding(newInfo.Id);
 
+        return Ok(dto);
+    }
+
+    /// <summary>Rename an existing session.</summary>
+    [HttpPut("{id}/name")]
+    public async Task<ActionResult<SessionInfoDto>> RenameSession(
+        string id,
+        [FromBody] RenameSessionRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        var existing = _sessionManager.Sessions.FirstOrDefault(s => s.Id == id);
+        if (existing == null)
+            return NotFound(new { error = $"Session '{id}' not found" });
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return BadRequest(new { error = "Name cannot be empty." });
+
+        var info = await _sessionManager.RenameSessionAsync(id, request.Name, cancellationToken);
+        var dto = SessionInfoDto.FromSessionInfo(info);
+        await _hubContext.Clients.All.SessionReconfigured(dto);
         return Ok(dto);
     }
 

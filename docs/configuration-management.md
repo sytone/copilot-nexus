@@ -47,6 +47,7 @@ Primary paths are centralized in `src/CopilotNexus.Core/CopilotNexusPaths.cs`:
 
 - `StateRoot`: `%LOCALAPPDATA%\\CopilotNexus\\state`
 - `NexusAppStateFile`: `%LOCALAPPDATA%\\CopilotNexus\\state\\session-state.json`
+- `NexusSessionProfilesFile`: `%LOCALAPPDATA%\\CopilotNexus\\state\\session-profiles.json`
 - `UserConfigRoot`: `%USERPROFILE%\\.copilot-nexus` (test-mode fallback)
 - `AppStateFile`: `%USERPROFILE%\\.copilot-nexus\\session-state.json` (test-mode fallback)
 - `Root`: `%LOCALAPPDATA%\CopilotNexus`
@@ -110,6 +111,22 @@ Current usage is minimal:
 3. App loads state from Nexus (`GET /api/app-state`).
 4. `MainWindowViewModel.RestoreStateAsync` resumes sessions by `SdkSessionId`.
 5. On app close (and hot restart), current metadata is captured and saved via Nexus (`PUT /api/app-state`).
+
+## Session Profile Persistence
+
+Session profiles are Nexus-owned and shared across clients via:
+
+- `GET /api/session-profiles`
+- `POST /api/session-profiles`
+- `PUT /api/session-profiles/{id}`
+- `DELETE /api/session-profiles/{id}`
+
+Persisted file:
+
+- `%LOCALAPPDATA%\\CopilotNexus\\state\\session-profiles.json`
+
+Profiles store defaults for model, mode, working directory, optional custom agent file,
+and MCP behavior (well-known discovery + additional config files + enabled server filter).
 
 ## Related Files
 

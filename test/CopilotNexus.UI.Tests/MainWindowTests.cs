@@ -120,7 +120,24 @@ public class MainWindowTests
 
         var root = window.Content as Grid;
         Assert.NotNull(root);
-        Assert.Equal(3, root.RowDefinitions.Count);
-        Assert.True(root.RowDefinitions[1].Height.IsStar);
+        Assert.Equal(4, root.RowDefinitions.Count);
+        Assert.True(root.RowDefinitions[2].Height.IsStar);
+    }
+
+    [AvaloniaFact]
+    public void MainWindow_HasWorkspaceModeToolbar()
+    {
+        var window = CreateTestWindow();
+        window.Show();
+
+        var sessionsButton = window.GetVisualDescendants()
+            .OfType<Button>()
+            .FirstOrDefault(button => string.Equals(button.Content?.ToString(), "Sessions", StringComparison.Ordinal));
+        var profilesButton = window.GetVisualDescendants()
+            .OfType<Button>()
+            .FirstOrDefault(button => string.Equals(button.Content?.ToString(), "Profiles", StringComparison.Ordinal));
+
+        Assert.NotNull(sessionsButton);
+        Assert.NotNull(profilesButton);
     }
 }

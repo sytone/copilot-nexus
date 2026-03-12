@@ -101,6 +101,12 @@ public class NexusSessionManager : ISessionManager
             Model = config?.Model,
             WorkingDirectory = config?.WorkingDirectory,
             IsAutopilot = config?.IsAutopilot ?? true,
+            ProfileId = config?.ProfileId,
+            AgentFilePath = config?.AgentFilePath,
+            IncludeWellKnownMcpConfigs = config?.IncludeWellKnownMcpConfigs ?? true,
+            AdditionalMcpConfigPaths = config?.AdditionalMcpConfigPaths ?? [],
+            EnabledMcpServers = config?.EnabledMcpServers ?? [],
+            SkillDirectories = config?.SkillDirectories ?? [],
         };
 
         var response = await _httpClient.PostAsJsonAsync("/api/sessions", request, cancellationToken);
@@ -146,6 +152,12 @@ public class NexusSessionManager : ISessionManager
             Model = config?.Model,
             WorkingDirectory = config?.WorkingDirectory,
             IsAutopilot = config?.IsAutopilot ?? true,
+            ProfileId = config?.ProfileId,
+            AgentFilePath = config?.AgentFilePath,
+            IncludeWellKnownMcpConfigs = config?.IncludeWellKnownMcpConfigs ?? true,
+            AdditionalMcpConfigPaths = config?.AdditionalMcpConfigPaths ?? [],
+            EnabledMcpServers = config?.EnabledMcpServers ?? [],
+            SkillDirectories = config?.SkillDirectories ?? [],
         };
 
         var response = await _httpClient.PostAsJsonAsync("/api/sessions", request, cancellationToken);
@@ -222,6 +234,12 @@ public class NexusSessionManager : ISessionManager
             Model = config.Model,
             WorkingDirectory = config.WorkingDirectory,
             IsAutopilot = config.IsAutopilot,
+            ProfileId = config.ProfileId,
+            AgentFilePath = config.AgentFilePath,
+            IncludeWellKnownMcpConfigs = config.IncludeWellKnownMcpConfigs,
+            AdditionalMcpConfigPaths = config.AdditionalMcpConfigPaths ?? [],
+            EnabledMcpServers = config.EnabledMcpServers ?? [],
+            SkillDirectories = config.SkillDirectories ?? [],
         };
 
         var response = await _httpClient.PutAsJsonAsync($"/api/sessions/{sessionId}/configure", request, cancellationToken);
@@ -255,6 +273,18 @@ public class NexusSessionManager : ISessionManager
                 await _hubConnection.InvokeAsync("JoinSession", info.Id, cancellationToken);
             }
         }
+        return info;
+    }
+
+    public async Task<SessionInfo> RenameSessionAsync(string sessionId, string name, CancellationToken cancellationToken = default)
+    {
+        var request = new RenameSessionRequest { Name = name };
+        var response = await _httpClient.PutAsJsonAsync($"/api/sessions/{sessionId}/name", request, cancellationToken);
+        response.EnsureSuccessStatusCode();
+
+        var dto = await response.Content.ReadFromJsonAsync<SessionInfoDto>(cancellationToken: cancellationToken);
+        var info = ToSessionInfo(dto!);
+        _sessions[info.Id] = info;
         return info;
     }
 
@@ -377,7 +407,14 @@ public class NexusSessionManager : ISessionManager
     {
         var info = SessionInfo.FromRemote(
             dto.Id, dto.Name, dto.Model, dto.SdkSessionId,
-            dto.IsAutopilot, dto.WorkingDirectory);
+            dto.IsAutopilot,
+            dto.WorkingDirectory,
+            dto.ProfileId,
+            dto.AgentFilePath,
+            dto.IncludeWellKnownMcpConfigs,
+            dto.AdditionalMcpConfigPaths,
+            dto.EnabledMcpServers,
+            dto.SkillDirectories);
         if (Enum.TryParse<SessionState>(dto.State, out var s))
             info.State = s;
         return info;

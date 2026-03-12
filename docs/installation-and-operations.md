@@ -36,6 +36,12 @@ Desktop app tab/session metadata is owned by Nexus and stored at:
 %LOCALAPPDATA%\CopilotNexus\state\session-state.json
 ```
 
+Session profiles are also Nexus-owned and stored at:
+
+```
+%LOCALAPPDATA%\CopilotNexus\state\session-profiles.json
+```
+
 The app loads/saves this state via Nexus API (`/api/app-state`) on startup and shutdown.
 
 > **Important:** The `staging/` folder is a sibling of the install dirs — updates are

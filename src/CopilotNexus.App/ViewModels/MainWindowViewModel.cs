@@ -2,6 +2,7 @@ namespace CopilotNexus.App.ViewModels;
 
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using CopilotNexus.App.Services;
 using CopilotNexus.Core.Events;
 using CopilotNexus.Core.Interfaces;
 using CopilotNexus.Core.Models;
@@ -10,17 +11,21 @@ using Microsoft.Extensions.Logging;
 public class MainWindowViewModel : ViewModelBase, IDisposable
 {
     private readonly ISessionManager _sessionManager;
+    private readonly ISessionProfileService _profileService;
     private readonly IUiDispatcher _dispatcher;
     private readonly ILogger<MainWindowViewModel> _logger;
     private SessionTabViewModel? _selectedTab;
+    private SessionProfile? _selectedProfile;
     private int _sessionCounter;
     private bool _disposed;
     private string? _statusText;
     private bool _isUpdateAvailable;
+    private bool _isProfileEditorVisible;
     private string _updateNotificationText = "A new version is available.";
     private ModelInfo? _selectedModel;
 
     public ObservableCollection<SessionTabViewModel> Tabs { get; } = new();
+    public ObservableCollection<SessionProfile> Profiles { get; } = new();
 
     /// <summary>Available models (populated after InitializeAsync).</summary>
     public ObservableCollection<ModelInfo> AvailableModels { get; } = new();
@@ -56,6 +61,30 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         set => SetProperty(ref _selectedModel, value);
     }
 
+    public SessionProfile? SelectedProfile
+    {
+        get => _selectedProfile;
+        set
+        {
+            if (SetProperty(ref _selectedProfile, value))
+            {
+                ApplySelectedProfileDefaults(value);
+            }
+        }
+    }
+
+    public bool IsProfileEditorVisible
+    {
+        get => _isProfileEditorVisible;
+        set
+        {
+            if (SetProperty(ref _isProfileEditorVisible, value))
+                OnPropertyChanged(nameof(IsSessionEditorVisible));
+        }
+    }
+
+    public bool IsSessionEditorVisible => !IsProfileEditorVisible;
+
     /// <summary>Raised when the user accepts a hot restart. The host (MainWindow) should handle the process lifecycle.</summary>
     public event EventHandler? RestartRequested;
 
@@ -78,16 +107,31 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     public ICommand CloseTabCommand { get; }
     public ICommand RestartNowCommand { get; }
     public ICommand DismissUpdateCommand { get; }
+    public ICommand ShowSessionsViewCommand { get; }
+    public ICommand ShowProfilesViewCommand { get; }
+    public ICommand NewProfileCommand { get; }
+    public ICommand SaveProfileCommand { get; }
+    public ICommand DeleteProfileCommand { get; }
 
-    public MainWindowViewModel(ISessionManager sessionManager, IUiDispatcher dispatcher, ILogger<MainWindowViewModel> logger)
+    public MainWindowViewModel(
+        ISessionManager sessionManager,
+        IUiDispatcher dispatcher,
+        ILogger<MainWindowViewModel> logger,
+        ISessionProfileService? profileService = null)
     {
         _sessionManager = sessionManager;
+        _profileService = profileService ?? new InMemorySessionProfileService();
         _dispatcher = dispatcher;
         _logger = logger;
         NewTabCommand = new AsyncRelayCommand(CreateNewTabAsync);
         CloseTabCommand = new AsyncRelayCommand(CloseTabAsync);
         RestartNowCommand = new RelayCommand(OnRestartNow);
         DismissUpdateCommand = new RelayCommand(OnDismissUpdate);
+        ShowSessionsViewCommand = new RelayCommand(() => IsProfileEditorVisible = false);
+        ShowProfilesViewCommand = new RelayCommand(() => IsProfileEditorVisible = true);
+        NewProfileCommand = new RelayCommand(CreateNewProfile);
+        SaveProfileCommand = new AsyncRelayCommand(SaveSelectedProfileAsync);
+        DeleteProfileCommand = new AsyncRelayCommand(DeleteSelectedProfileAsync);
     }
 
     public void ShowUpdateNotification(string? currentVersion = null, string? availableVersion = null)
@@ -150,8 +194,107 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         _logger.LogInformation("Loaded {Count} models, default: {Model}",
             AvailableModels.Count, SelectedModel?.ModelId ?? "none");
 
+        try
+        {
+            await LoadProfilesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load session profiles; using fallback default profile.");
+            Profiles.Clear();
+            var fallback = new SessionProfile
+            {
+                Id = "default",
+                Name = "Default",
+                Description = "Fallback profile",
+                IsAutopilot = true,
+                IncludeWellKnownMcpConfigs = true,
+            };
+            Profiles.Add(fallback);
+            SelectedProfile = fallback;
+        }
+
         StatusText = null;
         _logger.LogInformation("Application initialized successfully");
+    }
+
+    private async Task LoadProfilesAsync()
+    {
+        var previousSelectedId = SelectedProfile?.Id;
+        var profiles = await _profileService.ListAsync();
+
+        Profiles.Clear();
+        foreach (var profile in profiles.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase))
+        {
+            Profiles.Add(profile);
+        }
+
+        if (Profiles.Count == 0)
+        {
+            var defaultProfile = await _profileService.SaveAsync(new SessionProfile
+            {
+                Name = "Default",
+                Description = "Default Nexus profile",
+                IsAutopilot = true,
+                IncludeWellKnownMcpConfigs = true,
+            });
+            Profiles.Add(defaultProfile);
+        }
+
+        SelectedProfile = previousSelectedId != null
+            ? Profiles.FirstOrDefault(profile => string.Equals(profile.Id, previousSelectedId, StringComparison.OrdinalIgnoreCase))
+            : SelectedProfile;
+        SelectedProfile ??= Profiles.FirstOrDefault();
+    }
+
+    private void ApplySelectedProfileDefaults(SessionProfile? profile)
+    {
+        if (profile == null)
+            return;
+
+        if (!string.IsNullOrWhiteSpace(profile.Model))
+        {
+            var matched = AvailableModels.FirstOrDefault(model =>
+                string.Equals(model.ModelId, profile.Model, StringComparison.OrdinalIgnoreCase));
+            if (matched != null)
+                SelectedModel = matched;
+        }
+    }
+
+    private void CreateNewProfile()
+    {
+        var profile = new SessionProfile
+        {
+            Name = "New Profile",
+            IsAutopilot = true,
+            IncludeWellKnownMcpConfigs = true,
+        };
+
+        Profiles.Add(profile);
+        SelectedProfile = profile;
+        IsProfileEditorVisible = true;
+    }
+
+    private async Task SaveSelectedProfileAsync()
+    {
+        if (SelectedProfile == null)
+            return;
+
+        var saved = await _profileService.SaveAsync(SelectedProfile);
+        await LoadProfilesAsync();
+        SelectedProfile = Profiles.FirstOrDefault(profile =>
+            string.Equals(profile.Id, saved.Id, StringComparison.OrdinalIgnoreCase));
+        _logger.LogInformation("Saved profile '{Name}' ({Id})", saved.Name, saved.Id);
+    }
+
+    private async Task DeleteSelectedProfileAsync()
+    {
+        if (SelectedProfile == null || string.IsNullOrWhiteSpace(SelectedProfile.Id))
+            return;
+
+        var profileId = SelectedProfile.Id;
+        await _profileService.DeleteAsync(profileId);
+        await LoadProfilesAsync();
     }
 
     /// <summary>
@@ -177,6 +320,12 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                     Model = tabState.Model,
                     WorkingDirectory = tabState.WorkingDirectory,
                     IsAutopilot = tabState.IsAutopilot,
+                    ProfileId = tabState.ProfileId,
+                    AgentFilePath = tabState.AgentFilePath,
+                    IncludeWellKnownMcpConfigs = tabState.IncludeWellKnownMcpConfigs,
+                    AdditionalMcpConfigPaths = tabState.AdditionalMcpConfigPaths ?? new List<string>(),
+                    EnabledMcpServers = tabState.EnabledMcpServers ?? new List<string>(),
+                    SkillDirectories = tabState.SkillDirectories ?? new List<string>(),
                 };
 
                 var permHandler = tabState.IsAutopilot ? null : GetPermissionHandler();
@@ -225,6 +374,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 var tabViewModel = new SessionTabViewModel(sessionInfo, session, _dispatcher, _logger, AvailableModels);
                 tabViewModel.CloseRequested += (_, _) => _ = CloseSpecificTabAsync(tabViewModel);
                 tabViewModel.ReconfigureRequested += OnTabReconfigureRequested;
+                tabViewModel.RenameRequested += OnTabRenameRequested;
 
                 tabViewModel.Messages.Clear();
                 foreach (var item in history)
@@ -301,6 +451,12 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 SdkSessionId = tab.Info.SdkSessionId,
                 WorkingDirectory = tab.Info.WorkingDirectory,
                 IsAutopilot = tab.Info.IsAutopilot,
+                ProfileId = tab.Info.ProfileId,
+                AgentFilePath = tab.Info.AgentFilePath,
+                IncludeWellKnownMcpConfigs = tab.Info.IncludeWellKnownMcpConfigs,
+                AdditionalMcpConfigPaths = tab.Info.AdditionalMcpConfigPaths.ToList(),
+                EnabledMcpServers = tab.Info.EnabledMcpServers.ToList(),
+                SkillDirectories = tab.Info.SkillDirectories.ToList(),
                 NexusSystemMessages = nexusSystemMessages,
             });
         }
@@ -313,16 +469,27 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     {
         _sessionCounter++;
         var name = $"Session {_sessionCounter}";
+        var profile = SelectedProfile;
 
         _logger.LogInformation("Creating new tab '{Name}'", name);
         StatusText = $"Creating {name}…";
 
         try
         {
+            var profileModel = string.IsNullOrWhiteSpace(profile?.Model) ? null : profile!.Model;
+            var resolvedModel = profileModel ?? SelectedModel?.ModelId;
+
             var config = new SessionConfiguration
             {
-                Model = SelectedModel?.ModelId,
-                IsAutopilot = true,
+                Model = resolvedModel,
+                IsAutopilot = profile?.IsAutopilot ?? true,
+                WorkingDirectory = profile?.WorkingDirectory,
+                ProfileId = profile?.Id,
+                AgentFilePath = profile?.AgentFilePath,
+                IncludeWellKnownMcpConfigs = profile?.IncludeWellKnownMcpConfigs ?? true,
+                AdditionalMcpConfigPaths = ParseDelimitedList(profile?.AdditionalMcpConfigPaths),
+                EnabledMcpServers = ParseDelimitedList(profile?.EnabledMcpServers),
+                SkillDirectories = ParseDelimitedList(profile?.AdditionalSkillDirectories),
             };
 
             var sessionInfo = await _sessionManager.CreateSessionAsync(name, config);
@@ -331,6 +498,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             var tabViewModel = new SessionTabViewModel(sessionInfo, session, _dispatcher, _logger, AvailableModels);
             tabViewModel.CloseRequested += (_, _) => _ = CloseSpecificTabAsync(tabViewModel);
             tabViewModel.ReconfigureRequested += OnTabReconfigureRequested;
+            tabViewModel.RenameRequested += OnTabRenameRequested;
 
             Tabs.Add(tabViewModel);
             SelectedTab = tabViewModel;
@@ -393,6 +561,41 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         }
     }
 
+    private async void OnTabRenameRequested(object? sender, string newName)
+    {
+        if (sender is not SessionTabViewModel tab)
+            return;
+
+        if (string.IsNullOrWhiteSpace(newName) ||
+            string.Equals(tab.Title, newName, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        try
+        {
+            var updated = await _sessionManager.RenameSessionAsync(tab.Info.Id, newName);
+            tab.ApplyRename(updated.Name);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to rename tab '{Title}'", tab.Title);
+            tab.AppendSystemMessage($"Rename failed: {ex.Message}");
+        }
+    }
+
+    private static List<string> ParseDelimitedList(string? rawValue)
+    {
+        if (string.IsNullOrWhiteSpace(rawValue))
+            return [];
+
+        return rawValue
+            .Split(['\r', '\n', ';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     private Func<ToolPermissionRequest, Task<PermissionDecision>>? GetPermissionHandler()
     {
         if (PermissionRequested != null)
@@ -429,6 +632,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         }
 
         tab.ReconfigureRequested -= OnTabReconfigureRequested;
+        tab.RenameRequested -= OnTabRenameRequested;
         Tabs.Remove(tab);
 
         if (SelectedTab == tab || SelectedTab == null)
@@ -449,6 +653,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
         foreach (var tab in Tabs)
         {
             tab.ReconfigureRequested -= OnTabReconfigureRequested;
+            tab.RenameRequested -= OnTabRenameRequested;
             tab.Dispose();
         }
 

@@ -18,6 +18,12 @@ public record SessionInfoDto
     public string SdkSessionId { get; init; } = string.Empty;
     public string? WorkingDirectory { get; init; }
     public bool IsAutopilot { get; init; } = true;
+    public string? ProfileId { get; init; }
+    public string? AgentFilePath { get; init; }
+    public bool IncludeWellKnownMcpConfigs { get; init; } = true;
+    public List<string> AdditionalMcpConfigPaths { get; init; } = new();
+    public List<string> EnabledMcpServers { get; init; } = new();
+    public List<string> SkillDirectories { get; init; } = new();
     public string State { get; init; } = "Running";
     public DateTime CreatedAt { get; init; }
 
@@ -29,6 +35,12 @@ public record SessionInfoDto
         SdkSessionId = info.SdkSessionId,
         WorkingDirectory = info.WorkingDirectory,
         IsAutopilot = info.IsAutopilot,
+        ProfileId = info.ProfileId,
+        AgentFilePath = info.AgentFilePath,
+        IncludeWellKnownMcpConfigs = info.IncludeWellKnownMcpConfigs,
+        AdditionalMcpConfigPaths = new List<string>(info.AdditionalMcpConfigPaths ?? []),
+        EnabledMcpServers = new List<string>(info.EnabledMcpServers ?? []),
+        SkillDirectories = new List<string>(info.SkillDirectories ?? []),
         State = info.State.ToString(),
         CreatedAt = info.CreatedAt,
     };
@@ -58,6 +70,12 @@ public record CreateSessionRequest
     public string? Model { get; init; }
     public string? WorkingDirectory { get; init; }
     public bool IsAutopilot { get; init; } = true;
+    public string? ProfileId { get; init; }
+    public string? AgentFilePath { get; init; }
+    public bool IncludeWellKnownMcpConfigs { get; init; } = true;
+    public List<string> AdditionalMcpConfigPaths { get; init; } = new();
+    public List<string> EnabledMcpServers { get; init; } = new();
+    public List<string> SkillDirectories { get; init; } = new();
     /// <summary>Optional initial message to send after creation.</summary>
     public string? InitialMessage { get; init; }
 }
@@ -65,9 +83,22 @@ public record CreateSessionRequest
 /// <summary>Request body for reconfiguring a session.</summary>
 public record ConfigureSessionRequest
 {
+    public string? Name { get; init; }
     public string? Model { get; init; }
     public string? WorkingDirectory { get; init; }
     public bool? IsAutopilot { get; init; }
+    public string? ProfileId { get; init; }
+    public string? AgentFilePath { get; init; }
+    public bool? IncludeWellKnownMcpConfigs { get; init; }
+    public List<string>? AdditionalMcpConfigPaths { get; init; }
+    public List<string>? EnabledMcpServers { get; init; }
+    public List<string>? SkillDirectories { get; init; }
+}
+
+/// <summary>Request body for renaming a session.</summary>
+public record RenameSessionRequest
+{
+    public string Name { get; init; } = string.Empty;
 }
 
 /// <summary>Request body for sending input to a session.</summary>

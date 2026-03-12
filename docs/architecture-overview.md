@@ -107,6 +107,8 @@ contract types used by both App and Nexus.
 | `SessionManager`                | Implementation — maps session IDs to wrappers, generates structured SDK IDs       |
 | `IStatePersistenceService`      | Save/load application state (open tabs, SDK session IDs)                          |
 | `JsonStatePersistenceService`   | JSON persistence with atomic file writes for crash safety                         |
+| `ISessionProfileService`        | CRUD for reusable session profiles (model/mode/MCP/agent defaults)               |
+| `JsonSessionProfileService`     | JSON-backed Nexus profile persistence                                              |
 | `IUpdateDetectionService`       | Watch for staged updates in dist/staging/                                         |
 | `StagingUpdateDetectionService` | FileSystemWatcher + timer fallback for staging detection                          |
 | `IUiDispatcher`                 | Abstracts UI thread marshalling for testability                                   |
@@ -159,6 +161,7 @@ in `CopilotNexus.Cli`. Any client (desktop, web, CLI, automation) connects here.
 | ---------------------- | ------------------------------------------------------------------------------------- |
 | `SessionHub` (SignalR) | Real-time session operations: `JoinSession`, `LeaveSession`, `SendInput`, `AbortSession` |
 | `SessionsController`   | REST API for session CRUD — create, list, get, configure, send input, delete          |
+| `SessionProfilesController` | REST API for profile CRUD (`/api/session-profiles`)                              |
 | `ModelsController`     | REST API for listing available Copilot models                                         |
 | `WebhookController`    | Automation endpoint — accepts callback URLs for async session interaction (`POST /api/webhooks/sessions/{id}/message`) |
 | `SessionManager`       | Reuses `SessionManager` from Core to manage SDK session lifecycle                     |

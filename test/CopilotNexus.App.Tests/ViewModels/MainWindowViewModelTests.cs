@@ -324,6 +324,46 @@ public class MainWindowViewModelTests : IDisposable
         Assert.Contains(tabState.NexusSystemMessages, m => m.Content == "Nexus runtime message");
     }
 
+    [Fact]
+    public async Task CreateNewTabAsync_UsesSelectedProfileConfiguration()
+    {
+        SetupSessionCreation("Session 1");
+        await _viewModel.InitializeAsync();
+
+        var profile = new SessionProfile
+        {
+            Id = "p1",
+            Name = "Profile 1",
+            Model = "gpt-5.2-codex",
+            IsAutopilot = false,
+            WorkingDirectory = @"Q:\repos\gh\copilot-nexus",
+            IncludeWellKnownMcpConfigs = true,
+            AdditionalMcpConfigPaths = @"Q:\mcp\custom.json",
+            EnabledMcpServers = "context7",
+            AdditionalSkillDirectories = @"Q:\repos\gh\copilot-nexus\.github\skills",
+        };
+        _viewModel.Profiles.Add(profile);
+        _viewModel.SelectedProfile = profile;
+
+        await _viewModel.CreateNewTabAsync();
+
+        _mockSessionManager.Verify(
+            m => m.CreateSessionAsync(
+                It.IsAny<string>(),
+                It.Is<SessionConfiguration?>(cfg =>
+                    cfg != null &&
+                    cfg.Model == "gpt-5.2-codex" &&
+                    cfg.IsAutopilot == false &&
+                    cfg.WorkingDirectory == @"Q:\repos\gh\copilot-nexus" &&
+                    cfg.ProfileId == "p1" &&
+                    cfg.AdditionalMcpConfigPaths.Contains(@"Q:\mcp\custom.json") &&
+                    cfg.EnabledMcpServers.Contains("context7")),
+                It.IsAny<Func<ToolPermissionRequest, Task<PermissionDecision>>?>(),
+                It.IsAny<Func<AgentUserInputRequest, Task<AgentUserInputResponse>>?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
     private void SetupSessionCreation(string name)
     {
         var sessionInfo = new SessionInfo(name);

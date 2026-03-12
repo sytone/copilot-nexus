@@ -79,6 +79,14 @@ public class CopilotNexusPathsTests
     }
 
     [Fact]
+    public void NexusSessionProfilesFile_IsUnderStateRoot()
+    {
+        Assert.Equal(
+            Path.Combine(ExpectedRoot, "state", "session-profiles.json"),
+            CopilotNexusPaths.NexusSessionProfilesFile);
+    }
+
+    [Fact]
     public void CliExe_IsInCliInstall()
     {
         Assert.Equal(

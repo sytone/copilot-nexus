@@ -29,6 +29,7 @@ public class SessionTabViewModelTests : IDisposable
     public void Constructor_SetsTitle()
     {
         Assert.Equal("Test Session", _viewModel.Title);
+        Assert.Equal("Test Session", _viewModel.EditableTitle);
     }
 
     [Fact]
@@ -134,6 +135,28 @@ public class SessionTabViewModelTests : IDisposable
         _viewModel.RequestClose();
 
         Assert.True(raised);
+    }
+
+    [Fact]
+    public void RenameSessionCommand_RaisesRenameRequested()
+    {
+        string? renamed = null;
+        _viewModel.RenameRequested += (_, value) => renamed = value;
+
+        _viewModel.EditableTitle = "Friendly Name";
+        _viewModel.RenameSessionCommand.Execute(null);
+
+        Assert.Equal("Friendly Name", renamed);
+    }
+
+    [Fact]
+    public void ApplyRename_UpdatesTitleAndEditableTitle()
+    {
+        _viewModel.ApplyRename("New Name");
+
+        Assert.Equal("New Name", _viewModel.Title);
+        Assert.Equal("New Name", _viewModel.EditableTitle);
+        Assert.Equal("New Name", _viewModel.Info.Name);
     }
 
     [Fact]

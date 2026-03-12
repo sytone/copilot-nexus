@@ -181,4 +181,21 @@ public class SessionsApiTests : IClassFixture<NexusTestFactory>
         var dto = await response.Content.ReadFromJsonAsync<SessionInfoDto>();
         Assert.Equal("gpt-5", dto!.Model);
     }
+
+    [Fact]
+    public async Task RenameSession_UpdatesName()
+    {
+        var createRequest = new CreateSessionRequest { Name = "Before Rename" };
+        var createResponse = await _client.PostAsJsonAsync("/api/sessions", createRequest);
+        var created = await createResponse.Content.ReadFromJsonAsync<SessionInfoDto>();
+
+        var renameResponse = await _client.PutAsJsonAsync(
+            $"/api/sessions/{created!.Id}/name",
+            new RenameSessionRequest { Name = "After Rename" });
+        renameResponse.EnsureSuccessStatusCode();
+
+        var renamed = await renameResponse.Content.ReadFromJsonAsync<SessionInfoDto>();
+        Assert.NotNull(renamed);
+        Assert.Equal("After Rename", renamed!.Name);
+    }
 }
