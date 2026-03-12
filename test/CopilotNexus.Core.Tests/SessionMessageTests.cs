@@ -49,6 +49,23 @@ public class SessionMessageTests
     }
 
     [Fact]
+    public void Constructor_DefaultIsNotNexusSystemMessage()
+    {
+        var message = new SessionMessage(MessageRole.System, "test");
+        Assert.False(message.IsNexusSystemMessage);
+    }
+
+    [Fact]
+    public void Constructor_CanMarkAsNexusSystemMessage()
+    {
+        var message = new SessionMessage(
+            MessageRole.System,
+            "test",
+            isNexusSystemMessage: true);
+        Assert.True(message.IsNexusSystemMessage);
+    }
+
+    [Fact]
     public void Constructor_CanBeCreatedAsStreaming()
     {
         var message = new SessionMessage(MessageRole.Assistant, "partial", isStreaming: true);

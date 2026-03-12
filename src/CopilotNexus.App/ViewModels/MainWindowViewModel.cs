@@ -216,6 +216,11 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                         _logger.LogWarning(historyEx, "Failed to load history for resumed tab '{Name}'", tabState.Name);
                     }
                 }
+                var nexusSystemMessages = (tabState.NexusSystemMessages ?? [])
+                    .Where(msg => msg.Role == MessageRole.System)
+                    .Where(msg => !string.IsNullOrWhiteSpace(msg.Content))
+                    .OrderBy(msg => msg.Timestamp)
+                    .ToArray();
 
                 var tabViewModel = new SessionTabViewModel(sessionInfo, session, _dispatcher, _logger, AvailableModels);
                 tabViewModel.CloseRequested += (_, _) => _ = CloseSpecificTabAsync(tabViewModel);
@@ -226,7 +231,20 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 {
                     tabViewModel.Messages.Add(new SessionMessage(item.Role, item.Content));
                 }
-                tabViewModel.Messages.Add(new SessionMessage(MessageRole.System, systemMessage));
+                foreach (var item in nexusSystemMessages)
+                {
+                    tabViewModel.Messages.Add(new SessionMessage(
+                        item.Role,
+                        item.Content,
+                        isNexusSystemMessage: true)
+                    {
+                        Timestamp = item.Timestamp == default ? DateTime.UtcNow : item.Timestamp,
+                    });
+                }
+                tabViewModel.Messages.Add(new SessionMessage(
+                    MessageRole.System,
+                    systemMessage,
+                    isNexusSystemMessage: true));
 
                 Tabs.Add(tabViewModel);
                 _logger.LogInformation("Restored tab '{Name}'", tabState.Name);
@@ -251,7 +269,8 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// Captures the current application state for persistence.
-    /// Only stores tab metadata — the SDK handles conversation history.
+    /// Stores tab metadata and Nexus-generated system messages.
+    /// The SDK handles conversation history.
     /// </summary>
     public AppState CaptureState()
     {
@@ -263,6 +282,18 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
 
         foreach (var tab in Tabs)
         {
+            var nexusSystemMessages = tab.Messages
+                .Where(message => message.IsNexusSystemMessage)
+                .Where(message => message.Role == MessageRole.System)
+                .Where(message => !string.IsNullOrWhiteSpace(message.Content))
+                .Select(message => new MessageState
+                {
+                    Role = message.Role,
+                    Content = message.Content,
+                    Timestamp = message.Timestamp,
+                })
+                .ToList();
+
             state.Tabs.Add(new TabState
             {
                 Name = tab.Title,
@@ -270,6 +301,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 SdkSessionId = tab.Info.SdkSessionId,
                 WorkingDirectory = tab.Info.WorkingDirectory,
                 IsAutopilot = tab.Info.IsAutopilot,
+                NexusSystemMessages = nexusSystemMessages,
             });
         }
 

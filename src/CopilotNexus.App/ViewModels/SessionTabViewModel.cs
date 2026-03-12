@@ -150,7 +150,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         if (info.WorkingDirectory != null)
             startMsg += $" | path: {info.WorkingDirectory}";
         startMsg += $" | mode: {(info.IsAutopilot ? "autopilot" : "interactive")}";
-        AppendMessage(new SessionMessage(MessageRole.System, startMsg));
+        AppendMessage(new SessionMessage(MessageRole.System, startMsg, isNexusSystemMessage: true));
     }
 
     /// <summary>
@@ -199,7 +199,10 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
 
     public void AppendSystemMessage(string text)
     {
-        _dispatcher.BeginInvoke(() => AppendMessage(new SessionMessage(MessageRole.System, text)));
+        _dispatcher.BeginInvoke(() => AppendMessage(new SessionMessage(
+            MessageRole.System,
+            text,
+            isNexusSystemMessage: true)));
     }
 
     private void BrowseWorkingDirectory()
@@ -238,12 +241,18 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         catch (OperationCanceledException)
         {
             _logger.LogInformation("Tab '{Title}': request aborted by user", Title);
-            AppendMessage(new SessionMessage(MessageRole.System, "Request aborted."));
+            AppendMessage(new SessionMessage(
+                MessageRole.System,
+                "Request aborted.",
+                isNexusSystemMessage: true));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Tab '{Title}': send failed", Title);
-            AppendMessage(new SessionMessage(MessageRole.System, $"Error: {ex.Message}"));
+            AppendMessage(new SessionMessage(
+                MessageRole.System,
+                $"Error: {ex.Message}",
+                isNexusSystemMessage: true));
         }
         finally
         {
@@ -261,7 +270,10 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             _logger.LogError(ex, "Tab '{Title}': abort failed", Title);
-            AppendMessage(new SessionMessage(MessageRole.System, $"Abort error: {ex.Message}"));
+            AppendMessage(new SessionMessage(
+                MessageRole.System,
+                $"Abort error: {ex.Message}",
+                isNexusSystemMessage: true));
         }
     }
 

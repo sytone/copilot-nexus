@@ -75,6 +75,18 @@ public class JsonStatePersistenceServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RoundTrip_PreservesNexusSystemMessages()
+    {
+        var state = CreateSampleState();
+        await _service.SaveAsync(state);
+        var loaded = await _service.LoadAsync();
+
+        Assert.NotNull(loaded);
+        Assert.Single(loaded!.Tabs[0].NexusSystemMessages);
+        Assert.Equal("Nexus persisted note", loaded.Tabs[0].NexusSystemMessages[0].Content);
+    }
+
+    [Fact]
     public async Task LoadAsync_ReturnsNull_WhenFileDoesNotExist()
     {
         var result = await _service.LoadAsync();
@@ -184,6 +196,15 @@ public class JsonStatePersistenceServiceTests : IDisposable
                     Name = "Session 1",
                     Model = "gpt-4.1",
                     SdkSessionId = "copilot-nexus-1-1706932800",
+                    NexusSystemMessages = new List<MessageState>
+                    {
+                        new()
+                        {
+                            Role = MessageRole.System,
+                            Content = "Nexus persisted note",
+                            Timestamp = new DateTime(2026, 3, 12, 0, 0, 0, DateTimeKind.Utc),
+                        },
+                    },
                 },
                 new()
                 {

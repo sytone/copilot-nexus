@@ -244,6 +244,86 @@ public class MainWindowViewModelTests : IDisposable
         Assert.Equal("Session resumed", tab.Messages[3].Content);
     }
 
+    [Fact]
+    public async Task RestoreStateAsync_LoadsPersistedNexusSystemMessages()
+    {
+        var resumedSession = SessionInfo.FromRemote(
+            id: "tab-1",
+            name: "Session 1",
+            model: "gpt-4.1",
+            sdkSessionId: "sdk-123");
+
+        _mockSessionManager
+            .Setup(m => m.ResumeSessionAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<SessionConfiguration?>(),
+                It.IsAny<Func<ToolPermissionRequest, Task<PermissionDecision>>?>(),
+                It.IsAny<Func<AgentUserInputRequest, Task<AgentUserInputResponse>>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(resumedSession);
+
+        _mockSessionManager
+            .Setup(m => m.GetSession("tab-1"))
+            .Returns(_mockSession.Object);
+
+        _mockSession
+            .Setup(s => s.GetHistoryAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new[]
+            {
+                new SessionOutputEventArgs("tab-1", "Assistant history", MessageRole.Assistant, OutputKind.Message),
+            });
+
+        var state = new AppState
+        {
+            SessionCounter = 1,
+            SelectedTabIndex = 0,
+            Tabs =
+            {
+                new TabState
+                {
+                    Name = "Session 1",
+                    SdkSessionId = "sdk-123",
+                    Model = "gpt-4.1",
+                    IsAutopilot = true,
+                    NexusSystemMessages =
+                    {
+                        new MessageState
+                        {
+                            Role = MessageRole.System,
+                            Content = "Nexus-side note",
+                            Timestamp = DateTime.UtcNow.AddMinutes(-5),
+                        },
+                    },
+                },
+            },
+        };
+
+        await _viewModel.RestoreStateAsync(state);
+
+        var tab = Assert.Single(_viewModel.Tabs);
+        Assert.Equal(3, tab.Messages.Count);
+        Assert.Equal("Assistant history", tab.Messages[0].Content);
+        Assert.Equal("Nexus-side note", tab.Messages[1].Content);
+        Assert.True(tab.Messages[1].IsNexusSystemMessage);
+        Assert.Equal("Session resumed", tab.Messages[2].Content);
+        Assert.True(tab.Messages[2].IsNexusSystemMessage);
+    }
+
+    [Fact]
+    public async Task CaptureState_PersistsNexusSystemMessages()
+    {
+        SetupSessionCreation("Session 1");
+        await _viewModel.CreateNewTabAsync();
+        var tab = Assert.Single(_viewModel.Tabs);
+        tab.AppendSystemMessage("Nexus runtime message");
+
+        var state = _viewModel.CaptureState();
+
+        var tabState = Assert.Single(state.Tabs);
+        Assert.Contains(tabState.NexusSystemMessages, m => m.Content == "Nexus runtime message");
+    }
+
     private void SetupSessionCreation(string name)
     {
         var sessionInfo = new SessionInfo(name);

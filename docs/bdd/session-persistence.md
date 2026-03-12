@@ -31,8 +31,8 @@ launch. The user returns to exactly where they left off.
   planning state (`plan.md`), session artifacts. API keys are NOT persisted.
 
 - **What the app must persist**: Tab metadata (name, model, SDK session ID,
-  tab order, selected tab index, session counter). The SDK handles message
-  history — the app only stores lightweight UI state.
+  tab order, selected tab index, session counter), plus Nexus-generated
+  system messages that are outside SDK conversation history.
 
 - **State file format**: JSON via `System.Text.Json`. Include a schema version
   field for forward compatibility.
@@ -104,6 +104,7 @@ When the application starts
 Then 2 tabs are created with the saved names
 And each tab uses ResumeSessionAsync with the saved SDK session ID
 And the full conversation history is loaded from the SDK and displayed in the tab
+And Nexus-generated system messages are restored from app state and displayed in the tab
 And the previously selected tab is re-selected
 And the session counter resumes from the saved value
 And a system message is appended: "Session resumed"

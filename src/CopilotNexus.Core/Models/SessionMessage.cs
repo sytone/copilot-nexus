@@ -14,6 +14,7 @@ public class SessionMessage : INotifyPropertyChanged
 {
     public MessageRole Role { get; }
     public DateTime Timestamp { get; init; }
+    public bool IsNexusSystemMessage { get; }
 
     private string _content;
     public string Content
@@ -31,12 +32,17 @@ public class SessionMessage : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public SessionMessage(MessageRole role, string content, bool isStreaming = false)
+    public SessionMessage(
+        MessageRole role,
+        string content,
+        bool isStreaming = false,
+        bool isNexusSystemMessage = false)
     {
         Role = role;
         _content = content;
         Timestamp = DateTime.UtcNow;
         _isStreaming = isStreaming;
+        IsNexusSystemMessage = isNexusSystemMessage;
     }
 
     public void AppendContent(string delta)
