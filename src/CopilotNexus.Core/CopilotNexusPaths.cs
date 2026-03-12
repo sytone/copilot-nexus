@@ -3,7 +3,8 @@ namespace CopilotNexus.Core;
 /// <summary>
 /// Centralized path definitions for the CopilotNexus installation layout.
 /// Install/runtime binaries live under %LOCALAPPDATA%\CopilotNexus\.
-/// User-specific app configuration/state lives under %USERPROFILE%\.copilot-nexus\.
+/// Nexus-owned app state lives under %LOCALAPPDATA%\CopilotNexus\state\.
+/// User profile state is retained as a local fallback for app test mode.
 /// </summary>
 public static class CopilotNexusPaths
 {
@@ -36,6 +37,9 @@ public static class CopilotNexusPaths
     /// <summary>Shared log directory.</summary>
     public static string Logs { get; } = Path.Combine(Root, "logs");
 
+    /// <summary>Service-owned state root for persisted app metadata.</summary>
+    public static string StateRoot { get; } = Path.Combine(Root, "state");
+
     /// <summary>PID lock file for the Nexus service process.</summary>
     public static string NexusLockFile { get; } = Path.Combine(Root, "nexus.lock");
 
@@ -44,8 +48,11 @@ public static class CopilotNexusPaths
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".copilot-nexus");
 
-    /// <summary>Application state file (tab layout, session IDs).</summary>
+    /// <summary>Local fallback state file (used in app test mode).</summary>
     public static string AppStateFile { get; } = Path.Combine(UserConfigRoot, "session-state.json");
+
+    /// <summary>Nexus-owned application state file used by service APIs.</summary>
+    public static string NexusAppStateFile { get; } = Path.Combine(StateRoot, "session-state.json");
 
     /// <summary>CLI executable — the 'nexus' command users interact with.</summary>
     public static string CliExe { get; } = Path.Combine(CliInstall, "CopilotNexus.Cli.exe");
@@ -71,6 +78,7 @@ public static class CopilotNexusPaths
         Directory.CreateDirectory(CliStaging);
         Directory.CreateDirectory(AppStaging);
         Directory.CreateDirectory(Logs);
+        Directory.CreateDirectory(StateRoot);
         Directory.CreateDirectory(UserConfigRoot);
     }
 

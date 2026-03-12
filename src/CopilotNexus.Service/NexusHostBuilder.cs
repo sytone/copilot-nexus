@@ -1,5 +1,6 @@
 namespace CopilotNexus.Service;
 
+using CopilotNexus.Core;
 using CopilotNexus.Core.Interfaces;
 using CopilotNexus.Core.Services;
 using CopilotNexus.Service.Hubs;
@@ -49,6 +50,12 @@ public static class NexusHostBuilder
             return new SessionManager(client, logger);
         });
 
+        builder.Services.AddSingleton<IStatePersistenceService>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<JsonStatePersistenceService>>();
+            return new JsonStatePersistenceService(logger, GetServiceStatePath());
+        });
+
         // CORS for local development
         builder.Services.AddCors(options =>
         {
@@ -60,6 +67,19 @@ public static class NexusHostBuilder
         });
 
         return builder;
+    }
+
+    private static string GetServiceStatePath()
+    {
+        var isTestMode = Environment.GetEnvironmentVariable("NEXUS_TEST_MODE") == "1";
+        if (isTestMode)
+        {
+            var testStateRoot = Path.Combine(Path.GetTempPath(), "CopilotNexus", "test-state");
+            Directory.CreateDirectory(testStateRoot);
+            return Path.Combine(testStateRoot, $"session-state-{Environment.ProcessId}.json");
+        }
+
+        return CopilotNexusPaths.NexusAppStateFile;
     }
 
     /// <summary>

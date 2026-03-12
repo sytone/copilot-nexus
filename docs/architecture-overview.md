@@ -182,9 +182,9 @@ production, or locally in test mode):
 4. **Delete on tab close** — `client.DeleteSessionAsync(sessionId)` permanently removes
    session data when the user explicitly closes a tab.
 
-5. **App state file** — only lightweight metadata is persisted locally:
-   `%USERPROFILE%\\.copilot-nexus\\session-state.json` stores tab names, models, and SDK
-   session IDs. The SDK handles all conversation history.
+5. **Nexus-owned app state** — lightweight tab metadata is persisted by the service:
+   `%LOCALAPPDATA%\\CopilotNexus\\state\\session-state.json` stores tab names, models, and SDK
+   session IDs. The desktop app loads/saves via `/api/app-state`; the SDK handles conversation history.
 
 ## Distribution and Hot Restart
 

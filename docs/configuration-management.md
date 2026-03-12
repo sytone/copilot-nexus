@@ -8,7 +8,7 @@ applied, and what is persisted per user.
 Configuration is currently managed through three main sources:
 
 1. Command-line arguments
-2. Local user files under `%USERPROFILE%\\.copilot-nexus`
+2. Nexus-owned persisted state under `%LOCALAPPDATA%\\CopilotNexus\\state`
 3. Environment variables (limited use)
 
 ## Runtime Arguments
@@ -35,20 +35,20 @@ Examples:
 - `nexus start --url <url>`
 - `nexus status --url <url>`
 - `nexus build -c <Debug|Release>`
-- `nexus publish --component <nexus|app|both>`
-- `nexus update --component <nexus|app|both>`
+- `nexus publish --component <nexus|app|cli|both>`
+- `nexus update --component <nexus|app|cli|both>`
 - `nexus winapp start --nexus-url <url> --test-mode`
 
 ## User-Specific Storage
-
-User-specific configuration/state is stored under `%USERPROFILE%\\.copilot-nexus\\`.
 
 Install/runtime binaries remain under `%LOCALAPPDATA%\CopilotNexus\`.
 
 Primary paths are centralized in `src/CopilotNexus.Core/CopilotNexusPaths.cs`:
 
-- `UserConfigRoot`: `%USERPROFILE%\\.copilot-nexus`
-- `AppStateFile`: `%USERPROFILE%\\.copilot-nexus\\session-state.json`
+- `StateRoot`: `%LOCALAPPDATA%\\CopilotNexus\\state`
+- `NexusAppStateFile`: `%LOCALAPPDATA%\\CopilotNexus\\state\\session-state.json`
+- `UserConfigRoot`: `%USERPROFILE%\\.copilot-nexus` (test-mode fallback)
+- `AppStateFile`: `%USERPROFILE%\\.copilot-nexus\\session-state.json` (test-mode fallback)
 - `Root`: `%LOCALAPPDATA%\CopilotNexus`
 - `CliInstall`: `%LOCALAPPDATA%\CopilotNexus\cli`
 - `NexusInstall`: `%LOCALAPPDATA%\CopilotNexus\nexus`
@@ -59,12 +59,12 @@ Primary paths are centralized in `src/CopilotNexus.Core/CopilotNexusPaths.cs`:
 
 ## Session Information Persistence
 
-Session metadata used by the desktop app is persisted by
-`src/CopilotNexus.Core/Services/JsonStatePersistenceService.cs`.
+Session metadata used by the desktop app is persisted by Nexus via
+`/api/app-state`, backed by `JsonStatePersistenceService` on the service host.
 
 Persisted file:
 
-- `%USERPROFILE%\\.copilot-nexus\\session-state.json`
+- `%LOCALAPPDATA%\\CopilotNexus\\state\\session-state.json`
 
 Stored schema (`src/CopilotNexus.Core/Models/AppState.cs`):
 
@@ -83,6 +83,7 @@ Important notes:
 - Conversation history is not persisted by this file; SDK-managed session data is used
   when restoring via `SdkSessionId`.
 - Corrupt JSON is backed up to `session-state.json.bak` and then reset.
+- Orphaned temporary writes (`.tmp`) are recovered on next load.
 
 ## Settings vs State
 
@@ -92,7 +93,7 @@ theme or preferences) outside of persisted app/session state.
 In practice, user-specific behavior is represented by:
 
 - Startup flags (for example `--test-mode`, `--nexus-url`)
-- Persisted `session-state.json` metadata
+- Nexus-managed persisted `session-state.json` metadata
 - Install/update layout and lock/log files under `%LOCALAPPDATA%\CopilotNexus`
 
 ## Environment Variables
@@ -106,9 +107,9 @@ Current usage is minimal:
 
 1. `MainWindow` initializes session manager.
 2. If `--reset-state` is set, persisted state is cleared.
-3. App loads `session-state.json` (if present).
+3. App loads state from Nexus (`GET /api/app-state`).
 4. `MainWindowViewModel.RestoreStateAsync` resumes sessions by `SdkSessionId`.
-5. On app close (and hot restart), current metadata is captured and saved.
+5. On app close (and hot restart), current metadata is captured and saved via Nexus (`PUT /api/app-state`).
 
 ## Related Files
 

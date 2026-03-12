@@ -42,15 +42,18 @@ public partial class MainWindow : Window
             _logger.LogInformation("Running in TEST MODE with mock services");
             var mockClient = new MockCopilotClientService(factory.CreateLogger<MockCopilotClientService>());
             _sessionManager = new SessionManager(mockClient, factory.CreateLogger<SessionManager>());
+            _stateService = new JsonStatePersistenceService(factory.CreateLogger<JsonStatePersistenceService>());
         }
         else
         {
             var nexusUrl = GetNexusUrl();
             _logger.LogInformation("Connecting to Nexus at {Url}", nexusUrl);
             _sessionManager = new NexusSessionManager(nexusUrl, _logger);
+            _stateService = new NexusStatePersistenceService(
+                nexusUrl,
+                factory.CreateLogger<NexusStatePersistenceService>());
         }
 
-        _stateService = new JsonStatePersistenceService(factory.CreateLogger<JsonStatePersistenceService>());
         _viewModel = new MainWindowViewModel(_sessionManager, dispatcher, factory.CreateLogger<MainWindowViewModel>());
         _viewModel.RestartRequested += OnRestartRequested;
         _viewModel.UpdateDismissed += OnUpdateDismissed;
@@ -233,6 +236,11 @@ public partial class MainWindow : Window
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Error disposing session manager on exit");
+        }
+
+        if (_stateService is IDisposable disposableState)
+        {
+            disposableState.Dispose();
         }
         base.OnClosed(e);
     }
