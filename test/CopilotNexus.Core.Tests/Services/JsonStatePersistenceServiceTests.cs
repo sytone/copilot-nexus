@@ -1,6 +1,7 @@
 namespace CopilotNexus.Core.Tests.Services;
 
 using System.IO;
+using System.Text.Json;
 using CopilotNexus.Core.Models;
 using CopilotNexus.Core.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -78,6 +79,24 @@ public class JsonStatePersistenceServiceTests : IDisposable
     {
         var result = await _service.LoadAsync();
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task LoadAsync_RecoversFromTempFile_WhenPrimaryMissing()
+    {
+        var state = CreateSampleState();
+        var json = JsonSerializer.Serialize(state, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        });
+        await File.WriteAllTextAsync(_stateFile + ".tmp", json);
+
+        var result = await _service.LoadAsync();
+
+        Assert.NotNull(result);
+        Assert.True(File.Exists(_stateFile));
+        Assert.False(File.Exists(_stateFile + ".tmp"));
     }
 
     [Fact]

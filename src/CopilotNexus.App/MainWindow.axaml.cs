@@ -208,7 +208,7 @@ public partial class MainWindow : Window
         }
     }
 
-    protected override async void OnClosed(EventArgs e)
+    protected override void OnClosed(EventArgs e)
     {
         _logger.LogInformation("MainWindow closing — saving state");
 
@@ -218,7 +218,7 @@ public partial class MainWindow : Window
         try
         {
             var state = _viewModel.CaptureState();
-            await _stateService.SaveAsync(state);
+            Task.Run(() => _stateService.SaveAsync(state)).GetAwaiter().GetResult();
         }
         catch (Exception ex)
         {
@@ -226,7 +226,14 @@ public partial class MainWindow : Window
         }
 
         _viewModel.Dispose();
-        await _sessionManager.DisposeAsync();
+        try
+        {
+            Task.Run(async () => await _sessionManager.DisposeAsync()).GetAwaiter().GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error disposing session manager on exit");
+        }
         base.OnClosed(e);
     }
 }

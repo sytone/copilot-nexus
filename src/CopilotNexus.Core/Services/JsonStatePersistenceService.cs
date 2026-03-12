@@ -58,6 +58,21 @@ public class JsonStatePersistenceService : IStatePersistenceService
 
     public async Task<AppState?> LoadAsync(CancellationToken cancellationToken = default)
     {
+        var tmpPath = _stateFilePath + ".tmp";
+
+        if (!File.Exists(_stateFilePath) && File.Exists(tmpPath))
+        {
+            try
+            {
+                File.Move(tmpPath, _stateFilePath, overwrite: true);
+                _logger.LogWarning("Recovered state from temp file at {TmpPath}", tmpPath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to recover state from temp file {TmpPath}", tmpPath);
+            }
+        }
+
         if (!File.Exists(_stateFilePath))
         {
             _logger.LogDebug("No state file found at {Path}", _stateFilePath);
@@ -109,6 +124,8 @@ public class JsonStatePersistenceService : IStatePersistenceService
 
     public Task ClearAsync(CancellationToken cancellationToken = default)
     {
+        var tmpPath = _stateFilePath + ".tmp";
+
         try
         {
             if (File.Exists(_stateFilePath))
@@ -119,6 +136,12 @@ public class JsonStatePersistenceService : IStatePersistenceService
             else
             {
                 _logger.LogDebug("No state file to clear at {Path}", _stateFilePath);
+            }
+
+            if (File.Exists(tmpPath))
+            {
+                File.Delete(tmpPath);
+                _logger.LogInformation("State temp file cleared: {Path}", tmpPath);
             }
         }
         catch (Exception ex)
