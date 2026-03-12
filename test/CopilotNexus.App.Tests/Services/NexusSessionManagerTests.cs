@@ -262,7 +262,7 @@ public class NexusSessionManagerTests : IAsyncDisposable
         {
             new("s1", "Message", "User", "hello"),
             new("s1", "Message", "Assistant", "world"),
-            new("s1", "Activity", "System", "Tool started: rg"),
+            new("s1", "Activity", "System", "Tool started: rg", "tool-1"),
         };
         _mockHandler.SetResponse("/api/sessions/s1/history", HttpMethod.Get, HttpStatusCode.OK,
             JsonSerializer.Serialize(history));
@@ -277,6 +277,7 @@ public class NexusSessionManagerTests : IAsyncDisposable
         Assert.Equal("hello", loadedHistory[0].Content);
         Assert.Equal("world", loadedHistory[1].Content);
         Assert.Equal(OutputKind.Activity, loadedHistory[2].Kind);
+        Assert.Equal("tool-1", loadedHistory[2].CorrelationId);
         Assert.Equal("/api/sessions/s1/history", _mockHandler.LastRequest!.RequestUri!.AbsolutePath);
     }
 

@@ -7,7 +7,8 @@ public record SessionOutputDto(
     string SessionId,
     string Kind,
     string Role,
-    string Content);
+    string Content,
+    string? CorrelationId = null);
 
 /// <summary>DTO for session info sent via SignalR and REST.</summary>
 public record SessionInfoDto

@@ -50,6 +50,11 @@ public class SessionMessage : INotifyPropertyChanged
         Content += delta;
     }
 
+    public void ReplaceContent(string content)
+    {
+        Content = content;
+    }
+
     public void CompleteStreaming()
     {
         IsStreaming = false;

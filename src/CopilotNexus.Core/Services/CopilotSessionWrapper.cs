@@ -86,7 +86,7 @@ public class CopilotSessionWrapper : ICopilotSessionWrapper
     {
         switch (evt)
         {
-            case UserMessageEvent user when !string.IsNullOrWhiteSpace(user.Data?.Content):
+            case UserMessageEvent user when !includeStreamingEvents && !string.IsNullOrWhiteSpace(user.Data?.Content):
                 return new SessionOutputEventArgs(SessionId, user.Data.Content, MessageRole.User, OutputKind.Message);
 
             case AssistantMessageDeltaEvent delta when includeStreamingEvents &&
@@ -98,10 +98,20 @@ public class CopilotSessionWrapper : ICopilotSessionWrapper
 
             case AssistantReasoningDeltaEvent reasoningDelta when includeStreamingEvents &&
                                                                  !string.IsNullOrWhiteSpace(reasoningDelta.Data?.DeltaContent):
-                return new SessionOutputEventArgs(SessionId, reasoningDelta.Data.DeltaContent, MessageRole.System, OutputKind.ReasoningDelta);
+                return new SessionOutputEventArgs(
+                    SessionId,
+                    reasoningDelta.Data.DeltaContent,
+                    MessageRole.System,
+                    OutputKind.ReasoningDelta,
+                    reasoningDelta.Data.ReasoningId);
 
             case AssistantReasoningEvent reasoning when !string.IsNullOrWhiteSpace(reasoning.Data?.Content):
-                return new SessionOutputEventArgs(SessionId, reasoning.Data.Content, MessageRole.System, OutputKind.Reasoning);
+                return new SessionOutputEventArgs(
+                    SessionId,
+                    reasoning.Data.Content,
+                    MessageRole.System,
+                    OutputKind.Reasoning,
+                    reasoning.Data.ReasoningId);
 
             case SystemMessageEvent system when !string.IsNullOrWhiteSpace(system.Data?.Content):
                 return new SessionOutputEventArgs(SessionId, system.Data.Content, MessageRole.System, OutputKind.Message);
@@ -126,14 +136,14 @@ public class CopilotSessionWrapper : ICopilotSessionWrapper
                 var message = string.IsNullOrWhiteSpace(toolName)
                     ? "Tool execution started"
                     : $"Tool started: {toolName}";
-                return BuildActivity(message);
+                return BuildActivity(message, toolStart.Data?.ToolCallId);
             }
 
             case ToolExecutionProgressEvent toolProgress when !string.IsNullOrWhiteSpace(toolProgress.Data?.ProgressMessage):
-                return BuildActivity($"Tool progress: {toolProgress.Data.ProgressMessage}");
+                return BuildActivity($"Tool progress: {toolProgress.Data.ProgressMessage}", toolProgress.Data.ToolCallId);
 
             case ToolExecutionPartialResultEvent partial when !string.IsNullOrWhiteSpace(partial.Data?.PartialOutput):
-                return BuildActivity($"Tool partial result: {partial.Data.PartialOutput}");
+                return BuildActivity($"Tool partial result: {partial.Data.PartialOutput}", partial.Data.ToolCallId);
 
             case ToolExecutionCompleteEvent toolComplete:
             {
@@ -142,7 +152,7 @@ public class CopilotSessionWrapper : ICopilotSessionWrapper
                 var message = detail is { Length: > 0 }
                     ? $"Tool {status}: {detail}"
                     : $"Tool {status}";
-                return BuildActivity(message);
+                return BuildActivity(message, toolComplete.Data?.ToolCallId);
             }
 
             case SkillInvokedEvent skill when !string.IsNullOrWhiteSpace(skill.Data?.Name):
@@ -152,16 +162,16 @@ public class CopilotSessionWrapper : ICopilotSessionWrapper
             {
                 var name = subagentStarted.Data?.AgentDisplayName ?? subagentStarted.Data?.AgentName;
                 return !string.IsNullOrWhiteSpace(name)
-                    ? BuildActivity($"Subagent started: {name}")
-                    : BuildActivity("Subagent started");
+                    ? BuildActivity($"Subagent started: {name}", subagentStarted.Data?.ToolCallId)
+                    : BuildActivity("Subagent started", subagentStarted.Data?.ToolCallId);
             }
 
             case SubagentCompletedEvent subagentCompleted:
             {
                 var name = subagentCompleted.Data?.AgentDisplayName ?? subagentCompleted.Data?.AgentName;
                 return !string.IsNullOrWhiteSpace(name)
-                    ? BuildActivity($"Subagent completed: {name}")
-                    : BuildActivity("Subagent completed");
+                    ? BuildActivity($"Subagent completed: {name}", subagentCompleted.Data?.ToolCallId)
+                    : BuildActivity("Subagent completed", subagentCompleted.Data?.ToolCallId);
             }
 
             case SubagentFailedEvent subagentFailed:
@@ -169,19 +179,19 @@ public class CopilotSessionWrapper : ICopilotSessionWrapper
                 var name = subagentFailed.Data?.AgentDisplayName ?? subagentFailed.Data?.AgentName;
                 var errorMessage = subagentFailed.Data?.Error;
                 if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(errorMessage))
-                    return BuildActivity($"Subagent failed: {name} ({errorMessage})");
+                    return BuildActivity($"Subagent failed: {name} ({errorMessage})", subagentFailed.Data?.ToolCallId);
                 if (!string.IsNullOrWhiteSpace(name))
-                    return BuildActivity($"Subagent failed: {name}");
+                    return BuildActivity($"Subagent failed: {name}", subagentFailed.Data?.ToolCallId);
                 if (!string.IsNullOrWhiteSpace(errorMessage))
-                    return BuildActivity($"Subagent failed: {errorMessage}");
-                return BuildActivity("Subagent failed");
+                    return BuildActivity($"Subagent failed: {errorMessage}", subagentFailed.Data?.ToolCallId);
+                return BuildActivity("Subagent failed", subagentFailed.Data?.ToolCallId);
             }
 
             case CommandQueuedEvent queued when !string.IsNullOrWhiteSpace(queued.Data?.Command):
-                return BuildActivity($"Command queued: {queued.Data.Command}");
+                return BuildActivity($"Command queued: {queued.Data.Command}", queued.Data.RequestId);
 
-            case CommandCompletedEvent:
-                return BuildActivity("Command completed");
+            case CommandCompletedEvent completed:
+                return BuildActivity("Command completed", completed.Data?.RequestId);
 
             case SessionIdleEvent when includeStreamingEvents:
                 return new SessionOutputEventArgs(SessionId, string.Empty, MessageRole.System, OutputKind.Idle);
@@ -191,9 +201,9 @@ public class CopilotSessionWrapper : ICopilotSessionWrapper
         }
     }
 
-    private SessionOutputEventArgs BuildActivity(string content)
+    private SessionOutputEventArgs BuildActivity(string content, string? correlationId = null)
     {
-        return new SessionOutputEventArgs(SessionId, content, MessageRole.System, OutputKind.Activity);
+        return new SessionOutputEventArgs(SessionId, content, MessageRole.System, OutputKind.Activity, correlationId);
     }
 
     private void RaiseOutput(string content, MessageRole role, OutputKind kind)

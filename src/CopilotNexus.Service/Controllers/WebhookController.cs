@@ -162,7 +162,8 @@ public class WebhookController : ControllerBase
                 sessionId,
                 e.Kind.ToString(),
                 e.Role.ToString(),
-                e.Content);
+                e.Content,
+                e.CorrelationId);
 
             _ = _hubContext.Clients.Group(sessionId).SessionOutput(sessionId, dto);
         };

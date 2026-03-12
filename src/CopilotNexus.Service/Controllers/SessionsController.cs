@@ -64,7 +64,8 @@ public class SessionsController : ControllerBase
                 id,
                 item.Kind.ToString(),
                 item.Role.ToString(),
-                item.Content))
+                item.Content,
+                item.CorrelationId))
             .ToList();
 
         return Ok(output);
@@ -233,7 +234,8 @@ public class SessionsController : ControllerBase
                 sessionId,
                 e.Kind.ToString(),
                 e.Role.ToString(),
-                e.Content);
+                e.Content,
+                e.CorrelationId);
 
             _ = _hubContext.Clients.Group(sessionId).SessionOutput(sessionId, dto);
         };

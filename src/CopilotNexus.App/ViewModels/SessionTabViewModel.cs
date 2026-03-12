@@ -16,6 +16,9 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     private readonly ILogger _logger;
     private SessionMessage? _currentStreamingMessage;
     private SessionMessage? _currentReasoningMessage;
+    private string? _currentReasoningCorrelationId;
+    private readonly Dictionary<string, SessionMessage> _activityMessagesByCorrelation =
+        new(StringComparer.OrdinalIgnoreCase);
     private string _inputText = string.Empty;
     private string _title;
     private string _editableTitle;
@@ -421,6 +424,8 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         Messages.Clear();
         _currentStreamingMessage = null;
         _currentReasoningMessage = null;
+        _currentReasoningCorrelationId = null;
+        _activityMessagesByCorrelation.Clear();
     }
 
     public void RequestClose()
@@ -461,11 +466,11 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
                 break;
 
             case OutputKind.ReasoningDelta:
-                HandleReasoningDelta(e.Content);
+                HandleReasoningDelta(e.Content, e.CorrelationId);
                 break;
 
             case OutputKind.Reasoning:
-                HandleReasoningMessage(e.Content);
+                HandleReasoningMessage(e.Content, e.CorrelationId);
                 break;
 
             case OutputKind.Message:
@@ -483,7 +488,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
             case OutputKind.Activity:
                 if (!string.IsNullOrWhiteSpace(e.Content))
                 {
-                    AppendActivityMessage(e.Content);
+                    AppendActivityMessage(e.Content, e.CorrelationId);
                 }
                 break;
 
@@ -505,32 +510,49 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         {
             _currentReasoningMessage.CompleteStreaming();
             _currentReasoningMessage = null;
+            _currentReasoningCorrelationId = null;
         }
     }
 
-    private void HandleReasoningDelta(string content)
+    private void HandleReasoningDelta(string content, string? correlationId)
     {
         if (string.IsNullOrWhiteSpace(content))
             return;
 
-        if (_currentReasoningMessage == null)
+        if (_currentReasoningMessage == null ||
+            (!string.IsNullOrWhiteSpace(correlationId) &&
+             !string.Equals(_currentReasoningCorrelationId, correlationId, StringComparison.Ordinal)))
         {
+            if (_currentReasoningMessage != null)
+            {
+                _currentReasoningMessage.CompleteStreaming();
+            }
+
             _currentReasoningMessage = new SessionMessage(
                 MessageRole.System,
                 "[thinking] ",
                 isStreaming: true);
+            _currentReasoningCorrelationId = correlationId;
             AppendMessage(_currentReasoningMessage);
         }
 
         _currentReasoningMessage.AppendContent(content);
     }
 
-    private void HandleReasoningMessage(string content)
+    private void HandleReasoningMessage(string content, string? correlationId)
     {
         if (_currentReasoningMessage != null)
         {
+            if (!string.IsNullOrWhiteSpace(content) &&
+                (string.IsNullOrWhiteSpace(correlationId) ||
+                 string.Equals(_currentReasoningCorrelationId, correlationId, StringComparison.Ordinal)))
+            {
+                _currentReasoningMessage.ReplaceContent($"[thinking] {content}");
+            }
+
             _currentReasoningMessage.CompleteStreaming();
             _currentReasoningMessage = null;
+            _currentReasoningCorrelationId = null;
             return;
         }
 
@@ -540,9 +562,22 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         }
     }
 
-    private void AppendActivityMessage(string content)
+    private void AppendActivityMessage(string content, string? correlationId)
     {
-        AppendMessage(new SessionMessage(MessageRole.System, $"[activity] {content}"));
+        if (!string.IsNullOrWhiteSpace(correlationId) &&
+            _activityMessagesByCorrelation.TryGetValue(correlationId, out var existing) &&
+            Messages.Contains(existing))
+        {
+            existing.ReplaceContent($"[activity] {content}");
+            return;
+        }
+
+        var message = new SessionMessage(MessageRole.System, $"[activity] {content}");
+        AppendMessage(message);
+        if (!string.IsNullOrWhiteSpace(correlationId))
+        {
+            _activityMessagesByCorrelation[correlationId] = message;
+        }
     }
 
     private void AppendMessage(SessionMessage message)

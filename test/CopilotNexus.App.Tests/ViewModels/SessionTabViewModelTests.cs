@@ -306,6 +306,18 @@ public class SessionTabViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ActivityOutput_WithSameCorrelation_UpdatesPreviousMessage()
+    {
+        _mockSession.Raise(s => s.OutputReceived += null, _mockSession.Object,
+            new SessionOutputEventArgs("test", "Tool started: rg", MessageRole.System, OutputKind.Activity, "tool-1"));
+        _mockSession.Raise(s => s.OutputReceived += null, _mockSession.Object,
+            new SessionOutputEventArgs("test", "Tool progress: 50%", MessageRole.System, OutputKind.Activity, "tool-1"));
+
+        Assert.Equal(2, _viewModel.Messages.Count);
+        Assert.Equal("[activity] Tool progress: 50%", _viewModel.Messages[1].Content);
+    }
+
+    [Fact]
     public void IdleOutput_CompletesStreamingMessage()
     {
         _mockSession.Raise(s => s.OutputReceived += null, _mockSession.Object,

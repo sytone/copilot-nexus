@@ -94,6 +94,19 @@ public class SessionMessageTests
     }
 
     [Fact]
+    public void ReplaceContent_UpdatesContentAndRaisesPropertyChanged()
+    {
+        var message = new SessionMessage(MessageRole.System, "Old");
+        var changedProps = new List<string>();
+        message.PropertyChanged += (_, e) => changedProps.Add(e.PropertyName!);
+
+        message.ReplaceContent("New");
+
+        Assert.Equal("New", message.Content);
+        Assert.Contains("Content", changedProps);
+    }
+
+    [Fact]
     public void CompleteStreaming_SetsIsStreamingFalse()
     {
         var message = new SessionMessage(MessageRole.Assistant, "data", isStreaming: true);

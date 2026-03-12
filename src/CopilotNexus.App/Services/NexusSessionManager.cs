@@ -315,7 +315,7 @@ public class NexusSessionManager : ISessionManager
                 ? parsedRole
                 : MessageRole.Assistant;
 
-            history.Add(new SessionOutputEventArgs(sessionId, item.Content, role, kind));
+            history.Add(new SessionOutputEventArgs(sessionId, item.Content, role, kind, item.CorrelationId));
         }
 
         return history;
@@ -388,7 +388,7 @@ public class NexusSessionManager : ISessionManager
         {
             var kind = Enum.TryParse<OutputKind>(output.Kind, out var k) ? k : OutputKind.Message;
             var role = Enum.TryParse<MessageRole>(output.Role, out var r) ? r : MessageRole.Assistant;
-            proxy.RaiseOutput(new SessionOutputEventArgs(sessionId, output.Content, role, kind));
+            proxy.RaiseOutput(new SessionOutputEventArgs(sessionId, output.Content, role, kind, output.CorrelationId));
         }
     }
 
