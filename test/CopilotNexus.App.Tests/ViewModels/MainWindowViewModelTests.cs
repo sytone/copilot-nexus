@@ -2,6 +2,7 @@ namespace CopilotNexus.App.Tests.ViewModels;
 
 using CopilotNexus.App.Tests.Helpers;
 using CopilotNexus.App.ViewModels;
+using CopilotNexus.Core.Events;
 using CopilotNexus.Core.Interfaces;
 using CopilotNexus.Core.Models;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,9 @@ public class MainWindowViewModelTests : IDisposable
     public MainWindowViewModelTests()
     {
         _mockSession = new Mock<ICopilotSessionWrapper>();
+        _mockSession
+            .Setup(s => s.GetHistoryAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Array.Empty<SessionOutputEventArgs>());
         _mockSessionManager = new Mock<ISessionManager>();
         _mockSessionManager.SetupGet(m => m.AvailableModels)
             .Returns(Array.Empty<ModelInfo>());
@@ -179,6 +183,65 @@ public class MainWindowViewModelTests : IDisposable
 
         Assert.True(_viewModel.IsUpdateAvailable);
         Assert.Equal("A new version is available.", _viewModel.UpdateNotificationText);
+    }
+
+    [Fact]
+    public async Task RestoreStateAsync_WhenSessionResumed_LoadsHistoryMessages()
+    {
+        var resumedSession = SessionInfo.FromRemote(
+            id: "tab-1",
+            name: "Session 1",
+            model: "gpt-4.1",
+            sdkSessionId: "sdk-123");
+
+        _mockSessionManager
+            .Setup(m => m.ResumeSessionAsync(
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<SessionConfiguration?>(),
+                It.IsAny<Func<ToolPermissionRequest, Task<PermissionDecision>>?>(),
+                It.IsAny<Func<AgentUserInputRequest, Task<AgentUserInputResponse>>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(resumedSession);
+
+        _mockSessionManager
+            .Setup(m => m.GetSession("tab-1"))
+            .Returns(_mockSession.Object);
+
+        _mockSession
+            .Setup(s => s.GetHistoryAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new List<SessionOutputEventArgs>
+            {
+                new("tab-1", "System context", MessageRole.System, OutputKind.Message),
+                new("tab-1", "How does this work?", MessageRole.User, OutputKind.Message),
+                new("tab-1", "Here is the explanation.", MessageRole.Assistant, OutputKind.Message),
+            });
+
+        var state = new AppState
+        {
+            SessionCounter = 1,
+            SelectedTabIndex = 0,
+            Tabs =
+            {
+                new TabState
+                {
+                    Name = "Session 1",
+                    SdkSessionId = "sdk-123",
+                    Model = "gpt-4.1",
+                    IsAutopilot = true,
+                },
+            },
+        };
+
+        await _viewModel.RestoreStateAsync(state);
+
+        var tab = Assert.Single(_viewModel.Tabs);
+        Assert.Equal(4, tab.Messages.Count);
+        Assert.Equal("System context", tab.Messages[0].Content);
+        Assert.Equal("How does this work?", tab.Messages[1].Content);
+        Assert.Equal("Here is the explanation.", tab.Messages[2].Content);
+        Assert.Equal(MessageRole.System, tab.Messages[3].Role);
+        Assert.Equal("Session resumed", tab.Messages[3].Content);
     }
 
     private void SetupSessionCreation(string name)

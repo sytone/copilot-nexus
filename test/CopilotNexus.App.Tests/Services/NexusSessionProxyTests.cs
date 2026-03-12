@@ -72,6 +72,35 @@ public class NexusSessionProxyTests
     }
 
     [Fact]
+    public async Task GetHistoryAsync_ReturnsHistory_WhenTransportSet()
+    {
+        var proxy = new NexusSessionProxy("s1");
+        proxy.SetTransport(
+            (_, _) => Task.CompletedTask,
+            _ => Task.CompletedTask,
+            (sid, _) => Task.FromResult<IReadOnlyList<SessionOutputEventArgs>>(
+                new[]
+                {
+                    new SessionOutputEventArgs(sid, "prior message", MessageRole.Assistant, OutputKind.Message),
+                }));
+
+        var history = await proxy.GetHistoryAsync();
+
+        Assert.Single(history);
+        Assert.Equal("prior message", history[0].Content);
+    }
+
+    [Fact]
+    public async Task GetHistoryAsync_WithoutTransport_ReturnsEmpty()
+    {
+        var proxy = new NexusSessionProxy("s1");
+
+        var history = await proxy.GetHistoryAsync();
+
+        Assert.Empty(history);
+    }
+
+    [Fact]
     public void RaiseOutput_FiresOutputReceivedEvent()
     {
         var proxy = new NexusSessionProxy("s1");

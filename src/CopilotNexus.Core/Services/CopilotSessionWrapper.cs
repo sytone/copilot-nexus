@@ -49,6 +49,45 @@ public class CopilotSessionWrapper : ICopilotSessionWrapper
         await _session.AbortAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<SessionOutputEventArgs>> GetHistoryAsync(CancellationToken cancellationToken = default)
+    {
+        var events = await _session.GetMessagesAsync(cancellationToken);
+        var history = new List<SessionOutputEventArgs>();
+
+        foreach (var evt in events)
+        {
+            switch (evt)
+            {
+                case UserMessageEvent user when !string.IsNullOrWhiteSpace(user.Data?.Content):
+                    history.Add(new SessionOutputEventArgs(
+                        SessionId,
+                        user.Data.Content,
+                        MessageRole.User,
+                        OutputKind.Message));
+                    break;
+
+                case AssistantMessageEvent assistant when !string.IsNullOrWhiteSpace(assistant.Data?.Content):
+                    history.Add(new SessionOutputEventArgs(
+                        SessionId,
+                        assistant.Data.Content,
+                        MessageRole.Assistant,
+                        OutputKind.Message));
+                    break;
+
+                case SystemMessageEvent system when !string.IsNullOrWhiteSpace(system.Data?.Content):
+                    history.Add(new SessionOutputEventArgs(
+                        SessionId,
+                        system.Data.Content,
+                        MessageRole.System,
+                        OutputKind.Message));
+                    break;
+            }
+        }
+
+        _logger.LogDebug("Session {SessionId}: loaded {Count} history messages", SessionId, history.Count);
+        return history;
+    }
+
     private void HandleSessionEvent(SessionEvent evt)
     {
         try

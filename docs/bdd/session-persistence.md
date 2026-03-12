@@ -103,7 +103,7 @@ Given a state file exists with 2 tabs and their SDK session IDs
 When the application starts
 Then 2 tabs are created with the saved names
 And each tab uses ResumeSessionAsync with the saved SDK session ID
-And the full conversation history is available from the SDK
+And the full conversation history is loaded from the SDK and displayed in the tab
 And the previously selected tab is re-selected
 And the session counter resumes from the saved value
 And a system message is appended: "Session resumed"

@@ -1,6 +1,7 @@
 namespace CopilotNexus.App.Services;
 
 using System.Collections.Concurrent;
+using System.Net;
 using System.Net.Http.Json;
 using CopilotNexus.Core.Contracts;
 using CopilotNexus.Core.Events;
@@ -118,7 +119,8 @@ public class NexusSessionManager : ISessionManager
             {
                 if (_hubConnection?.State == HubConnectionState.Connected)
                     await _hubConnection.InvokeAsync("AbortSession", sid);
-            });
+            },
+            async (sid, ct) => await GetSessionHistoryAsync(sid, ct));
         _proxies[info.Id] = proxy;
 
         if (_hubConnection?.State == HubConnectionState.Connected)
@@ -162,7 +164,8 @@ public class NexusSessionManager : ISessionManager
             {
                 if (_hubConnection?.State == HubConnectionState.Connected)
                     await _hubConnection.InvokeAsync("AbortSession", sid);
-            });
+            },
+            async (sid, ct) => await GetSessionHistoryAsync(sid, ct));
         _proxies[info.Id] = proxy;
 
         if (_hubConnection?.State == HubConnectionState.Connected)
@@ -243,7 +246,8 @@ public class NexusSessionManager : ISessionManager
                 {
                     if (_hubConnection?.State == HubConnectionState.Connected)
                         await _hubConnection.InvokeAsync("AbortSession", sid);
-                });
+                },
+                async (sid, ct) => await GetSessionHistoryAsync(sid, ct));
             _proxies[info.Id] = proxy;
 
             if (_hubConnection?.State == HubConnectionState.Connected)
@@ -252,6 +256,39 @@ public class NexusSessionManager : ISessionManager
             }
         }
         return info;
+    }
+
+    internal async Task<IReadOnlyList<SessionOutputEventArgs>> GetSessionHistoryAsync(
+        string sessionId,
+        CancellationToken cancellationToken = default)
+    {
+        var response = await _httpClient.GetAsync($"/api/sessions/{sessionId}/history", cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            _logger.LogDebug("No history endpoint data for session {SessionId}", sessionId);
+            return Array.Empty<SessionOutputEventArgs>();
+        }
+
+        response.EnsureSuccessStatusCode();
+        var items = await response.Content.ReadFromJsonAsync<List<SessionOutputDto>>(cancellationToken: cancellationToken)
+            ?? new List<SessionOutputDto>();
+
+        var history = new List<SessionOutputEventArgs>(items.Count);
+        foreach (var item in items)
+        {
+            if (!Enum.TryParse<OutputKind>(item.Kind, ignoreCase: true, out var kind) || kind != OutputKind.Message)
+                continue;
+            if (string.IsNullOrWhiteSpace(item.Content))
+                continue;
+
+            var role = Enum.TryParse<MessageRole>(item.Role, ignoreCase: true, out var parsedRole)
+                ? parsedRole
+                : MessageRole.Assistant;
+
+            history.Add(new SessionOutputEventArgs(sessionId, item.Content, role, OutputKind.Message));
+        }
+
+        return history;
     }
 
     // --- SignalR callbacks ---
@@ -292,7 +329,8 @@ public class NexusSessionManager : ISessionManager
                 {
                     if (_hubConnection?.State == HubConnectionState.Connected)
                         await _hubConnection.InvokeAsync("AbortSession", sid);
-                });
+                },
+                async (sid, ct) => await GetSessionHistoryAsync(sid, ct));
             _proxies[info.Id] = proxy;
         }
 

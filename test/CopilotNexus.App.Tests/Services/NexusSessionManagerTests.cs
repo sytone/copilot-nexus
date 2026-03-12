@@ -220,6 +220,40 @@ public class NexusSessionManagerTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task GetSessionHistoryAsync_UsesHistoryEndpoint()
+    {
+        var dto = new SessionInfoDto
+        {
+            Id = "s1",
+            Name = "Session 1",
+            SdkSessionId = "sdk-s1",
+            State = "Running",
+        };
+
+        _mockHandler.SetResponse("/api/sessions", HttpMethod.Post, HttpStatusCode.OK,
+            JsonSerializer.Serialize(dto));
+
+        var history = new List<SessionOutputDto>
+        {
+            new("s1", "Message", "User", "hello"),
+            new("s1", "Message", "Assistant", "world"),
+        };
+        _mockHandler.SetResponse("/api/sessions/s1/history", HttpMethod.Get, HttpStatusCode.OK,
+            JsonSerializer.Serialize(history));
+
+        await _manager.CreateSessionAsync("Session 1");
+        var session = _manager.GetSession("s1");
+        Assert.NotNull(session);
+
+        var loadedHistory = await session!.GetHistoryAsync();
+
+        Assert.Equal(2, loadedHistory.Count);
+        Assert.Equal("hello", loadedHistory[0].Content);
+        Assert.Equal("world", loadedHistory[1].Content);
+        Assert.Equal("/api/sessions/s1/history", _mockHandler.LastRequest!.RequestUri!.AbsolutePath);
+    }
+
+    [Fact]
     public async Task CreateMultipleSessions_AllTracked()
     {
         for (int i = 1; i <= 3; i++)

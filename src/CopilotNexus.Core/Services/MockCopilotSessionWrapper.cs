@@ -69,6 +69,12 @@ public class MockCopilotSessionWrapper : ICopilotSessionWrapper
         return Task.CompletedTask;
     }
 
+    public Task<IReadOnlyList<SessionOutputEventArgs>> GetHistoryAsync(CancellationToken cancellationToken = default)
+    {
+        IReadOnlyList<SessionOutputEventArgs> history = Array.Empty<SessionOutputEventArgs>();
+        return Task.FromResult(history);
+    }
+
     private static string GenerateResponse(string prompt)
     {
         return $"[Mock response] You asked: \"{prompt}\". " +

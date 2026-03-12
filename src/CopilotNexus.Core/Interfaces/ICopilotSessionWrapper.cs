@@ -25,4 +25,9 @@ public interface ICopilotSessionWrapper : IAsyncDisposable
     /// Aborts the current in-flight message processing.
     /// </summary>
     Task AbortAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Gets persisted session history messages in chronological order.
+    /// </summary>
+    Task<IReadOnlyList<SessionOutputEventArgs>> GetHistoryAsync(CancellationToken cancellationToken = default);
 }

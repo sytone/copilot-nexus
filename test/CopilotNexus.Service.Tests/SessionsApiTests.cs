@@ -75,6 +75,20 @@ public class SessionsApiTests : IClassFixture<NexusTestFactory>
     }
 
     [Fact]
+    public async Task GetSessionHistory_ReturnsOk()
+    {
+        var request = new CreateSessionRequest { Name = "History Session" };
+        var createResponse = await _client.PostAsJsonAsync("/api/sessions", request);
+        var created = await createResponse.Content.ReadFromJsonAsync<SessionInfoDto>();
+
+        var historyResponse = await _client.GetAsync($"/api/sessions/{created!.Id}/history");
+        historyResponse.EnsureSuccessStatusCode();
+
+        var history = await historyResponse.Content.ReadFromJsonAsync<List<SessionOutputDto>>();
+        Assert.NotNull(history);
+    }
+
+    [Fact]
     public async Task CreateSession_ThenListIncludes()
     {
         var request = new CreateSessionRequest { Name = "Listed Session" };
@@ -108,6 +122,13 @@ public class SessionsApiTests : IClassFixture<NexusTestFactory>
     public async Task GetSession_NotFound()
     {
         var response = await _client.GetAsync("/api/sessions/nonexistent-id");
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetSessionHistory_NotFound()
+    {
+        var response = await _client.GetAsync("/api/sessions/nonexistent-id/history");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
 

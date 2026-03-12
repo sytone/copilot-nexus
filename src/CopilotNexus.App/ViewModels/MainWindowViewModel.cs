@@ -2,6 +2,7 @@ namespace CopilotNexus.App.ViewModels;
 
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using CopilotNexus.Core.Events;
 using CopilotNexus.Core.Interfaces;
 using CopilotNexus.Core.Models;
 using Microsoft.Extensions.Logging;
@@ -199,11 +200,32 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 }
 
                 var session = _sessionManager.GetSession(sessionInfo.Id)!;
+                var history = Array.Empty<SessionOutputEventArgs>();
+                if (string.Equals(systemMessage, "Session resumed", StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        history = (await session.GetHistoryAsync())
+                            .Where(item => item.Kind == OutputKind.Message)
+                            .Where(item => !string.IsNullOrWhiteSpace(item.Content))
+                            .ToArray();
+                        _logger.LogInformation("Loaded {Count} history messages for resumed tab '{Name}'", history.Length, tabState.Name);
+                    }
+                    catch (Exception historyEx)
+                    {
+                        _logger.LogWarning(historyEx, "Failed to load history for resumed tab '{Name}'", tabState.Name);
+                    }
+                }
+
                 var tabViewModel = new SessionTabViewModel(sessionInfo, session, _dispatcher, _logger, AvailableModels);
                 tabViewModel.CloseRequested += (_, _) => _ = CloseSpecificTabAsync(tabViewModel);
                 tabViewModel.ReconfigureRequested += OnTabReconfigureRequested;
 
                 tabViewModel.Messages.Clear();
+                foreach (var item in history)
+                {
+                    tabViewModel.Messages.Add(new SessionMessage(item.Role, item.Content));
+                }
                 tabViewModel.Messages.Add(new SessionMessage(MessageRole.System, systemMessage));
 
                 Tabs.Add(tabViewModel);
