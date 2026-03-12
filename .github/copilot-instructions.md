@@ -86,6 +86,21 @@ dotnet test test/CopilotNexus.App.Tests/
 - Run `dotnet test CopilotNexus.slnx` after any code change to verify tests still pass
 - If a change breaks the build or tests, fix it immediately before moving on
 
+## Runtime Log Review Gate
+
+Before implementing a feature, bug fix, or refactor, review **app + service + CLI logs** for new warnings/errors since the last review checkpoint.
+
+- Use the review state file at `%USERPROFILE%\.copilot\copilot-nexus\log-review-state.json` to track `lastReviewedUtc`.
+- Review logs under `%LOCALAPPDATA%\CopilotNexus\logs\`:
+  - `copilot-nexus-YYYYMMDD.log` (desktop app)
+  - `nexus-YYYYMMDD.log` (Nexus service)
+  - `cli-YYYYMMDD.log` (CLI)
+- Use `scripts/Review-NexusLogs.ps1` to perform this check consistently:
+  - `pwsh -File .\scripts\Review-NexusLogs.ps1`
+- If logs reveal bugs/regressions, include the fix in the active change set (or clearly call out a blocker).
+- If logs are too vague to diagnose failures, add/upgrade structured logging at the failing boundary so future triage is actionable.
+- Update the review state timestamp after each log pass and include a short log-review summary in handoff notes.
+
 ## Documentation Guidelines
 
 - All documentation lives in the `docs/` folder

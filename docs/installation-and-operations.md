@@ -377,6 +377,9 @@ All logs are written to `%LOCALAPPDATA%\CopilotNexus\logs\`:
 ```powershell
 # View recent log entries
 Get-Content "$env:LOCALAPPDATA\CopilotNexus\logs\*.log" -Tail 50
+
+# Review only new log issues since the last checkpoint
+pwsh -File .\scripts\Review-NexusLogs.ps1
 ```
 
 Notable logs:
@@ -384,6 +387,10 @@ Notable logs:
 - `copilot-nexus-YYYYMMDD.log` — desktop app runtime logs
 - `nexus-YYYYMMDD.log` — Nexus service logs
 - `cli-YYYYMMDD.log` — CLI build/publish command diagnostics (command, exit code, elapsed, output sizes)
+
+The review script stores its checkpoint at:
+
+- `%USERPROFILE%\.copilot\copilot-nexus\log-review-state.json`
 
 ### Clean reinstall
 
