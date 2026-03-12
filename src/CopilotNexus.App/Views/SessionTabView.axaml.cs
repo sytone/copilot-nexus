@@ -125,4 +125,20 @@ public partial class SessionTabView : UserControl
             e.Handled = true;
         }
     }
+
+    private async void CopyMessageMenuItem_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem menuItem)
+            return;
+
+        var message = menuItem.Tag as SessionMessage ?? menuItem.DataContext as SessionMessage;
+        if (message == null || string.IsNullOrWhiteSpace(message.Content))
+            return;
+
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel?.Clipboard == null)
+            return;
+
+        await topLevel.Clipboard.SetTextAsync(message.Content);
+    }
 }

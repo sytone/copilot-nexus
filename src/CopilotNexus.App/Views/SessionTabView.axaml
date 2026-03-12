@@ -66,6 +66,13 @@
                     <Border Padding="12,6"
                             BorderBrush="{StaticResource BorderBrush}"
                             BorderThickness="0,0,0,0.5">
+                        <Border.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Copy"
+                                          Click="CopyMessageMenuItem_Click"
+                                          Tag="{Binding}"/>
+                            </ContextMenu>
+                        </Border.ContextMenu>
                         <StackPanel>
                             <DockPanel>
                                 <TextBlock DockPanel.Dock="Left"

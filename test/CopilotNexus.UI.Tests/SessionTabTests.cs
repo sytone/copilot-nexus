@@ -173,4 +173,24 @@ public class SessionTabTests
         Assert.NotNull(modeSelector);
         Assert.NotNull(modelSelector);
     }
+
+    [AvaloniaFact]
+    public async Task SessionMessages_HaveCopyContextMenu()
+    {
+        var (window, vm) = await CreateWindowWithTabAsync();
+
+        var sessionView = window.GetVisualDescendants().OfType<SessionTabView>().FirstOrDefault();
+        Assert.NotNull(sessionView);
+
+        var messageBorder = sessionView.GetVisualDescendants()
+            .OfType<Border>()
+            .FirstOrDefault(border => border.ContextMenu != null);
+        Assert.NotNull(messageBorder);
+        Assert.NotNull(messageBorder.ContextMenu);
+
+        var copyMenuItem = messageBorder.ContextMenu!.Items
+            .OfType<MenuItem>()
+            .FirstOrDefault(menuItem => string.Equals(menuItem.Header?.ToString(), "Copy", StringComparison.Ordinal));
+        Assert.NotNull(copyMenuItem);
+    }
 }
