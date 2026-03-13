@@ -97,6 +97,16 @@ catch (Exception ex)
 static ParsedArguments ParseArgs(string[] inputArgs)
 {
     var result = new ParsedArguments();
+    if (!inputArgs.Any(IsShimSpecificArgument))
+    {
+        foreach (var arg in inputArgs)
+        {
+            result.ForwardedArgs.Add(arg);
+        }
+
+        return result;
+    }
+
     for (var index = 0; index < inputArgs.Length; index++)
     {
         var arg = inputArgs[index];
@@ -152,6 +162,13 @@ static ParsedArguments ParseArgs(string[] inputArgs)
     }
 
     return result;
+}
+
+static bool IsShimSpecificArgument(string arg)
+{
+    return string.Equals(arg, "--previous", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(arg, "--resolve-path", StringComparison.OrdinalIgnoreCase) ||
+           string.Equals(arg, "--cleanup", StringComparison.OrdinalIgnoreCase);
 }
 
 static void PrintHelp()

@@ -40,6 +40,7 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - Pi-only runtime startup/validation no longer forces model id `pi-auto`, and Pi wrapper now maps `pi-auto`/`auto` to runtime-default model selection.
 - Shim-launched payloads now preserve the caller working directory so repo-root commands (`build`/`publish`) resolve correctly.
 - Installed-shim publish now skips in-use shim binaries during refresh to avoid Windows file-lock failures.
+- Shim `--help`/`-h` now passes through to the target CLI unless a shim-specific flag (`--previous`, `--resolve-path`, `--cleanup`) is used.
 
 ### Added (prior)
 
