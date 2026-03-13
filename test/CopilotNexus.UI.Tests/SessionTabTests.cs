@@ -1,5 +1,6 @@
 namespace CopilotNexus.UI.Tests;
 
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
@@ -16,6 +17,8 @@ using Xunit;
 /// </summary>
 public class SessionTabTests
 {
+    private const double BottomTolerance = 8.0;
+
     private static async Task<(MainWindow window, MainWindowViewModel vm)> CreateWindowWithTabAsync()
     {
         App.StartupArgs = new[] { "--test-mode", "--reset-state" };
@@ -30,6 +33,42 @@ public class SessionTabTests
         await Task.Delay(300);
 
         return (window, vm);
+    }
+
+    private static SessionTabView GetSessionView(MainWindow window)
+    {
+        var sessionView = window.GetVisualDescendants().OfType<SessionTabView>().FirstOrDefault();
+        Assert.NotNull(sessionView);
+        return sessionView;
+    }
+
+    private static ScrollViewer GetMessagesScrollViewer(SessionTabView sessionView)
+    {
+        var listBox = sessionView.FindControl<ListBox>("MessagesList");
+        Assert.NotNull(listBox);
+
+        var scrollViewer = listBox.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault();
+        Assert.NotNull(scrollViewer);
+        return scrollViewer;
+    }
+
+    private static bool IsNearBottom(ScrollViewer scrollViewer)
+    {
+        var maxOffsetY = Math.Max(0, scrollViewer.Extent.Height - scrollViewer.Viewport.Height);
+        return maxOffsetY - scrollViewer.Offset.Y <= BottomTolerance;
+    }
+
+    private static async Task EnsureMessagesAreScrollableAsync(SessionTabViewModel tab, ScrollViewer scrollViewer)
+    {
+        for (var i = 0; i < 160 && scrollViewer.Extent.Height <= scrollViewer.Viewport.Height; i++)
+        {
+            tab.Messages.Add(new SessionMessage(MessageRole.Assistant, $"history-{i} {new string('x', 80)}"));
+            await Task.Delay(10);
+        }
+
+        Assert.True(
+            scrollViewer.Extent.Height > scrollViewer.Viewport.Height,
+            "Expected message list to be scrollable for auto-scroll behavior tests.");
     }
 
     [AvaloniaFact]
@@ -164,8 +203,7 @@ public class SessionTabTests
     {
         var (window, vm) = await CreateWindowWithTabAsync();
 
-        var sessionView = window.GetVisualDescendants().OfType<SessionTabView>().FirstOrDefault();
-        Assert.NotNull(sessionView);
+        var sessionView = GetSessionView(window);
 
         var modeSelector = sessionView.FindControl<ComboBox>("ModeSelector");
         var modelSelector = sessionView.FindControl<ComboBox>("FooterModelSelector");
@@ -175,12 +213,79 @@ public class SessionTabTests
     }
 
     [AvaloniaFact]
+    public async Task SessionTabView_DefaultsToLatestMessage()
+    {
+        var (window, vm) = await CreateWindowWithTabAsync();
+        var tab = vm.Tabs[0];
+        var sessionView = GetSessionView(window);
+        var scrollViewer = GetMessagesScrollViewer(sessionView);
+
+        await EnsureMessagesAreScrollableAsync(tab, scrollViewer);
+        await Task.Delay(200);
+
+        Assert.True(IsNearBottom(scrollViewer), "Expected auto-scroll to keep latest message visible.");
+    }
+
+    [AvaloniaFact]
+    public async Task SessionTabView_UserScrollUpWhileActive_PausesAutoScroll()
+    {
+        var (window, vm) = await CreateWindowWithTabAsync();
+        var tab = vm.Tabs[0];
+        var sessionView = GetSessionView(window);
+        var scrollViewer = GetMessagesScrollViewer(sessionView);
+
+        await EnsureMessagesAreScrollableAsync(tab, scrollViewer);
+        tab.IsProcessing = true;
+
+        scrollViewer.Offset = new Vector(scrollViewer.Offset.X, 0);
+        await Task.Delay(150);
+
+        tab.Messages.Add(new SessionMessage(MessageRole.Assistant, "stream update after manual scroll"));
+        await Task.Delay(200);
+
+        Assert.False(IsNearBottom(scrollViewer), "Expected manual scroll-up to pause forced auto-scroll while active.");
+    }
+
+    [AvaloniaFact]
+    public async Task SessionTabView_Inactivity_ResumesAutoScroll()
+    {
+        var originalDelay = SessionTabView.AutoScrollResumeDelay;
+        SessionTabView.AutoScrollResumeDelay = TimeSpan.FromMilliseconds(300);
+        try
+        {
+            var (window, vm) = await CreateWindowWithTabAsync();
+            var tab = vm.Tabs[0];
+            var sessionView = GetSessionView(window);
+            var scrollViewer = GetMessagesScrollViewer(sessionView);
+
+            await EnsureMessagesAreScrollableAsync(tab, scrollViewer);
+            tab.IsProcessing = true;
+
+            scrollViewer.Offset = new Vector(scrollViewer.Offset.X, 0);
+            await Task.Delay(150);
+
+            tab.Messages.Add(new SessionMessage(MessageRole.Assistant, "first streaming update"));
+            await Task.Delay(100);
+            Assert.False(IsNearBottom(scrollViewer), "Expected auto-scroll to remain paused immediately after manual scroll.");
+
+            await Task.Delay(500);
+            tab.Messages.Add(new SessionMessage(MessageRole.Assistant, "update after inactivity timeout"));
+            await Task.Delay(250);
+
+            Assert.True(IsNearBottom(scrollViewer), "Expected auto-scroll to resume after inactivity timeout.");
+        }
+        finally
+        {
+            SessionTabView.AutoScrollResumeDelay = originalDelay;
+        }
+    }
+
+    [AvaloniaFact]
     public async Task SessionMessages_HaveCopyContextMenu()
     {
         var (window, vm) = await CreateWindowWithTabAsync();
 
-        var sessionView = window.GetVisualDescendants().OfType<SessionTabView>().FirstOrDefault();
-        Assert.NotNull(sessionView);
+        var sessionView = GetSessionView(window);
 
         var messageBorder = sessionView.GetVisualDescendants()
             .OfType<Border>()
