@@ -9,6 +9,7 @@
   <Folder Name="/test/">
     <Project Path="test/CopilotNexus.App.Tests/CopilotNexus.App.Tests.csproj" />
     <Project Path="test/CopilotNexus.Core.Tests/CopilotNexus.Core.Tests.csproj" />
+    <Project Path="test/CopilotNexus.E2E.Tests/CopilotNexus.E2E.Tests.csproj" />
     <Project Path="test/CopilotNexus.Service.Tests/CopilotNexus.Service.Tests.csproj" />
     <Project Path="test/CopilotNexus.UI.Tests/CopilotNexus.UI.Tests.csproj" />
   </Folder>

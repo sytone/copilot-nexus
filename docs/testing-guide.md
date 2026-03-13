@@ -2,14 +2,17 @@
 
 ## Overview
 
-Copilot Nexus has three test projects covering unit tests, ViewModel tests, and
-UI automation tests. All tests use **xUnit 2.7** as the test framework.
+Copilot Nexus has multiple test projects covering core unit tests, ViewModel tests,
+service integration tests, UI automation tests, and opt-in end-to-end tests.
+All tests use **xUnit 2.7** as the test framework.
 
 | Project | Type | Tests | What It Covers |
 |---|---|---|---|
 | `CopilotNexus.Core.Tests` | Unit | 65 | Models, SessionManager, persistence, integration |
 | `CopilotNexus.App.Tests` | Unit | 47 | ViewModels, XAML value converters |
+| `CopilotNexus.Service.Tests` | Integration | 20 | REST/webhook endpoints via in-memory host |
 | `CopilotNexus.UI.Tests` | UI Automation | 12 | App launch, tab management, user interactions |
+| `CopilotNexus.E2E.Tests` | End-to-End (opt-in) | - | Running-server API smoke + optional CLI lifecycle |
 
 ## Prerequisites
 
@@ -36,6 +39,19 @@ dotnet test test/CopilotNexus.App.Tests
 
 # UI automation tests (launches the app — requires a display)
 dotnet test test/CopilotNexus.UI.Tests
+
+# E2E tests against a running Nexus server (opt-in)
+set NEXUS_E2E_ENABLED=1
+dotnet test test/CopilotNexus.E2E.Tests
+```
+
+### Managed Service E2E (start/status/stop/update via CLI)
+
+```bash
+set NEXUS_E2E_ENABLED=1
+set NEXUS_E2E_MANAGE_SERVICE=1
+set NEXUS_E2E_MANAGED_URL=http://localhost:5290
+dotnet test test/CopilotNexus.E2E.Tests --filter "FullyQualifiedName~CliManagedE2ETests"
 ```
 
 ### Filtered by Test Name
