@@ -16,6 +16,13 @@ record HealthResponse(string? Status, int Sessions, int Models, string? Uptime);
 internal static class CliCommands
 {
     private const string InitialPublishBaseVersion = "0.1.0";
+    private const string VersionPlaceholder = "<version>";
+    private static readonly string[] LegacyRootInstallFolders =
+    [
+        Path.Combine(CopilotNexusPaths.Root, "cli"),
+        Path.Combine(CopilotNexusPaths.Root, "service"),
+        Path.Combine(CopilotNexusPaths.Root, "winapp"),
+    ];
     private sealed record ProcessExecutionResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Elapsed);
     private sealed record StartValidationResult(bool IsReady, string Message);
     private sealed record ServiceLockInfo(int Pid, string? ExecutablePath, string? Version, string? Url, DateTimeOffset StartedAtUtc);
@@ -61,6 +68,8 @@ internal static class CliCommands
             $"  Service: [dim]{Markup.Escape(GetComponentVersionDisplay(CopilotNexusPaths.ServiceExe, CopilotNexusPaths.NexusInstall, "CopilotNexus.Service.exe"))}[/]");
         AnsiConsole.MarkupLine(
             $"  App: [dim]{Markup.Escape(GetComponentVersionDisplay(CopilotNexusPaths.AppExe, CopilotNexusPaths.AppInstall, "CopilotNexus.App.exe"))}[/]");
+        AnsiConsole.MarkupLine($"  Layout: [dim]{Markup.Escape(GetVersionedPayloadLayoutHint())}[/]");
+        WarnIfLegacyRootInstallFoldersExist();
     }
 
     // --- start ---
@@ -232,7 +241,9 @@ internal static class CliCommands
         if (!string.IsNullOrWhiteSpace(lockInfo?.ExecutablePath))
             table.AddRow("Service path", Markup.Escape(lockInfo!.ExecutablePath!));
         table.AddEmptyRow();
-        table.AddRow("Install dir", Markup.Escape(CopilotNexusPaths.Root));
+        table.AddRow("Install root", Markup.Escape(CopilotNexusPaths.Root));
+        table.AddRow("Payload root", Markup.Escape(CopilotNexusPaths.AppRoot));
+        table.AddRow("Payload layout", Markup.Escape(GetVersionedPayloadLayoutHint()));
         table.AddRow("Log dir", Markup.Escape(CopilotNexusPaths.Logs));
 
         AnsiConsole.Write(table);
@@ -324,10 +335,13 @@ internal static class CliCommands
         AnsiConsole.Write(rule);
         AnsiConsole.MarkupLine($"  Repo:    [dim]{Markup.Escape(repoRoot)}[/]");
         AnsiConsole.MarkupLine($"  Install: [dim]{Markup.Escape(CopilotNexusPaths.Root)}[/]");
+        AnsiConsole.MarkupLine($"  Layout:  [dim]{Markup.Escape(GetVersionedPayloadLayoutHint())}[/]");
         AnsiConsole.WriteLine();
 
         var versionPlan = CreatePublishVersionPlan(repoRoot);
         AnsiConsole.MarkupLine($"[dim]Install version: {Markup.Escape(versionPlan.PublishVersion)}[/]");
+        PrintVersionedPayloadTargets(versionPlan.PublishVersion);
+        WarnIfLegacyRootInstallFoldersExist();
 
         var cliOutput = CopilotNexusPaths.GetVersionedInstallPath("cli", versionPlan.PublishVersion);
         var serviceOutput = CopilotNexusPaths.GetVersionedInstallPath("nexus", versionPlan.PublishVersion);
@@ -379,6 +393,8 @@ internal static class CliCommands
         {
             AnsiConsole.MarkupLine("[red]Component shims are not installed.[/]");
             AnsiConsole.MarkupLine($"  Expected shims under: [dim]{Markup.Escape(CopilotNexusPaths.AppRoot)}[/]");
+            PrintVersionedPayloadTargets();
+            WarnIfLegacyRootInstallFoldersExist();
             AnsiConsole.WriteLine();
             AnsiConsole.MarkupLine("Run [blue]nexus install[/] first.");
             Environment.ExitCode = 1;
@@ -399,6 +415,8 @@ internal static class CliCommands
         var releaseMode = versionPlan.IsReleaseMode ? "release" : "dev";
         AnsiConsole.MarkupLine($"[dim]Publish version: {Markup.Escape(versionPlan.PublishVersion)} ({releaseMode})[/]");
         AnsiConsole.MarkupLine($"[dim]Version bump: {versionPlan.Bump} from {versionPlan.CommitCount} commit(s)[/]");
+        PrintVersionedPayloadTargets(versionPlan.PublishVersion);
+        WarnIfLegacyRootInstallFoldersExist();
 
         await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
@@ -449,7 +467,7 @@ internal static class CliCommands
             SavePublishVersionState(versionPlan);
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[green]✓ Versioned publish complete.[/]");
-        AnsiConsole.MarkupLine("[dim]No update-copy step is required. Launch via shims to pick up newest version.[/]");
+        AnsiConsole.MarkupLine("[dim]Published payloads are available immediately through shims.[/]");
         AnsiConsole.WriteLine();
 
         var panel = new Panel(
@@ -737,6 +755,7 @@ internal static class CliCommands
             _ => throw new ArgumentException($"Unknown component: {component}"),
         };
 
+        EnsureVersionedPayloadOutputPath(component, outputPath, version);
         AnsiConsole.MarkupLine($"  [blue]{component}[/] → [dim]{Markup.Escape(outputPath)}[/]");
         var versionArgs = string.IsNullOrWhiteSpace(version)
             ? string.Empty
@@ -913,26 +932,214 @@ internal static class CliCommands
             throw new FileNotFoundException("Shim project was not found.", projectPath);
 
         Directory.CreateDirectory(outputPath);
-        var psi = new ProcessStartInfo
+        var baseArguments =
+            $"publish \"{projectPath}\" -c Release --self-contained true --use-current-runtime --nologo -v q " +
+            $"-p:Version={version} -p:InformationalVersion={version} " +
+            "-p:PublishTrimmed=true -p:TrimMode=partial -p:InvariantGlobalization=true -p:DebugType=None -p:DebugSymbols=false";
+
+        ProcessExecutionResult? lastFailure = null;
+        var publishAttempts = new (string Name, string Arguments)[]
         {
-            FileName = "dotnet",
-            Arguments =
-                $"publish \"{projectPath}\" -c Release -o \"{outputPath}\" --self-contained false --nologo -v q " +
-                $"-p:AssemblyName={assemblyName} -p:Version={version} -p:InformationalVersion={version}",
-            UseShellExecute = false,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            CreateNoWindow = true,
+            ("single-file", $"{baseArguments} -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true"),
+            ("multi-file fallback", $"{baseArguments} -p:PublishSingleFile=false"),
         };
 
-        WriteCliLog($"publish start [{label}] (version={version}): {psi.FileName} {psi.Arguments}");
-        var result = await RunProcessWithCapturedOutputAsync(psi);
-        if (result.ExitCode != 0)
+        foreach (var attempt in publishAttempts)
         {
-            WriteCliLog($"publish failed [{label}] stdout tail:\n{Tail(result.StandardOutput)}");
-            WriteCliLog($"publish failed [{label}] stderr tail:\n{Tail(result.StandardError)}");
-            throw new InvalidOperationException($"Failed to publish {label}. {Tail(result.StandardError)}");
+            var tempPublishPath = Path.Combine(
+                Path.GetTempPath(),
+                "copilot-nexus-shim-publish",
+                Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempPublishPath);
+
+            var psi = new ProcessStartInfo
+            {
+                FileName = "dotnet",
+                Arguments = $"{attempt.Arguments} -o \"{tempPublishPath}\"",
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            };
+
+            WriteCliLog($"publish start [{label}/{attempt.Name}] (version={version}): {psi.FileName} {psi.Arguments}");
+            ProcessExecutionResult result;
+            try
+            {
+                result = await RunProcessWithCapturedOutputAsync(psi);
+            }
+            catch
+            {
+                TryDeleteDirectory(tempPublishPath);
+                throw;
+            }
+
+            if (result.ExitCode == 0)
+            {
+                InstallShimArtifacts(tempPublishPath, outputPath, $"{assemblyName}.exe");
+                TryDeleteDirectory(tempPublishPath);
+                if (attempt.Name != "single-file")
+                {
+                    AnsiConsole.MarkupLine($"  [yellow]![/] {label} published self-contained + trimmed without single-file fallback.");
+                }
+                return;
+            }
+
+            WriteCliLog($"publish failed [{label}/{attempt.Name}] stdout tail:\n{Tail(result.StandardOutput)}");
+            WriteCliLog($"publish failed [{label}/{attempt.Name}] stderr tail:\n{Tail(result.StandardError)}");
+            lastFailure = result;
+            TryDeleteDirectory(tempPublishPath);
         }
+
+        var failureOutput = !string.IsNullOrWhiteSpace(lastFailure?.StandardError)
+            ? lastFailure!.StandardError
+            : lastFailure?.StandardOutput ?? string.Empty;
+        throw new InvalidOperationException($"Failed to publish {label}. {Tail(failureOutput)}");
+    }
+
+    private static void InstallShimArtifacts(string sourcePath, string destinationPath, string shimExecutableName)
+    {
+        var currentProcessPath = string.IsNullOrWhiteSpace(Environment.ProcessPath)
+            ? null
+            : NormalizePath(Environment.ProcessPath);
+        var activeShimPath = NormalizeOptionalPath(Environment.GetEnvironmentVariable("COPILOT_NEXUS_SHIM_PATH"));
+
+        foreach (var file in Directory.EnumerateFiles(destinationPath))
+        {
+            var normalizedFile = NormalizePath(file);
+            if (IsInUseShimFile(normalizedFile, currentProcessPath, activeShimPath))
+            {
+                continue;
+            }
+
+            File.Delete(file);
+        }
+
+        foreach (var sourceFile in Directory.EnumerateFiles(sourcePath))
+        {
+            var fileName = Path.GetFileName(sourceFile);
+            if (string.Equals(fileName, "CopilotNexus.Shim.exe", StringComparison.OrdinalIgnoreCase))
+            {
+                fileName = shimExecutableName;
+            }
+            else if (string.Equals(fileName, "CopilotNexus.Shim.pdb", StringComparison.OrdinalIgnoreCase))
+            {
+                fileName = Path.ChangeExtension(shimExecutableName, ".pdb");
+            }
+
+            var targetPath = Path.Combine(destinationPath, fileName);
+            var normalizedTargetPath = NormalizePath(targetPath);
+            if (IsInUseShimFile(normalizedTargetPath, currentProcessPath, activeShimPath))
+            {
+                AnsiConsole.MarkupLine($"  [yellow]![/] Skipping in-use shim file: [dim]{Markup.Escape(targetPath)}[/]");
+                continue;
+            }
+
+            File.Copy(sourceFile, targetPath, overwrite: true);
+        }
+    }
+
+    private static bool IsInUseShimFile(string normalizedPath, string? currentProcessPath, string? activeShimPath)
+    {
+        if (currentProcessPath != null &&
+            string.Equals(normalizedPath, currentProcessPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (activeShimPath != null &&
+            string.Equals(normalizedPath, activeShimPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static void TryDeleteDirectory(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+                Directory.Delete(path, recursive: true);
+        }
+        catch (IOException)
+        {
+            // Best effort cleanup.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Best effort cleanup.
+        }
+    }
+
+    private static string GetVersionedPayloadLayoutHint()
+    {
+        return Path.Combine(CopilotNexusPaths.AppRoot, "{cli|service|winapp}", VersionPlaceholder);
+    }
+
+    private static void PrintVersionedPayloadTargets(string? version = null)
+    {
+        var resolvedVersion = string.IsNullOrWhiteSpace(version) ? VersionPlaceholder : version.Trim();
+        AnsiConsole.MarkupLine($"[dim]Versioned payload layout: {Markup.Escape(GetVersionedPayloadLayoutHint())}[/]");
+        AnsiConsole.MarkupLine($"  [dim]CLI[/]     → {Markup.Escape(CopilotNexusPaths.GetVersionedInstallPath("cli", resolvedVersion))}");
+        AnsiConsole.MarkupLine($"  [dim]Service[/] → {Markup.Escape(CopilotNexusPaths.GetVersionedInstallPath("nexus", resolvedVersion))}");
+        AnsiConsole.MarkupLine($"  [dim]Win App[/] → {Markup.Escape(CopilotNexusPaths.GetVersionedInstallPath("app", resolvedVersion))}");
+    }
+
+    private static void WarnIfLegacyRootInstallFoldersExist()
+    {
+        var legacyFolders = LegacyRootInstallFolders.Where(Directory.Exists).ToArray();
+        if (legacyFolders.Length == 0)
+            return;
+
+        AnsiConsole.MarkupLine("[yellow]Legacy root component folders detected (ignored by current shims):[/]");
+        foreach (var folder in legacyFolders)
+        {
+            AnsiConsole.MarkupLine($"  [dim]- {Markup.Escape(folder)}[/]");
+        }
+    }
+
+    private static void EnsureVersionedPayloadOutputPath(string component, string outputPath, string? version)
+    {
+        if (string.IsNullOrWhiteSpace(version))
+            return;
+
+        if (!SemanticVersion.TryParse(version.Trim(), out _))
+        {
+            throw new InvalidOperationException($"Publish version '{version}' is not a valid semantic version.");
+        }
+
+        var expectedPath = component switch
+        {
+            "cli" => CopilotNexusPaths.GetVersionedInstallPath("cli", version),
+            "service" => CopilotNexusPaths.GetVersionedInstallPath("nexus", version),
+            "app" or "updater" => CopilotNexusPaths.GetVersionedInstallPath("app", version),
+            _ => throw new ArgumentException($"Unknown component: {component}"),
+        };
+
+        if (!string.Equals(
+                NormalizePath(outputPath),
+                NormalizePath(expectedPath),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"Publish output for '{component}' must target versioned path '{expectedPath}', but was '{outputPath}'.");
+        }
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return Path.GetFullPath(path)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    }
+
+    private static string? NormalizeOptionalPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+
+        return NormalizePath(path);
     }
 
     private static PublishVersionPlan CreatePublishVersionPlan(string repoRoot)

@@ -60,10 +60,14 @@ try
         return 1;
     }
 
+    var launchWorkingDirectory = Directory.Exists(Environment.CurrentDirectory)
+        ? Environment.CurrentDirectory
+        : Path.GetDirectoryName(resolved.ExecutablePath)!;
+
     var psi = new ProcessStartInfo
     {
         FileName = resolved.ExecutablePath,
-        WorkingDirectory = Path.GetDirectoryName(resolved.ExecutablePath)!,
+        WorkingDirectory = launchWorkingDirectory,
         UseShellExecute = false,
     };
 
@@ -71,6 +75,8 @@ try
     {
         psi.ArgumentList.Add(forwardedArg);
     }
+
+    psi.Environment["COPILOT_NEXUS_SHIM_PATH"] = currentProcessPath;
 
     using var child = Process.Start(psi);
     if (child == null)

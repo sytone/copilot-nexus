@@ -53,7 +53,7 @@ function Invoke-NexusOrThrow {
         [string]$FailureMessage
     )
 
-    & nexus @Arguments
+    & dotnet run --project $cliProject -- @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "$FailureMessage (exit code $LASTEXITCODE)"
     }
@@ -61,7 +61,7 @@ function Invoke-NexusOrThrow {
 
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptRoot
-$defaultNexusExe = Join-Path $env:LOCALAPPDATA 'CopilotNexus\app\cli\CopilotNexus.Cli.exe'
+$cliProject = Join-Path $projectRoot 'src/CopilotNexus.Cli/CopilotNexus.Cli.csproj'
 
 Write-Host 'Copilot Nexus Publish Script' -ForegroundColor Cyan
 Write-Host "Project root: $projectRoot" -ForegroundColor DarkGray
@@ -70,12 +70,8 @@ if (-not (Test-Path (Join-Path $projectRoot 'CopilotNexus.slnx'))) {
     throw "Solution file not found under project root: $projectRoot"
 }
 
-if (Test-Path $defaultNexusExe) {
-    Set-Alias nexus $defaultNexusExe
-    Write-Host "Using installed nexus CLI shim: $defaultNexusExe" -ForegroundColor Yellow
-}
-elseif (-not (Get-Command nexus -ErrorAction SilentlyContinue)) {
-    throw "'nexus' command not found and default install was not found at: $defaultNexusExe"
+if (-not (Test-Path $cliProject)) {
+    throw "CLI project not found: $cliProject"
 }
 
 Push-Location $projectRoot
@@ -94,7 +90,7 @@ try {
 
     if ($RestartService -and ($Component -eq 'nexus' -or $Component -eq 'both')) {
         Write-Host "`nRestarting Nexus service to load latest version..." -ForegroundColor Yellow
-        & nexus stop | Out-Null
+        & dotnet run --project $cliProject -- stop | Out-Null
         Invoke-NexusOrThrow -Arguments @('start') -FailureMessage 'Service restart failed'
         Write-Host 'Service restarted' -ForegroundColor Green
     }
@@ -104,6 +100,7 @@ finally {
 }
 
 Write-Host "`nPublish complete." -ForegroundColor Green
+Write-Host 'Published payloads are available immediately through shims.' -ForegroundColor DarkGray
 Write-Host 'Next steps:' -ForegroundColor Cyan
 if ($Component -eq 'nexus' -or $Component -eq 'both') {
     Write-Host '  nexus stop' -ForegroundColor DarkGray

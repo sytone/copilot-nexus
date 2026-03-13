@@ -34,8 +34,9 @@ nexus publish                  # publish nexus + app payloads
 nexus publish --component cli # publish only CLI payload
 ```
 
-Publish is side-by-side under `%LOCALAPPDATA%\CopilotNexus\app\<component>\<version>\...`.
-No separate `nexus update` copy step is used.
+Publish is side-by-side under `%LOCALAPPDATA%\CopilotNexus\app\{cli|service|winapp}\<version>\...`.
+Legacy root folders (`%LOCALAPPDATA%\CopilotNexus\cli|service|winapp`) are ignored by shims.
+Published versions are available immediately through shim resolution.
 
 ## Testing
 
