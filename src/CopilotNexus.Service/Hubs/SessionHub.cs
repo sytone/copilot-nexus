@@ -12,13 +12,16 @@ using Microsoft.AspNetCore.SignalR;
 public class SessionHub : Hub<ISessionHubClient>
 {
     private readonly ISessionManager _sessionManager;
+    private readonly IHubContext<SessionHub, ISessionHubClient> _hubContext;
     private readonly ILogger<SessionHub> _logger;
 
     public SessionHub(
         ISessionManager sessionManager,
+        IHubContext<SessionHub, ISessionHubClient> hubContext,
         ILogger<SessionHub> logger)
     {
         _sessionManager = sessionManager;
+        _hubContext = hubContext;
         _logger = logger;
     }
 
@@ -63,20 +66,20 @@ public class SessionHub : Hub<ISessionHubClient>
     }
 
     /// <summary>Send text input to a session.</summary>
-    public async Task SendInput(string sessionId, string input)
+    public Task SendInput(string sessionId, string input)
     {
+        if (string.IsNullOrWhiteSpace(input))
+            throw new HubException("Input cannot be empty");
+
         _logger.LogDebug("Client {ConnectionId} sending input to {SessionId} ({Length} chars)",
             Context.ConnectionId, sessionId, input.Length);
 
-        try
-        {
-            await _sessionManager.SendInputAsync(sessionId, input);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to send input to session {SessionId}", sessionId);
-            throw new HubException($"Failed to send input: {ex.Message}");
-        }
+        var session = _sessionManager.GetSession(sessionId);
+        if (session == null)
+            throw new HubException($"Session '{sessionId}' not found");
+
+        _ = Task.Run(() => DispatchSendInputAsync(sessionId, input, Context.ConnectionId));
+        return Task.CompletedTask;
     }
 
     /// <summary>Abort the current request in a session.</summary>
@@ -92,4 +95,46 @@ public class SessionHub : Hub<ISessionHubClient>
         }
     }
 
+    private async Task DispatchSendInputAsync(string sessionId, string input, string connectionId)
+    {
+        try
+        {
+            await _sessionManager.SendInputAsync(sessionId, input);
+        }
+        catch (OperationCanceledException ex)
+        {
+            _logger.LogInformation(
+                ex,
+                "Send canceled for session {SessionId} requested by {ConnectionId}",
+                sessionId,
+                connectionId);
+            await NotifySendFailureAsync(sessionId, "Request canceled.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Background send failed for session {SessionId} requested by {ConnectionId}",
+                sessionId,
+                connectionId);
+            await NotifySendFailureAsync(sessionId, $"Error: {ex.Message}");
+        }
+    }
+
+    private async Task NotifySendFailureAsync(string sessionId, string message)
+    {
+        var errorOutput = new SessionOutputDto(
+            sessionId,
+            OutputKind.Activity.ToString(),
+            MessageRole.System.ToString(),
+            message);
+        var idleOutput = new SessionOutputDto(
+            sessionId,
+            OutputKind.Idle.ToString(),
+            MessageRole.System.ToString(),
+            string.Empty);
+
+        await _hubContext.Clients.Group(sessionId).SessionOutput(sessionId, errorOutput);
+        await _hubContext.Clients.Group(sessionId).SessionOutput(sessionId, idleOutput);
+    }
 }

@@ -14,6 +14,7 @@ using Microsoft.Extensions.Logging;
 /// </summary>
 public sealed class PiRpcSessionWrapper : ICopilotSessionWrapper
 {
+    private const string RuntimeAutoModelId = "pi-auto";
     private readonly string? _model;
     private readonly string? _workingDirectory;
     private readonly string _piExecutablePath;
@@ -32,6 +33,9 @@ public sealed class PiRpcSessionWrapper : ICopilotSessionWrapper
     private TaskCompletionSource<bool>? _activePromptCompletion;
     private bool _seenAssistantDelta;
     private bool _disposed;
+    private int _terminationSignaled;
+    private string? _lastStderrLine;
+    private Exception? _terminationException;
 
     public string SessionId { get; }
     public bool IsActive => !_disposed;
@@ -184,17 +188,43 @@ public sealed class PiRpcSessionWrapper : ICopilotSessionWrapper
     {
         if (_stdin == null)
             throw new InvalidOperationException("Pi RPC session is not initialized.");
+        if (_terminationException is Exception terminatedException)
+            throw terminatedException;
 
         var id = Guid.NewGuid().ToString("N");
         command["id"] = id;
         var responseWaiter = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pendingResponses[id] = responseWaiter;
+        if (_terminationException is Exception terminatedAfterRegistration)
+        {
+            _pendingResponses.TryRemove(id, out _);
+            throw terminatedAfterRegistration;
+        }
 
-        var payload = JsonSerializer.Serialize(command, _jsonOptions);
-        await _stdin.WriteLineAsync(payload);
+        try
+        {
+            var payload = JsonSerializer.Serialize(command, _jsonOptions);
+            await _stdin.WriteLineAsync(payload);
+        }
+        catch
+        {
+            _pendingResponses.TryRemove(id, out _);
+            throw;
+        }
 
-        using var registration = cancellationToken.Register(() => responseWaiter.TrySetCanceled(cancellationToken));
-        var responseLine = await responseWaiter.Task.WaitAsync(cancellationToken);
+        string responseLine;
+        using (var registration = cancellationToken.Register(() => responseWaiter.TrySetCanceled(cancellationToken)))
+        {
+            try
+            {
+                responseLine = await responseWaiter.Task.WaitAsync(cancellationToken);
+            }
+            finally
+            {
+                _pendingResponses.TryRemove(id, out _);
+            }
+        }
+
         using var responseDoc = JsonDocument.Parse(responseLine);
         var responseRoot = responseDoc.RootElement;
 
@@ -219,7 +249,10 @@ public sealed class PiRpcSessionWrapper : ICopilotSessionWrapper
             {
                 var line = await _process.StandardOutput.ReadLineAsync();
                 if (line == null)
+                {
+                    SignalProcessTermination("Pi RPC process exited before returning an RPC response");
                     break;
+                }
 
                 ProcessRpcLine(line);
             }
@@ -227,7 +260,7 @@ public sealed class PiRpcSessionWrapper : ICopilotSessionWrapper
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning(ex, "Pi RPC stdout loop failed for session {SessionId}", SessionId);
-            _activePromptCompletion?.TrySetException(ex);
+            SignalProcessTermination("Pi RPC stdout loop failed", ex);
         }
     }
 
@@ -245,12 +278,22 @@ public sealed class PiRpcSessionWrapper : ICopilotSessionWrapper
                     break;
 
                 if (!string.IsNullOrWhiteSpace(line))
+                {
+                    _lastStderrLine = line;
                     _logger.LogDebug("Pi RPC [{SessionId}] stderr: {Line}", SessionId, line);
+                }
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogDebug(ex, "Pi RPC stderr loop ended for session {SessionId}", SessionId);
+        }
+        finally
+        {
+            if (!cancellationToken.IsCancellationRequested && _process is { HasExited: true })
+            {
+                SignalProcessTermination("Pi RPC process exited before returning an RPC response");
+            }
         }
     }
 
@@ -446,10 +489,20 @@ public sealed class PiRpcSessionWrapper : ICopilotSessionWrapper
 
     private static string BuildArguments(string? model)
     {
-        if (string.IsNullOrWhiteSpace(model))
+        var normalizedModel = model?.Trim();
+        if (IsRuntimeAutoModel(normalizedModel))
             return "--mode rpc --no-session";
 
-        return $"--mode rpc --no-session --model \"{model.Replace("\"", "\\\"")}\"";
+        return $"--mode rpc --no-session --model \"{normalizedModel!.Replace("\"", "\\\"")}\"";
+    }
+
+    private static bool IsRuntimeAutoModel(string? model)
+    {
+        if (string.IsNullOrWhiteSpace(model))
+            return true;
+
+        return string.Equals(model.Trim(), RuntimeAutoModelId, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(model.Trim(), "auto", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string ResolveWorkingDirectory(string? workingDirectory)
@@ -466,5 +519,26 @@ public sealed class PiRpcSessionWrapper : ICopilotSessionWrapper
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(PiRpcSessionWrapper));
+    }
+
+    private void SignalProcessTermination(string reason, Exception? innerException = null)
+    {
+        if (_readerCts.IsCancellationRequested)
+            return;
+
+        var detail = string.IsNullOrWhiteSpace(_lastStderrLine)
+            ? reason
+            : $"{reason}. Last stderr: {_lastStderrLine}";
+        var failure = new InvalidOperationException(detail, innerException);
+        _terminationException ??= failure;
+
+        if (Interlocked.Exchange(ref _terminationSignaled, 1) != 0)
+            return;
+
+        foreach (var waiter in _pendingResponses.Values)
+            waiter.TrySetException(failure);
+        _pendingResponses.Clear();
+
+        _activePromptCompletion?.TrySetException(failure);
     }
 }

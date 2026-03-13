@@ -492,6 +492,8 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
                 MessageRole.System,
                 "Request aborted.",
                 isNexusSystemMessage: true));
+            FinalizeStreamingMessage();
+            IsProcessing = false;
         }
         catch (Exception ex)
         {
@@ -500,9 +502,6 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
                 MessageRole.System,
                 $"Error: {ex.Message}",
                 isNexusSystemMessage: true));
-        }
-        finally
-        {
             FinalizeStreamingMessage();
             IsProcessing = false;
         }
@@ -599,6 +598,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
 
             case OutputKind.Idle:
                 FinalizeStreamingMessage();
+                IsProcessing = false;
                 break;
         }
     }

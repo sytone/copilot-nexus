@@ -124,7 +124,7 @@ public class SessionsController : ControllerBase
         // Send initial message if provided
         if (!string.IsNullOrWhiteSpace(request?.InitialMessage))
         {
-            await _sessionManager.SendInputAsync(sessionInfo.Id, request.InitialMessage);
+            DispatchSendInput(sessionInfo.Id, request.InitialMessage, "create-session");
         }
 
         return CreatedAtAction(nameof(GetSession), new { id = sessionInfo.Id }, dto);
@@ -206,7 +206,7 @@ public class SessionsController : ControllerBase
 
     /// <summary>Send text input to a session.</summary>
     [HttpPost("{id}/input")]
-    public async Task<IActionResult> SendInput(
+    public IActionResult SendInput(
         string id,
         [FromBody] SendInputRequest request)
     {
@@ -218,7 +218,7 @@ public class SessionsController : ControllerBase
             return BadRequest(new { error = "Input cannot be empty" });
 
         _logger.LogDebug("Sending input to session {SessionId} ({Length} chars)", id, request.Input.Length);
-        await _sessionManager.SendInputAsync(id, request.Input);
+        DispatchSendInput(id, request.Input, "sessions-api");
 
         return Accepted();
     }
@@ -239,5 +239,51 @@ public class SessionsController : ControllerBase
 
             _ = _hubContext.Clients.Group(sessionId).SessionOutput(sessionId, dto);
         };
+    }
+
+    private void DispatchSendInput(string sessionId, string input, string source)
+    {
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await _sessionManager.SendInputAsync(sessionId, input);
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogInformation(
+                    ex,
+                    "Send canceled for session {SessionId} via {Source}",
+                    sessionId,
+                    source);
+                await NotifySendFailureAsync(sessionId, "Request canceled.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "Background send failed for session {SessionId} via {Source}",
+                    sessionId,
+                    source);
+                await NotifySendFailureAsync(sessionId, $"Error: {ex.Message}");
+            }
+        });
+    }
+
+    private async Task NotifySendFailureAsync(string sessionId, string message)
+    {
+        var errorOutput = new SessionOutputDto(
+            sessionId,
+            OutputKind.Activity.ToString(),
+            MessageRole.System.ToString(),
+            message);
+        var idleOutput = new SessionOutputDto(
+            sessionId,
+            OutputKind.Idle.ToString(),
+            MessageRole.System.ToString(),
+            string.Empty);
+
+        await _hubContext.Clients.Group(sessionId).SessionOutput(sessionId, errorOutput);
+        await _hubContext.Clients.Group(sessionId).SessionOutput(sessionId, idleOutput);
     }
 }

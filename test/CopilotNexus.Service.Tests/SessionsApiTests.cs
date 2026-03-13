@@ -2,6 +2,7 @@ namespace CopilotNexus.Service.Tests;
 
 using System.Net;
 using System.Net.Http.Json;
+using System.Linq;
 using CopilotNexus.Core.Contracts;
 using Xunit;
 
@@ -40,6 +41,22 @@ public class SessionsApiTests : IClassFixture<NexusTestFactory>
         Assert.NotNull(dto);
         Assert.Equal("Test Session", dto.Name);
         Assert.NotEmpty(dto.Id);
+    }
+
+    [Fact]
+    public async Task CreateSession_WithLongInitialMessage_ReturnsBeforeClientCancellation()
+    {
+        var request = new CreateSessionRequest
+        {
+            Name = "Long Initial Message Session",
+            InitialMessage = BuildLongPrompt(),
+            IsAutopilot = true,
+        };
+
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var response = await _client.PostAsJsonAsync("/api/sessions", request, timeoutCts.Token);
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
     }
 
     [Fact]
@@ -146,6 +163,20 @@ public class SessionsApiTests : IClassFixture<NexusTestFactory>
     }
 
     [Fact]
+    public async Task SendInput_LongRunningPrompt_ReturnsBeforeClientCancellation()
+    {
+        var createRequest = new CreateSessionRequest { Name = "Long Input Session" };
+        var createResponse = await _client.PostAsJsonAsync("/api/sessions", createRequest);
+        var created = await createResponse.Content.ReadFromJsonAsync<SessionInfoDto>();
+
+        var inputRequest = new SendInputRequest { Input = BuildLongPrompt() };
+        using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var response = await _client.PostAsJsonAsync($"/api/sessions/{created!.Id}/input", inputRequest, timeoutCts.Token);
+
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+    }
+
+    [Fact]
     public async Task SendInput_EmptyInput_ReturnsBadRequest()
     {
         var createRequest = new CreateSessionRequest { Name = "Empty Input Session" };
@@ -197,5 +228,10 @@ public class SessionsApiTests : IClassFixture<NexusTestFactory>
         var renamed = await renameResponse.Content.ReadFromJsonAsync<SessionInfoDto>();
         Assert.NotNull(renamed);
         Assert.Equal("After Rename", renamed!.Name);
+    }
+
+    private static string BuildLongPrompt(int words = 60)
+    {
+        return string.Join(" ", Enumerable.Repeat("timeout-regression", words));
     }
 }

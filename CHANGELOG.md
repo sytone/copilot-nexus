@@ -16,6 +16,7 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - `CopilotNexusPaths.CliExe` and `CopilotNexusPaths.ServiceExe` path constants replacing the former `NexusExe`
 - Session footer agent profile selector in the Windows app for applying per-session profile configuration (model/agent/MCP/skills) without leaving the tab.
 - Versioned launcher shim project (`CopilotNexus.Shim`) plus SemVer resolver utilities for side-by-side payload execution.
+- Send-timeout hardening coverage: new BDD spec (`docs/bdd/send-input-timeout-flow.md`) plus hub/API/app/core regression tests.
 
 ### Changed
 
@@ -28,12 +29,14 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - `CopilotNexusPaths.NexusExe` replaced by `CliExe` (CLI entry point) and `ServiceExe` (web server)
 - User-specific session state moved from `%LOCALAPPDATA%\CopilotNexus\...` to `%USERPROFILE%\.copilot-nexus\session-state.json`; install/runtime binaries remain under `%LOCALAPPDATA%\CopilotNexus\`
 - Install/publish flow now writes versioned payload directories under `%LOCALAPPDATA%\CopilotNexus\app\{cli|service|winapp}\<version>\...`.
+- Session send paths (`SessionHub` + `SessionsController`) now dispatch long-running sends in background and return acceptance immediately.
 
 ### Fixed
 
 - Webhook background-send cancellation now logs as informational cancellation (with optional canceled callback status) instead of error-level failure noise.
 - Pi runtime executable detection on Windows now defaults to `pi.cmd`, avoiding false "pi not found" failures when npm shims are installed.
 - Removed `nexus update` command from CLI and switched publish to shim-resolved side-by-side versions (no staged copy-over step).
+- Pi-only runtime startup/validation no longer forces model id `pi-auto`, and Pi wrapper now maps `pi-auto`/`auto` to runtime-default model selection.
 
 ### Added (prior)
 

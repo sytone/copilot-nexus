@@ -640,7 +640,6 @@ internal static class CliCommands
         {
             Name = "Nexus startup validation",
             IsAutopilot = true,
-            Model = "pi-auto",
         });
 
         if (!createResponse.IsSuccessStatusCode)

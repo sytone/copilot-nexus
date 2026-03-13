@@ -25,6 +25,17 @@ public class SessionTabViewModelTests : IDisposable
         _sessionInfo = new SessionInfo("Test Session", "gpt-4.1");
         _dispatcher = new SynchronousUiDispatcher();
         _viewModel = new SessionTabViewModel(_sessionInfo, _mockSession.Object, _dispatcher, NullLogger.Instance);
+
+        _mockSession
+            .Setup(s => s.SendAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                _mockSession.Raise(
+                    s => s.OutputReceived += null,
+                    _mockSession.Object,
+                    new SessionOutputEventArgs(_sessionInfo.Id, string.Empty, MessageRole.System, OutputKind.Idle));
+                return Task.CompletedTask;
+            });
     }
 
     [Fact]
@@ -110,6 +121,32 @@ public class SessionTabViewModelTests : IDisposable
 
         Assert.Contains(_viewModel.Messages, m =>
             m.Role == MessageRole.User && m.Content == "my message");
+    }
+
+    [Fact]
+    public async Task SendCommand_NonBlockingSend_RemainsProcessingUntilIdle()
+    {
+        var session = new Mock<ICopilotSessionWrapper>();
+        session
+            .Setup(s => s.SendAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var info = new SessionInfo("Non-blocking", "gpt-4.1");
+        var vm = new SessionTabViewModel(info, session.Object, _dispatcher, NullLogger.Instance);
+        vm.InputText = "hello";
+
+        vm.SendCommand.Execute(null);
+        await Task.Delay(100);
+
+        Assert.True(vm.IsProcessing);
+
+        session.Raise(
+            s => s.OutputReceived += null,
+            session.Object,
+            new SessionOutputEventArgs(info.Id, string.Empty, MessageRole.System, OutputKind.Idle));
+
+        Assert.False(vm.IsProcessing);
+        vm.Dispose();
     }
 
     [Fact]
