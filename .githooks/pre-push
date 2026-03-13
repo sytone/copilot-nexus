@@ -1,0 +1,9 @@
+#!/usr/bin/env sh
+set -eu
+
+if ! git diff --quiet --ignore-submodules -- || ! git diff --cached --quiet --ignore-submodules --; then
+  echo "pre-push blocked: uncommitted changes detected."
+  echo "Commit or stash all changes before pushing."
+  git --no-pager status --short
+  exit 1
+fi

@@ -302,6 +302,7 @@ This project uses git for version control. Follow these rules:
 - **Never leave uncommitted work** at the end of a dev cycle
 - **Commit before destructive operations** — if about to delete files, refactor heavily, or change architecture, commit first so rollback is easy
 - **Scope commits to the task** — include only files relevant to the active change set; do not batch unrelated work
+- **Enable repo hooks once per clone** — run `pwsh -File .\scripts\Enable-GitHooks.ps1` so `.githooks/pre-push` enforces clean-tree pushes
 - **Always include the Co-authored-by trailer:**
   ```
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
