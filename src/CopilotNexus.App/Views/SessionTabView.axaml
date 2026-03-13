@@ -173,8 +173,28 @@
                               MinWidth="120"
                               Height="26"
                               Background="{StaticResource InputBackgroundBrush}"
+                               Foreground="{StaticResource ForegroundBrush}"
+                               BorderBrush="{StaticResource BorderBrush}"/>
+
+                    <TextBlock Text="Agent:"
+                               Foreground="{StaticResource SystemMessageBrush}"
+                               VerticalAlignment="Center"/>
+                    <ComboBox ItemsSource="{Binding AvailableProfiles}"
+                              SelectedItem="{Binding SelectedProfile}"
+                              Name="FooterProfileSelector"
+                              MinWidth="200"
+                              MaxWidth="300"
+                              Height="26"
+                              Background="{StaticResource InputBackgroundBrush}"
                               Foreground="{StaticResource ForegroundBrush}"
-                              BorderBrush="{StaticResource BorderBrush}"/>
+                              BorderBrush="{StaticResource BorderBrush}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="{StaticResource ForegroundBrush}"/>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
 
                     <TextBlock Text="Model:"
                                Foreground="{StaticResource SystemMessageBrush}"

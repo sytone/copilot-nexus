@@ -199,16 +199,18 @@ public class SessionTabTests
     }
 
     [AvaloniaFact]
-    public async Task SessionTabView_HasModeAndModelFooterControls()
+    public async Task SessionTabView_HasModeProfileAndModelFooterControls()
     {
         var (window, vm) = await CreateWindowWithTabAsync();
 
         var sessionView = GetSessionView(window);
 
         var modeSelector = sessionView.FindControl<ComboBox>("ModeSelector");
+        var profileSelector = sessionView.FindControl<ComboBox>("FooterProfileSelector");
         var modelSelector = sessionView.FindControl<ComboBox>("FooterModelSelector");
 
         Assert.NotNull(modeSelector);
+        Assert.NotNull(profileSelector);
         Assert.NotNull(modelSelector);
     }
 

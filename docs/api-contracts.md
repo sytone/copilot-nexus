@@ -14,7 +14,7 @@ Base URL: `http://localhost:5280` (default)
 - `GET /api/sessions/{id}` — get one session.
 - `GET /api/sessions/{id}/history` — get persisted output history (`SessionOutputDto[]`).
 - `POST /api/sessions` — create or resume a session.
-- `PUT /api/sessions/{id}/configure` — reconfigure model/mode/path and related fields.
+- `PUT /api/sessions/{id}/configure` — reconfigure model/mode/path/profile/agent settings.
 - `PUT /api/sessions/{id}/name` — rename a session.
 - `POST /api/sessions/{id}/input` — send input text.
 - `DELETE /api/sessions/{id}` — close and delete the session from disk.
@@ -36,9 +36,14 @@ Base URL: `http://localhost:5280` (default)
 
 If resume is requested and the runtime reports `Session not found`, Nexus automatically creates a fresh session using the same `sdkSessionId`.
 
+Common action flows:
+
+- **Switch model**: `PUT /api/sessions/{id}/configure` with `model`.
+- **Apply agent/profile config**: read profile details from `GET /api/session-profiles`, then send `PUT /api/sessions/{id}/configure` with `profileId`, `agentFilePath`, MCP fields, and skill directories.
+
 ### Models
 
-- `GET /api/models` — list available Pi runtime models.
+- `GET /api/models` — list available Pi runtime models discovered from Pi RPC `get_available_models`.
 
 ### Session profiles
 

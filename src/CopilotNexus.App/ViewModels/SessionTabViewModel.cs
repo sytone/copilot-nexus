@@ -2,6 +2,7 @@ namespace CopilotNexus.App.ViewModels;
 
 using System.Collections.ObjectModel;
 using System.Windows.Input;
+using CopilotNexus.App.Utilities;
 using CopilotNexus.Core.Events;
 using CopilotNexus.Core.Interfaces;
 using CopilotNexus.Core.Models;
@@ -34,6 +35,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
     private string? _workingDirectory;
     private string? _gitBranch;
     private ModelInfo? _selectedModel;
+    private SessionProfile? _selectedProfile;
     private bool _disposed;
 
     public SessionInfo Info { get; private set; }
@@ -41,6 +43,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
 
     /// <summary>Available models for the model selector.</summary>
     public ObservableCollection<ModelInfo> AvailableModels { get; }
+    public ObservableCollection<SessionProfile> AvailableProfiles { get; }
 
     public string InputText
     {
@@ -175,6 +178,22 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
 
     public string? ModelCostDisplay => ResolveModelCost(SelectedModel);
 
+    public SessionProfile? SelectedProfile
+    {
+        get => _selectedProfile;
+        set
+        {
+            if (!SetProperty(ref _selectedProfile, value))
+                return;
+            if (value == null)
+                return;
+            if (string.Equals(Info.ProfileId, value.Id, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            RequestReconfigure(profile: value);
+        }
+    }
+
     public ICommand SendCommand { get; }
     public ICommand AbortCommand { get; }
     public ICommand ClearCommand { get; }
@@ -196,7 +215,8 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         ICopilotSessionWrapper session,
         IUiDispatcher dispatcher,
         ILogger logger,
-        ObservableCollection<ModelInfo>? availableModels = null)
+        ObservableCollection<ModelInfo>? availableModels = null,
+        ObservableCollection<SessionProfile>? availableProfiles = null)
     {
         Info = info;
         _session = session;
@@ -210,9 +230,12 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         IsRunning = true;
 
         AvailableModels = availableModels ?? new ObservableCollection<ModelInfo>();
+        AvailableProfiles = availableProfiles ?? new ObservableCollection<SessionProfile>();
 
         // Set selected model from info without triggering reconfigure
         _selectedModel = AvailableModels.FirstOrDefault(m => m.ModelId == info.Model);
+        _selectedProfile = AvailableProfiles.FirstOrDefault(profile =>
+            string.Equals(profile.Id, info.ProfileId, StringComparison.OrdinalIgnoreCase));
         RefreshWorkingDirectoryMetadata();
 
         SendCommand = new AsyncRelayCommand(SendInputAsync, () => IsRunning && !IsProcessing && !string.IsNullOrWhiteSpace(InputText));
@@ -251,6 +274,8 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
 
         // Update selected model without triggering reconfigure
         _selectedModel = AvailableModels.FirstOrDefault(m => m.ModelId == newInfo.Model);
+        _selectedProfile = AvailableProfiles.FirstOrDefault(profile =>
+            string.Equals(profile.Id, newInfo.ProfileId, StringComparison.OrdinalIgnoreCase));
         if (_isAutopilot)
         {
             _selectedMode = "Autopilot";
@@ -263,6 +288,7 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         RefreshWorkingDirectoryMetadata();
         NotifyModelMetadataChanged();
         OnPropertyChanged(nameof(SelectedModel));
+        OnPropertyChanged(nameof(SelectedProfile));
         OnPropertyChanged(nameof(SelectedMode));
         OnPropertyChanged(nameof(IsAutopilot));
         OnPropertyChanged(nameof(WorkingDirectory));
@@ -288,20 +314,48 @@ public class SessionTabViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(SelectedMode));
     }
 
-    private void RequestReconfigure(string? model = null, string? workDir = null)
+    public void RefreshSelectedProfile()
     {
-        var config = new SessionConfiguration
+        _selectedProfile = AvailableProfiles.FirstOrDefault(profile =>
+            string.Equals(profile.Id, Info.ProfileId, StringComparison.OrdinalIgnoreCase));
+        OnPropertyChanged(nameof(SelectedProfile));
+    }
+
+    private void RequestReconfigure(string? model = null, string? workDir = null, SessionProfile? profile = null)
+    {
+        SessionConfiguration config;
+        if (profile != null)
         {
-            Model = model ?? Info.Model,
-            WorkingDirectory = workDir ?? Info.WorkingDirectory,
-            IsAutopilot = Info.IsAutopilot,
-            ProfileId = Info.ProfileId,
-            AgentFilePath = Info.AgentFilePath,
-            IncludeWellKnownMcpConfigs = Info.IncludeWellKnownMcpConfigs,
-            AdditionalMcpConfigPaths = Info.AdditionalMcpConfigPaths.ToList(),
-            EnabledMcpServers = Info.EnabledMcpServers.ToList(),
-            SkillDirectories = Info.SkillDirectories.ToList(),
-        };
+            var profileModel = string.IsNullOrWhiteSpace(profile.Model) ? null : profile.Model;
+            var profileWorkingDirectory = string.IsNullOrWhiteSpace(profile.WorkingDirectory) ? null : profile.WorkingDirectory;
+            config = new SessionConfiguration
+            {
+                Model = model ?? profileModel ?? Info.Model,
+                WorkingDirectory = workDir ?? profileWorkingDirectory ?? Info.WorkingDirectory,
+                IsAutopilot = profile.IsAutopilot,
+                ProfileId = profile.Id,
+                AgentFilePath = profile.AgentFilePath,
+                IncludeWellKnownMcpConfigs = profile.IncludeWellKnownMcpConfigs,
+                AdditionalMcpConfigPaths = DelimitedListParser.Parse(profile.AdditionalMcpConfigPaths),
+                EnabledMcpServers = DelimitedListParser.Parse(profile.EnabledMcpServers),
+                SkillDirectories = DelimitedListParser.Parse(profile.AdditionalSkillDirectories),
+            };
+        }
+        else
+        {
+            config = new SessionConfiguration
+            {
+                Model = model ?? Info.Model,
+                WorkingDirectory = workDir ?? Info.WorkingDirectory,
+                IsAutopilot = Info.IsAutopilot,
+                ProfileId = Info.ProfileId,
+                AgentFilePath = Info.AgentFilePath,
+                IncludeWellKnownMcpConfigs = Info.IncludeWellKnownMcpConfigs,
+                AdditionalMcpConfigPaths = Info.AdditionalMcpConfigPaths.ToList(),
+                EnabledMcpServers = Info.EnabledMcpServers.ToList(),
+                SkillDirectories = Info.SkillDirectories.ToList(),
+            };
+        }
 
         _logger.LogInformation("Tab '{Title}': requesting reconfigure — model={Model}, workDir={WorkDir}",
             Title, config.Model, config.WorkingDirectory);

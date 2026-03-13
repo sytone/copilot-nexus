@@ -8,14 +8,14 @@ using Microsoft.AspNetCore.Mvc;
 [Route("api/[controller]")]
 public class ModelsController : ControllerBase
 {
-    private readonly ISessionManager _sessionManager;
-    public ModelsController(ISessionManager sessionManager) => _sessionManager = sessionManager;
+    private readonly IAgentClientService _runtimeClient;
+    public ModelsController(IAgentClientService runtimeClient) => _runtimeClient = runtimeClient;
 
     /// <summary>List all available models.</summary>
     [HttpGet]
-    public ActionResult<List<ModelInfoDto>> ListModels()
+    public async Task<ActionResult<List<ModelInfoDto>>> ListModels(CancellationToken cancellationToken = default)
     {
-        var models = _sessionManager.AvailableModels;
+        var models = await _runtimeClient.ListModelsAsync(cancellationToken);
 
         var output = models
             .Select(ModelInfoDto.FromModelInfo)

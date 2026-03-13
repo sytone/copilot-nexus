@@ -34,6 +34,7 @@ The application is split into two processes:
 - **Pi runtime integration** — Uses Pi RPC (`pi --mode rpc`) for session execution
 - **Real-time streaming** — Responses stream word-by-word as they're generated
 - **Model selection** — Change AI model per session from the UI
+- **Agent profile selection** — Apply reusable model/agent/MCP profile settings per session
 - **Dark terminal theme** — Comfortable for extended use
 - **Session persistence** — Resume sessions after restart
 - **Auto-update detection** — Staged updates with in-app notification

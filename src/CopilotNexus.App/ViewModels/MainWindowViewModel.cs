@@ -3,6 +3,7 @@ namespace CopilotNexus.App.ViewModels;
 using System.Collections.ObjectModel;
 using System.Windows.Input;
 using CopilotNexus.App.Services;
+using CopilotNexus.App.Utilities;
 using CopilotNexus.Core.Events;
 using CopilotNexus.Core.Interfaces;
 using CopilotNexus.Core.Models;
@@ -245,6 +246,11 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             ? Profiles.FirstOrDefault(profile => string.Equals(profile.Id, previousSelectedId, StringComparison.OrdinalIgnoreCase))
             : SelectedProfile;
         SelectedProfile ??= Profiles.FirstOrDefault();
+
+        foreach (var tab in Tabs)
+        {
+            tab.RefreshSelectedProfile();
+        }
     }
 
     private void ApplySelectedProfileDefaults(SessionProfile? profile)
@@ -374,7 +380,13 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                     .OrderBy(msg => msg.Timestamp)
                     .ToArray();
 
-                var tabViewModel = new SessionTabViewModel(sessionInfo, session, _dispatcher, _logger, AvailableModels);
+                var tabViewModel = new SessionTabViewModel(
+                    sessionInfo,
+                    session,
+                    _dispatcher,
+                    _logger,
+                    AvailableModels,
+                    Profiles);
                 tabViewModel.CloseRequested += (_, _) => _ = CloseSpecificTabAsync(tabViewModel);
                 tabViewModel.ReconfigureRequested += OnTabReconfigureRequested;
                 tabViewModel.RenameRequested += OnTabRenameRequested;
@@ -492,15 +504,21 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
                 ProfileId = profile?.Id,
                 AgentFilePath = profile?.AgentFilePath,
                 IncludeWellKnownMcpConfigs = profile?.IncludeWellKnownMcpConfigs ?? true,
-                AdditionalMcpConfigPaths = ParseDelimitedList(profile?.AdditionalMcpConfigPaths),
-                EnabledMcpServers = ParseDelimitedList(profile?.EnabledMcpServers),
-                SkillDirectories = ParseDelimitedList(profile?.AdditionalSkillDirectories),
+                AdditionalMcpConfigPaths = DelimitedListParser.Parse(profile?.AdditionalMcpConfigPaths),
+                EnabledMcpServers = DelimitedListParser.Parse(profile?.EnabledMcpServers),
+                SkillDirectories = DelimitedListParser.Parse(profile?.AdditionalSkillDirectories),
             };
 
             var sessionInfo = await _sessionManager.CreateSessionAsync(name, config);
             var session = _sessionManager.GetSession(sessionInfo.Id)!;
 
-            var tabViewModel = new SessionTabViewModel(sessionInfo, session, _dispatcher, _logger, AvailableModels);
+            var tabViewModel = new SessionTabViewModel(
+                sessionInfo,
+                session,
+                _dispatcher,
+                _logger,
+                AvailableModels,
+                Profiles);
             tabViewModel.CloseRequested += (_, _) => _ = CloseSpecificTabAsync(tabViewModel);
             tabViewModel.ReconfigureRequested += OnTabReconfigureRequested;
             tabViewModel.RenameRequested += OnTabRenameRequested;
@@ -587,18 +605,6 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
             _logger.LogError(ex, "Failed to rename tab '{Title}'", tab.Title);
             tab.AppendSystemMessage($"Rename failed: {ex.Message}");
         }
-    }
-
-    private static List<string> ParseDelimitedList(string? rawValue)
-    {
-        if (string.IsNullOrWhiteSpace(rawValue))
-            return [];
-
-        return rawValue
-            .Split(['\r', '\n', ';', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(item => !string.IsNullOrWhiteSpace(item))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
     }
 
     private static string NormalizeSessionMode(string? mode, bool isAutopilot)

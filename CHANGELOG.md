@@ -14,12 +14,14 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - Repository-managed git hook setup (`.githooks/pre-push`, `scripts/Enable-GitHooks.ps1`) to block pushes with uncommitted changes.
 - **CopilotNexus.Cli** — standalone CLI console app (`src/CopilotNexus.Cli/`) providing the `nexus` command interface (start, stop, status, build, install, publish, update, winapp)
 - `CopilotNexusPaths.CliExe` and `CopilotNexusPaths.ServiceExe` path constants replacing the former `NexusExe`
+- Session footer agent profile selector in the Windows app for applying per-session profile configuration (model/agent/MCP/skills) without leaving the tab.
 
 ### Changed
 
 - Nexus now runs Pi by default with simplified Pi-only API/model/session contracts (adapter-type payloads removed).
 - `nexus start` now performs startup validation (`/health`, `/api/models`, session create/delete probe) and returns a non-zero exit code on validation failure.
 - Session output view auto-scroll now pauses on manual scroll while active and resumes after inactivity.
+- Pi model catalog discovery now queries Pi RPC `get_available_models`, and `GET /api/models` returns the live runtime list.
 - **CLI/Service split** — `CopilotNexus.Service` is now a pure ASP.NET Core web host (~40 lines) with no CLI commands, no Spectre.Console, and no System.CommandLine; all CLI functionality moved to `CopilotNexus.Cli`
 - `nexus` alias now points to `CopilotNexus.Cli.exe` instead of `CopilotNexus.Service.exe`
 - `CopilotNexusPaths.NexusExe` replaced by `CliExe` (CLI entry point) and `ServiceExe` (web server)

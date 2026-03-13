@@ -268,6 +268,75 @@ public class SessionTabViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Constructor_SelectsProfileMatchingSessionInfo()
+    {
+        var info = new SessionInfo("Profile Session", "gpt-4.1")
+        {
+            ProfileId = "dev-profile",
+        };
+        var profiles = new ObservableCollection<SessionProfile>
+        {
+            new() { Id = "default", Name = "Default" },
+            new() { Id = "dev-profile", Name = "Dev Agent" },
+        };
+
+        var vm = new SessionTabViewModel(
+            info,
+            _mockSession.Object,
+            _dispatcher,
+            NullLogger.Instance,
+            availableProfiles: profiles);
+
+        Assert.NotNull(vm.SelectedProfile);
+        Assert.Equal("dev-profile", vm.SelectedProfile!.Id);
+    }
+
+    [Fact]
+    public void SelectedProfile_RaisesReconfigureWithProfileSettings()
+    {
+        var info = new SessionInfo("Profile Reconfigure", "gpt-4.1")
+        {
+            IsAutopilot = true,
+        };
+        var profile = new SessionProfile
+        {
+            Id = "analysis",
+            Name = "Analysis Agent",
+            Model = "anthropic/claude-sonnet-4-5-20250929",
+            IsAutopilot = false,
+            WorkingDirectory = @"Q:\repos\gh\copilot-nexus",
+            AgentFilePath = @"Q:\agents\analysis.md",
+            IncludeWellKnownMcpConfigs = false,
+            AdditionalMcpConfigPaths = @"Q:\mcp\a.json;Q:\mcp\b.json",
+            EnabledMcpServers = "context7,github",
+            AdditionalSkillDirectories = @"Q:\skills\custom",
+        };
+        var profiles = new ObservableCollection<SessionProfile> { profile };
+
+        var vm = new SessionTabViewModel(
+            info,
+            _mockSession.Object,
+            _dispatcher,
+            NullLogger.Instance,
+            availableProfiles: profiles);
+        SessionConfiguration? requested = null;
+        vm.ReconfigureRequested += (_, config) => requested = config;
+
+        vm.SelectedProfile = profile;
+
+        Assert.NotNull(requested);
+        Assert.Equal("analysis", requested!.ProfileId);
+        Assert.Equal("anthropic/claude-sonnet-4-5-20250929", requested.Model);
+        Assert.False(requested.IsAutopilot);
+        Assert.Equal(@"Q:\repos\gh\copilot-nexus", requested.WorkingDirectory);
+        Assert.Equal(@"Q:\agents\analysis.md", requested.AgentFilePath);
+        Assert.False(requested.IncludeWellKnownMcpConfigs);
+        Assert.Equal(2, requested.AdditionalMcpConfigPaths.Count);
+        Assert.Equal(2, requested.EnabledMcpServers.Count);
+        Assert.Single(requested.SkillDirectories);
+    }
+
+    [Fact]
     public void WorkingDirectory_WhenGitRepository_ShowsBranch()
     {
         var tempRoot = Path.Combine(Path.GetTempPath(), $"nexus-git-test-{Guid.NewGuid():N}");
