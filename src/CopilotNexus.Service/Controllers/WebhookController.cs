@@ -76,6 +76,14 @@ public class WebhookController : ControllerBase
                     await PostCallbackAsync(request.CallbackUrl, sessionInfo.Id, "completed");
                 }
             }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogInformation(ex, "Webhook: message processing canceled for session {SessionId}", sessionInfo.Id);
+                if (!string.IsNullOrWhiteSpace(request.CallbackUrl))
+                {
+                    await PostCallbackAsync(request.CallbackUrl, sessionInfo.Id, "canceled", ex.Message);
+                }
+            }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Webhook: failed to process message for session {SessionId}", sessionInfo.Id);
@@ -122,6 +130,14 @@ public class WebhookController : ControllerBase
                 if (!string.IsNullOrWhiteSpace(request.CallbackUrl))
                 {
                     await PostCallbackAsync(request.CallbackUrl, id, "completed");
+                }
+            }
+            catch (OperationCanceledException ex)
+            {
+                _logger.LogInformation(ex, "Webhook: send canceled for session {SessionId}", id);
+                if (!string.IsNullOrWhiteSpace(request.CallbackUrl))
+                {
+                    await PostCallbackAsync(request.CallbackUrl, id, "canceled", ex.Message);
                 }
             }
             catch (Exception ex)

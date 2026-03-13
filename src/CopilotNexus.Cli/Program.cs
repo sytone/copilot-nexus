@@ -102,4 +102,5 @@ rootCommand.Subcommands.Add(publishCommand);
 rootCommand.Subcommands.Add(winappCommand);
 
 CliCommands.PrintVersionBanner();
-return rootCommand.Parse(args).Invoke();
+var commandExitCode = rootCommand.Parse(args).Invoke();
+return commandExitCode != 0 ? commandExitCode : Environment.ExitCode;

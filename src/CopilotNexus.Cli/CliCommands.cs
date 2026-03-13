@@ -1,7 +1,9 @@
 using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using CopilotNexus.Core;
 using Spectre.Console;
 
@@ -16,6 +18,7 @@ internal static class CliCommands
     private const string PublishVersionBase = "0.1.0";
     private const string PublishVersionChannel = "dev";
     private sealed record ProcessExecutionResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Elapsed);
+    private sealed record StartValidationResult(bool IsReady, string Message);
 
     internal static string GetCurrentVersion()
     {
@@ -89,6 +92,16 @@ internal static class CliCommands
         if (proc == null)
         {
             AnsiConsole.MarkupLine("[red]Failed to start Nexus service.[/]");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var validation = ValidateStartedServiceAsync(url, proc).GetAwaiter().GetResult();
+        if (!validation.IsReady)
+        {
+            TryStopProcess(proc);
+            AnsiConsole.MarkupLine("[red]Nexus failed start validation.[/]");
+            AnsiConsole.MarkupLine($"  {Markup.Escape(validation.Message)}");
             Environment.ExitCode = 1;
             return;
         }
@@ -609,6 +622,148 @@ internal static class CliCommands
     private static string? FindRepoRoot()
     {
         return FindRepoRootFrom(AppContext.BaseDirectory) ?? FindRepoRootFrom(Environment.CurrentDirectory);
+    }
+
+    private static async Task<StartValidationResult> ValidateStartedServiceAsync(string url, Process process)
+    {
+        var baseUrl = url.TrimEnd('/');
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+        var timeout = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(15);
+        Exception? lastProbeError = null;
+
+        while (DateTimeOffset.UtcNow < timeout)
+        {
+            if (process.HasExited)
+            {
+                var logError = TryGetLatestServiceErrorLine();
+                var message = $"Service process exited early (PID {process.Id}, code {process.ExitCode}).";
+                if (!string.IsNullOrWhiteSpace(logError))
+                    message += $" Latest error: {logError}";
+                return new StartValidationResult(false, message);
+            }
+
+            try
+            {
+                var healthResponse = await http.GetAsync($"{baseUrl}/health");
+                if (healthResponse.IsSuccessStatusCode)
+                {
+                    var modelResponse = await http.GetAsync($"{baseUrl}/api/models");
+                    if (!modelResponse.IsSuccessStatusCode)
+                    {
+                        var modelBody = await modelResponse.Content.ReadAsStringAsync();
+                        return new StartValidationResult(
+                            false,
+                            $"Model catalog probe failed with {(int)modelResponse.StatusCode} {modelResponse.StatusCode}. {Tail(modelBody, 600)}");
+                    }
+
+                    var sessionProbe = await ProbeSessionCreateDeleteAsync(http, baseUrl);
+                    if (sessionProbe != null)
+                        return new StartValidationResult(false, sessionProbe);
+
+                    return new StartValidationResult(true, "ready");
+                }
+            }
+            catch (HttpRequestException ex)
+            {
+                lastProbeError = ex;
+            }
+            catch (TaskCanceledException ex)
+            {
+                lastProbeError = ex;
+            }
+
+            await Task.Delay(300);
+        }
+
+        var timeoutMessage = $"Service did not become healthy at {baseUrl} within 15 seconds.";
+        if (lastProbeError != null)
+            timeoutMessage += $" Last probe error: {lastProbeError.Message}";
+
+        var latestError = TryGetLatestServiceErrorLine();
+        if (!string.IsNullOrWhiteSpace(latestError))
+            timeoutMessage += $" Latest error: {latestError}";
+
+        return new StartValidationResult(false, timeoutMessage);
+    }
+
+    private static async Task<string?> ProbeSessionCreateDeleteAsync(HttpClient http, string baseUrl)
+    {
+        var createResponse = await http.PostAsJsonAsync($"{baseUrl}/api/sessions", new
+        {
+            Name = "Nexus startup validation",
+            IsAutopilot = true,
+            Model = "pi-auto",
+        });
+
+        if (!createResponse.IsSuccessStatusCode)
+        {
+            var createBody = await createResponse.Content.ReadAsStringAsync();
+            return $"Session creation probe failed with {(int)createResponse.StatusCode} {createResponse.StatusCode}. {Tail(createBody, 600)}";
+        }
+
+        var createContent = await createResponse.Content.ReadAsStringAsync();
+        string? sessionId = null;
+        try
+        {
+            using var json = JsonDocument.Parse(createContent);
+            if (json.RootElement.TryGetProperty("id", out var idValue))
+                sessionId = idValue.GetString();
+        }
+        catch (JsonException)
+        {
+            // Keep startup validation resilient to non-JSON error payloads.
+        }
+
+        if (string.IsNullOrWhiteSpace(sessionId))
+            return "Session creation probe succeeded but returned no session id.";
+
+        var deleteResponse = await http.DeleteAsync($"{baseUrl}/api/sessions/{sessionId}");
+        if (!deleteResponse.IsSuccessStatusCode && deleteResponse.StatusCode != HttpStatusCode.NotFound)
+        {
+            var deleteBody = await deleteResponse.Content.ReadAsStringAsync();
+            return $"Session cleanup probe failed with {(int)deleteResponse.StatusCode} {deleteResponse.StatusCode}. {Tail(deleteBody, 600)}";
+        }
+
+        return null;
+    }
+
+    private static void TryStopProcess(Process process)
+    {
+        if (process.HasExited)
+            return;
+
+        process.Kill(entireProcessTree: true);
+        process.WaitForExit(5000);
+    }
+
+    private static string? TryGetLatestServiceErrorLine()
+    {
+        try
+        {
+            if (!Directory.Exists(CopilotNexusPaths.Logs))
+                return null;
+
+            var latestLog = Directory
+                .EnumerateFiles(CopilotNexusPaths.Logs, "nexus-*.log")
+                .OrderByDescending(File.GetLastWriteTimeUtc)
+                .FirstOrDefault();
+
+            if (latestLog == null)
+                return null;
+
+            return File
+                .ReadLines(latestLog)
+                .Reverse()
+                .FirstOrDefault(line => line.Contains("[ERR]", StringComparison.OrdinalIgnoreCase));
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     internal static string? FindRepoRootFrom(string startDir)

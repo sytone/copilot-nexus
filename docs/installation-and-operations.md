@@ -149,6 +149,19 @@ All examples below use the `nexus` alias. If you haven't set it up, substitute
 
 ---
 
+## 3b. Enable Repository Git Hooks (Recommended)
+
+Enable repo-managed hooks so push operations are blocked when there are uncommitted changes:
+
+```powershell
+pwsh -File .\scripts\Enable-GitHooks.ps1
+git config --get core.hooksPath
+```
+
+This configures git to use `.githooks/` in this repository.
+
+---
+
 ## 4. Start the Nexus Service
 
 ```powershell
@@ -163,9 +176,18 @@ nexus start --interactive
 ```
 
 By default, `nexus start` launches Nexus as a **background process** and returns
-immediately. It prints the PID and URL so you can verify it's running. If Nexus is
-already running (detected via the lock file), it tells you instead of starting a second
-instance.
+after startup validation succeeds. It prints the PID and URL so you can verify it's
+running. If Nexus is already running (detected via the lock file), it tells you instead
+of starting a second instance.
+
+Startup validation checks:
+
+- The service process stays alive during startup
+- `/health` responds successfully
+- `/api/models` responds successfully
+
+If startup validation fails (for example, Pi is not installed or not discoverable), `nexus start`
+returns a non-zero exit code and includes the latest service error in the CLI output.
 
 Use `--interactive` when you want to see log output in the terminal or when debugging.
 
@@ -362,6 +384,17 @@ Get-Content "$env:LOCALAPPDATA\CopilotNexus\nexus.lock"
 
 # Remove stale lock file if the PID is dead
 Remove-Item "$env:LOCALAPPDATA\CopilotNexus\nexus.lock"
+```
+
+If startup validation reports Pi runtime issues:
+
+```powershell
+# Verify Pi is installed and on PATH
+pi --version
+
+# Optionally point Nexus to a non-default Pi executable path
+$env:NEXUS_PI_EXECUTABLE="C:\path\to\pi.exe"
+nexus start
 ```
 
 ### App can't connect to Nexus
