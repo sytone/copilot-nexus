@@ -36,7 +36,6 @@ Examples:
 - `nexus status --url <url>`
 - `nexus build -c <Debug|Release>`
 - `nexus publish --component <nexus|app|cli|both>`
-- `nexus update --component <nexus|app|cli|both>`
 - `nexus winapp start --nexus-url <url> --test-mode`
 
 ## User-Specific Storage
@@ -51,12 +50,13 @@ Primary paths are centralized in `src/CopilotNexus.Core/CopilotNexusPaths.cs`:
 - `UserConfigRoot`: `%USERPROFILE%\\.copilot-nexus` (test-mode fallback)
 - `AppStateFile`: `%USERPROFILE%\\.copilot-nexus\\session-state.json` (test-mode fallback)
 - `Root`: `%LOCALAPPDATA%\CopilotNexus`
-- `CliInstall`: `%LOCALAPPDATA%\CopilotNexus\cli`
-- `NexusInstall`: `%LOCALAPPDATA%\CopilotNexus\nexus`
-- `AppInstall`: `%LOCALAPPDATA%\CopilotNexus\app`
-- `StagingRoot`: `%LOCALAPPDATA%\CopilotNexus\staging`
+- `AppRoot`: `%LOCALAPPDATA%\CopilotNexus\app`
+- `CliInstall`: `%LOCALAPPDATA%\CopilotNexus\app\cli`
+- `NexusInstall`: `%LOCALAPPDATA%\CopilotNexus\app\service`
+- `AppInstall`: `%LOCALAPPDATA%\CopilotNexus\app\winapp`
 - `Logs`: `%LOCALAPPDATA%\CopilotNexus\logs`
 - `NexusLockFile`: `%LOCALAPPDATA%\CopilotNexus\nexus.lock`
+- `PublishVersionStateFile`: `%LOCALAPPDATA%\CopilotNexus\state\publish-version-state.json`
 
 ## Session Information Persistence
 
@@ -103,7 +103,7 @@ In practice, user-specific behavior is represented by:
 
 - Startup flags (for example `--test-mode`, `--nexus-url`)
 - Nexus-managed persisted `session-state.json` metadata
-- Install/update layout and lock/log files under `%LOCALAPPDATA%\CopilotNexus`
+- Install/versioned-publish layout and lock/log files under `%LOCALAPPDATA%\CopilotNexus`
 
 ## Environment Variables
 

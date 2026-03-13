@@ -1,9 +1,4 @@
 using System.CommandLine;
-using System.Diagnostics;
-using System.Net.Http.Json;
-using CopilotNexus.Core;
-using Spectre.Console;
-
 // CLI command routing — all management commands for CopilotNexus.
 // The Service (ASP.NET Core) is a separate executable; this CLI starts/stops it.
 
@@ -52,18 +47,9 @@ buildCommand.SetAction(async (parseResult, _) =>
     await CliCommands.RunBuildAsync(config);
 });
 
-// --- nexus update ---
-var updateComponentOption = new Option<string>("--component") { Description = "Component to update (nexus, app, cli, or both)", DefaultValueFactory = _ => "both" };
-var updateCommand = new Command("update", "Update a component from staging") { updateComponentOption };
-updateCommand.SetAction(async (parseResult, _) =>
-{
-    var component = parseResult.GetValue(updateComponentOption)!;
-    await CliCommands.RunUpdateAsync(component);
-});
-
 // --- nexus publish ---
 var publishComponentOption = new Option<string>("--component") { Description = "Component to publish (nexus, app, cli, or both)", DefaultValueFactory = _ => "both" };
-var publishCommand = new Command("publish", "Build and publish components to staging") { publishComponentOption };
+var publishCommand = new Command("publish", "Build and publish versioned component payloads") { publishComponentOption };
 publishCommand.SetAction(async (parseResult, _) =>
 {
     var component = parseResult.GetValue(publishComponentOption)!;
@@ -97,7 +83,6 @@ rootCommand.Subcommands.Add(statusCommand);
 rootCommand.Subcommands.Add(buildCommand);
 rootCommand.Subcommands.Add(installCommand);
 rootCommand.Subcommands.Add(versionCommand);
-rootCommand.Subcommands.Add(updateCommand);
 rootCommand.Subcommands.Add(publishCommand);
 rootCommand.Subcommands.Add(winappCommand);
 

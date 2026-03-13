@@ -45,7 +45,7 @@ set NEXUS_E2E_ENABLED=1
 dotnet test test/CopilotNexus.E2E.Tests
 ```
 
-### Managed Service E2E (start/status/stop/update via CLI)
+### Managed Service E2E (start/status/stop via CLI)
 
 ```bash
 set NEXUS_E2E_ENABLED=1

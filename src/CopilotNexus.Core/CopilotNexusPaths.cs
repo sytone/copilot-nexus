@@ -2,7 +2,7 @@ namespace CopilotNexus.Core;
 
 /// <summary>
 /// Centralized path definitions for the CopilotNexus installation layout.
-/// Install/runtime binaries live under %LOCALAPPDATA%\CopilotNexus\.
+/// Install/runtime binaries live under %LOCALAPPDATA%\CopilotNexus\app\{component}\.
 /// Nexus-owned app state lives under %LOCALAPPDATA%\CopilotNexus\state\.
 /// User profile state is retained as a local fallback for app test mode.
 /// </summary>
@@ -13,14 +13,17 @@ public static class CopilotNexusPaths
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "CopilotNexus");
 
-    /// <summary>Nexus service install directory.</summary>
-    public static string NexusInstall { get; } = Path.Combine(Root, "nexus");
+    /// <summary>Versioned runtime root containing cli/service/winapp shims and payloads.</summary>
+    public static string AppRoot { get; } = Path.Combine(Root, "app");
 
-    /// <summary>Nexus CLI install directory (separate to avoid self-update locks).</summary>
-    public static string CliInstall { get; } = Path.Combine(Root, "cli");
+    /// <summary>Nexus service shim/payload root.</summary>
+    public static string NexusInstall { get; } = Path.Combine(AppRoot, "service");
 
-    /// <summary>Desktop app install directory.</summary>
-    public static string AppInstall { get; } = Path.Combine(Root, "app");
+    /// <summary>Nexus CLI shim/payload root.</summary>
+    public static string CliInstall { get; } = Path.Combine(AppRoot, "cli");
+
+    /// <summary>Desktop app shim/payload root.</summary>
+    public static string AppInstall { get; } = Path.Combine(AppRoot, "winapp");
 
     /// <summary>Shared staging root — updates are staged here before being applied.</summary>
     public static string StagingRoot { get; } = Path.Combine(Root, "staging");
@@ -57,6 +60,9 @@ public static class CopilotNexusPaths
     /// <summary>Nexus-owned session profiles file used by service APIs.</summary>
     public static string NexusSessionProfilesFile { get; } = Path.Combine(StateRoot, "session-profiles.json");
 
+    /// <summary>CLI publish version tracking state.</summary>
+    public static string PublishVersionStateFile { get; } = Path.Combine(StateRoot, "publish-version-state.json");
+
     /// <summary>CLI executable — the 'nexus' command users interact with.</summary>
     public static string CliExe { get; } = Path.Combine(CliInstall, "CopilotNexus.Cli.exe");
 
@@ -73,6 +79,7 @@ public static class CopilotNexusPaths
     public static void EnsureDirectories()
     {
         Directory.CreateDirectory(Root);
+        Directory.CreateDirectory(AppRoot);
         Directory.CreateDirectory(NexusInstall);
         Directory.CreateDirectory(CliInstall);
         Directory.CreateDirectory(AppInstall);
@@ -106,4 +113,14 @@ public static class CopilotNexusPaths
         "app" => AppInstall,
         _ => throw new ArgumentException($"Unknown component: {component}", nameof(component)),
     };
+
+    /// <summary>
+    /// Returns the versioned payload directory path for a component.
+    /// </summary>
+    public static string GetVersionedInstallPath(string component, string version)
+    {
+        if (string.IsNullOrWhiteSpace(version))
+            throw new ArgumentException("Version is required.", nameof(version));
+        return Path.Combine(GetInstallPath(component), version.Trim());
+    }
 }

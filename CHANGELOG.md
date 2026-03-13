@@ -12,9 +12,10 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - Pi-only runtime contracts and services (`IAgentClientService`, `PiRpcClientService`, `PiRpcSessionWrapper`) for Nexus session execution over Pi RPC.
 - Opt-in E2E test project (`test/CopilotNexus.E2E.Tests`) for running-server API smoke checks and CLI lifecycle validation.
 - Repository-managed git hook setup (`.githooks/pre-push`, `scripts/Enable-GitHooks.ps1`) to block pushes with uncommitted changes.
-- **CopilotNexus.Cli** — standalone CLI console app (`src/CopilotNexus.Cli/`) providing the `nexus` command interface (start, stop, status, build, install, publish, update, winapp)
+- **CopilotNexus.Cli** — standalone CLI console app (`src/CopilotNexus.Cli/`) providing the `nexus` command interface (start, stop, status, build, install, publish, version, winapp)
 - `CopilotNexusPaths.CliExe` and `CopilotNexusPaths.ServiceExe` path constants replacing the former `NexusExe`
 - Session footer agent profile selector in the Windows app for applying per-session profile configuration (model/agent/MCP/skills) without leaving the tab.
+- Versioned launcher shim project (`CopilotNexus.Shim`) plus SemVer resolver utilities for side-by-side payload execution.
 
 ### Changed
 
@@ -26,11 +27,13 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - `nexus` alias now points to `CopilotNexus.Cli.exe` instead of `CopilotNexus.Service.exe`
 - `CopilotNexusPaths.NexusExe` replaced by `CliExe` (CLI entry point) and `ServiceExe` (web server)
 - User-specific session state moved from `%LOCALAPPDATA%\CopilotNexus\...` to `%USERPROFILE%\.copilot-nexus\session-state.json`; install/runtime binaries remain under `%LOCALAPPDATA%\CopilotNexus\`
+- Install/publish flow now writes versioned payload directories under `%LOCALAPPDATA%\CopilotNexus\app\{cli|service|winapp}\<version>\...`.
 
 ### Fixed
 
 - Webhook background-send cancellation now logs as informational cancellation (with optional canceled callback status) instead of error-level failure noise.
 - Pi runtime executable detection on Windows now defaults to `pi.cmd`, avoiding false "pi not found" failures when npm shims are installed.
+- Removed `nexus update` command from CLI and switched publish to shim-resolved side-by-side versions (no staged copy-over step).
 
 ### Added (prior)
 

@@ -109,8 +109,8 @@ contract types used by both App and Nexus.
 | `JsonStatePersistenceService`   | JSON persistence with atomic file writes for crash safety                         |
 | `ISessionProfileService`        | CRUD for reusable session profiles (model/mode/MCP/agent defaults)               |
 | `JsonSessionProfileService`     | JSON-backed Nexus profile persistence                                              |
-| `IUpdateDetectionService`       | Watch for staged updates in dist/staging/                                         |
-| `StagingUpdateDetectionService` | FileSystemWatcher + timer fallback for staging detection                          |
+| `SemanticVersion`               | SemVer parse/compare utility used for versioned payload ordering                 |
+| `VersionedExecutableResolver`   | Resolves latest/previous payloads and handles retention cleanup                  |
 | `IUiDispatcher`                 | Abstracts UI thread marshalling for testability                                   |
 | `SessionMessage`                | Chat message model with `INotifyPropertyChanged` for streaming                    |
 | `SessionInfo`                   | Session metadata (id, name, model, state, SDK session ID); includes `FromRemote()` static factory for reconstructing from DTOs |
@@ -131,7 +131,7 @@ and `NexusSessionProxy`. In **test mode**, it uses the local `SessionManager` wi
 | Component                            | Responsibility                                                                   |
 | ------------------------------------ | -------------------------------------------------------------------------------- |
 | `App.axaml.cs`                       | Serilog logging config, global exception handlers, startup arg parsing           |
-| `MainWindow.axaml.cs`               | Service creation — `NexusSessionManager(nexusUrl)` in prod, local `SessionManager` in test; state save/restore, update detection, updater wiring |
+| `MainWindow.axaml.cs`               | Service creation — `NexusSessionManager(nexusUrl)` in prod, local `SessionManager` in test; state save/restore and app lifecycle wiring |
 | `MainWindowViewModel`                | Manages tab collection, creates/closes tabs, update notification commands        |
 | `SessionTabViewModel`                | Manages one tab — input, streaming message accumulation, commands                |
 | `NexusSessionManager`                | `ISessionManager` implementation via SignalR + REST calls to Nexus (production)  |
@@ -175,19 +175,15 @@ and uses runtime session IDs to reconnect sessions.
 If a requested session cannot be resumed (for example, `Session not found`), Nexus creates a
 fresh session using the same persisted session ID and continues.
 
-## Distribution and Hot Restart
+## Distribution and Versioned Launch
 
-The app supports a fast iteration pipeline:
+Copilot Nexus uses shim-based side-by-side versioning:
 
-1. **Dist folder** — `dotnet publish` outputs to `dist/` for immediate use
-2. **Staging folder** — new builds placed in `dist/staging/` trigger update detection
-3. **Update notification** — `StagingUpdateDetectionService` watches staging via
-   FileSystemWatcher + 30-second timer fallback; shows notification bar in UI
-4. **Hot restart** — "Restart Now" launches `CopilotNexus.Updater.exe` (a
-   cross-platform C# console app), saves state, and exits. The updater waits for the
-   old process to exit, copies staged files to the install directory, clears staging,
-   and relaunches the app — no PowerShell dependency required.
-5. **Session continuity** — on restart, saved SDK session IDs are used to resume sessions
+1. `nexus publish` writes component payloads to `%LOCALAPPDATA%\CopilotNexus\app\<component>\<version>\...`
+2. Stable shim executables live at each component root (`app\cli`, `app\service`, `app\winapp`)
+3. Shims resolve and launch the newest payload by default
+4. Shims support `--previous` rollback and `--cleanup <N>` retention cleanup
+5. Service/app restarts pick up newly published versions without copy-over update steps
 
 ## Logging
 
@@ -258,7 +254,7 @@ All SDK and UI dependencies are behind interfaces, enabling pure unit tests:
 
 | Project                      | Tests | Coverage                                                                              |
 | ---------------------------- | ----- | ------------------------------------------------------------------------------------- |
-| `CopilotNexus.Core.Tests`   | 65    | SessionManager, SessionMessage, persistence, staging detection, dist/staging integration |
+| `CopilotNexus.Core.Tests`   | 65    | SessionManager, SessionMessage, persistence, SemVer and versioned resolver logic |
 | `CopilotNexus.App.Tests`    | 47    | ViewModels (MainWindow, SessionTab), Converters                                       |
 | `CopilotNexus.Service.Tests`  | 20    | Integration tests — REST API + webhooks via `WebApplicationFactory<Program>` with mock SDK |
 | `CopilotNexus.UI.Tests`     | 17    | Headless UI tests — Avalonia.Headless.XUnit, no visible windows                       |

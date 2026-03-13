@@ -28,14 +28,13 @@ public class CliManagedE2ETests
         Assert.Equal(0, stop.ExitCode);
     }
 
-    [ManagedServiceE2EFact]
-    public async Task Cli_UpdateWithoutStagedFiles_Completes()
+    [E2EFact]
+    public async Task Cli_Help_DoesNotIncludeRemovedUpdateCommand()
     {
-        await TryStopAsync();
-
-        var update = await RunCliAsync("update --component nexus", TimeSpan.FromMinutes(5));
-        Assert.Equal(0, update.ExitCode);
-        Assert.Contains("No staged update for nexus", update.StandardOutput + update.StandardError, StringComparison.OrdinalIgnoreCase);
+        var help = await RunCliAsync("--help");
+        Assert.Equal(0, help.ExitCode);
+        var output = help.StandardOutput + help.StandardError;
+        Assert.DoesNotContain("\n  update", output, StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task WaitForHealthAsync(string baseUrl, TimeSpan timeout)

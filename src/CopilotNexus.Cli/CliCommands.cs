@@ -2,9 +2,9 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Json;
 using System.Reflection;
-using System.Text;
 using System.Text.Json;
 using CopilotNexus.Core;
+using CopilotNexus.Core.Versioning;
 using Spectre.Console;
 
 record HealthResponse(string? Status, int Sessions, int Models, string? Uptime);
@@ -15,10 +15,25 @@ record HealthResponse(string? Status, int Sessions, int Models, string? Uptime);
 /// </summary>
 internal static class CliCommands
 {
-    private const string PublishVersionBase = "0.1.0";
-    private const string PublishVersionChannel = "dev";
+    private const string InitialPublishBaseVersion = "0.1.0";
     private sealed record ProcessExecutionResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Elapsed);
     private sealed record StartValidationResult(bool IsReady, string Message);
+    private sealed record ServiceLockInfo(int Pid, string? ExecutablePath, string? Version, string? Url, DateTimeOffset StartedAtUtc);
+    private sealed record PublishVersionState(string BaseVersion, string? LastCommitSha);
+    private sealed record PublishVersionPlan(
+        SemanticVersion NextBaseVersion,
+        string PublishVersion,
+        bool IsReleaseMode,
+        string? HeadCommitSha,
+        VersionBump Bump,
+        int CommitCount);
+    private enum VersionBump
+    {
+        None = 0,
+        Patch = 1,
+        Minor = 2,
+        Major = 3,
+    }
 
     internal static string GetCurrentVersion()
     {
@@ -40,32 +55,31 @@ internal static class CliCommands
     {
         var current = GetCurrentVersion();
         AnsiConsole.MarkupLine($"[bold]Copilot Nexus[/] [dim]{Markup.Escape(current)}[/]");
-        AnsiConsole.MarkupLine($"  CLI: [dim]{Markup.Escape(GetExecutableVersion(CopilotNexusPaths.CliExe) ?? "not installed")}[/]");
-        AnsiConsole.MarkupLine($"  Service: [dim]{Markup.Escape(GetExecutableVersion(CopilotNexusPaths.ServiceExe) ?? "not installed")}[/]");
-        AnsiConsole.MarkupLine($"  App: [dim]{Markup.Escape(GetExecutableVersion(CopilotNexusPaths.AppExe) ?? "not installed")}[/]");
+        AnsiConsole.MarkupLine(
+            $"  CLI: [dim]{Markup.Escape(GetComponentVersionDisplay(CopilotNexusPaths.CliExe, CopilotNexusPaths.CliInstall, "CopilotNexus.Cli.exe"))}[/]");
+        AnsiConsole.MarkupLine(
+            $"  Service: [dim]{Markup.Escape(GetComponentVersionDisplay(CopilotNexusPaths.ServiceExe, CopilotNexusPaths.NexusInstall, "CopilotNexus.Service.exe"))}[/]");
+        AnsiConsole.MarkupLine(
+            $"  App: [dim]{Markup.Escape(GetComponentVersionDisplay(CopilotNexusPaths.AppExe, CopilotNexusPaths.AppInstall, "CopilotNexus.App.exe"))}[/]");
     }
 
     // --- start ---
     internal static void RunStart(string url)
     {
         // Check if already running
-        var lockFile = CopilotNexusPaths.NexusLockFile;
-        if (File.Exists(lockFile))
+        var lockInfo = ReadServiceLockInfo();
+        if (lockInfo != null)
         {
-            var pidText = File.ReadAllText(lockFile).Trim();
-            if (int.TryParse(pidText, out var existingPid))
+            try
             {
-                try
-                {
-                    Process.GetProcessById(existingPid);
-                    AnsiConsole.MarkupLine($"[yellow]Nexus is already running[/] (PID [bold]{existingPid}[/]).");
-                    AnsiConsole.MarkupLine("Use [blue]nexus stop[/] first.");
-                    return;
-                }
-                catch (ArgumentException)
-                {
-                    // Process not running — stale lock file, continue
-                }
+                Process.GetProcessById(lockInfo.Pid);
+                AnsiConsole.MarkupLine($"[yellow]Nexus is already running[/] (PID [bold]{lockInfo.Pid}[/]).");
+                AnsiConsole.MarkupLine("Use [blue]nexus stop[/] first.");
+                return;
+            }
+            catch (ArgumentException)
+            {
+                // Process not running — stale lock file, continue
             }
         }
 
@@ -80,6 +94,7 @@ internal static class CliCommands
             return;
         }
 
+        var resolvedVersion = TryExtractVersionFromExecutablePath(serviceExe);
         var psi = new ProcessStartInfo
         {
             FileName = serviceExe,
@@ -96,10 +111,18 @@ internal static class CliCommands
             return;
         }
 
+        WriteServiceLockInfo(new ServiceLockInfo(
+            proc.Id,
+            serviceExe,
+            resolvedVersion,
+            url,
+            DateTimeOffset.UtcNow));
+
         var validation = ValidateStartedServiceAsync(url, proc).GetAwaiter().GetResult();
         if (!validation.IsReady)
         {
             TryStopProcess(proc);
+            TryDeleteLockFile();
             AnsiConsole.MarkupLine("[red]Nexus failed start validation.[/]");
             AnsiConsole.MarkupLine($"  {Markup.Escape(validation.Message)}");
             Environment.ExitCode = 1;
@@ -114,37 +137,28 @@ internal static class CliCommands
     // --- stop ---
     internal static void RunStop()
     {
-        var lockFile = CopilotNexusPaths.NexusLockFile;
-        if (!File.Exists(lockFile))
+        var lockInfo = ReadServiceLockInfo();
+        if (lockInfo == null)
         {
             AnsiConsole.MarkupLine("[yellow]Nexus is not running[/] (no lock file found)");
             Environment.ExitCode = 1;
             return;
         }
 
-        var pidText = File.ReadAllText(lockFile).Trim();
-        if (!int.TryParse(pidText, out var pid))
-        {
-            AnsiConsole.MarkupLine($"[red]Invalid PID in lock file:[/] {Markup.Escape(pidText)}");
-            File.Delete(lockFile);
-            Environment.ExitCode = 1;
-            return;
-        }
-
         try
         {
-            var proc = Process.GetProcessById(pid);
-            AnsiConsole.MarkupLine($"Stopping Nexus (PID [bold]{pid}[/])...");
+            var proc = Process.GetProcessById(lockInfo.Pid);
+            AnsiConsole.MarkupLine($"Stopping Nexus (PID [bold]{lockInfo.Pid}[/])...");
             proc.Kill(entireProcessTree: true);
             proc.WaitForExit(10_000);
             AnsiConsole.MarkupLine("[green]✓[/] Nexus stopped.");
         }
         catch (ArgumentException)
         {
-            AnsiConsole.MarkupLine($"[yellow]Nexus process (PID {pid}) is not running.[/] Cleaning up lock file.");
+            AnsiConsole.MarkupLine($"[yellow]Nexus process (PID {lockInfo.Pid}) is not running.[/] Cleaning up lock file.");
         }
 
-        try { File.Delete(lockFile); } catch { }
+        TryDeleteLockFile();
     }
 
     // --- status ---
@@ -154,28 +168,19 @@ internal static class CliCommands
 
         string processStatus;
         string pidDisplay;
-        var lockFile = CopilotNexusPaths.NexusLockFile;
-        if (File.Exists(lockFile))
+        var lockInfo = ReadServiceLockInfo();
+        if (lockInfo != null)
         {
-            var pidText = File.ReadAllText(lockFile).Trim();
-            if (int.TryParse(pidText, out var pid))
+            try
             {
-                try
-                {
-                    Process.GetProcessById(pid);
-                    processStatus = "[green]Running[/]";
-                    pidDisplay = pid.ToString();
-                }
-                catch (ArgumentException)
-                {
-                    processStatus = "[yellow]Stale lock file[/]";
-                    pidDisplay = $"{pid} (dead)";
-                }
+                Process.GetProcessById(lockInfo.Pid);
+                processStatus = "[green]Running[/]";
+                pidDisplay = lockInfo.Pid.ToString();
             }
-            else
+            catch (ArgumentException)
             {
-                processStatus = "[red]Invalid lock file[/]";
-                pidDisplay = Markup.Escape(pidText);
+                processStatus = "[yellow]Stale lock file[/]";
+                pidDisplay = $"{lockInfo.Pid} (dead)";
             }
         }
         else
@@ -209,11 +214,6 @@ internal static class CliCommands
             Environment.ExitCode = 1;
         }
 
-        var nexusStaging = CopilotNexusPaths.NexusStaging;
-        var appStaging = CopilotNexusPaths.AppStaging;
-        var nexusHasUpdate = Directory.Exists(nexusStaging) && Directory.EnumerateFiles(nexusStaging).Any();
-        var appHasUpdate = Directory.Exists(appStaging) && Directory.EnumerateFiles(appStaging).Any();
-
         var table = new Table()
             .Border(TableBorder.Rounded)
             .Title("[bold]Nexus Status[/]")
@@ -227,9 +227,10 @@ internal static class CliCommands
         table.AddRow("Sessions", sessions);
         table.AddRow("Models", models);
         table.AddRow("Started", Markup.Escape(uptime));
-        table.AddEmptyRow();
-        table.AddRow("Nexus update staged", nexusHasUpdate ? "[green]Yes[/]" : "[grey]No[/]");
-        table.AddRow("App update staged", appHasUpdate ? "[green]Yes[/]" : "[grey]No[/]");
+        if (!string.IsNullOrWhiteSpace(lockInfo?.Version))
+            table.AddRow("Service version", Markup.Escape(lockInfo!.Version!));
+        if (!string.IsNullOrWhiteSpace(lockInfo?.ExecutablePath))
+            table.AddRow("Service path", Markup.Escape(lockInfo!.ExecutablePath!));
         table.AddEmptyRow();
         table.AddRow("Install dir", Markup.Escape(CopilotNexusPaths.Root));
         table.AddRow("Log dir", Markup.Escape(CopilotNexusPaths.Logs));
@@ -298,7 +299,7 @@ internal static class CliCommands
         {
             AnsiConsole.MarkupLine($"[green]✓ Build succeeded[/] in [bold]{sw.Elapsed.TotalSeconds:F1}s[/]");
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("Next: [blue]nexus publish[/] to stage the update.");
+            AnsiConsole.MarkupLine("Next: [blue]nexus publish[/] to publish a new versioned payload.");
         }
         else
         {
@@ -325,109 +326,39 @@ internal static class CliCommands
         AnsiConsole.MarkupLine($"  Install: [dim]{Markup.Escape(CopilotNexusPaths.Root)}[/]");
         AnsiConsole.WriteLine();
 
+        var versionPlan = CreatePublishVersionPlan(repoRoot);
+        AnsiConsole.MarkupLine($"[dim]Install version: {Markup.Escape(versionPlan.PublishVersion)}[/]");
+
+        var cliOutput = CopilotNexusPaths.GetVersionedInstallPath("cli", versionPlan.PublishVersion);
+        var serviceOutput = CopilotNexusPaths.GetVersionedInstallPath("nexus", versionPlan.PublishVersion);
+        var appOutput = CopilotNexusPaths.GetVersionedInstallPath("app", versionPlan.PublishVersion);
+
         await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
             .SpinnerStyle(Style.Parse("blue"))
             .StartAsync("Publishing components...", async ctx =>
             {
-                ctx.Status("Publishing CLI...");
-                await PublishComponent(repoRoot, "cli", CopilotNexusPaths.CliInstall);
-                ctx.Status("Publishing Service...");
-                await PublishComponent(repoRoot, "service", CopilotNexusPaths.NexusInstall);
-                ctx.Status("Publishing App...");
-                await PublishComponent(repoRoot, "app", CopilotNexusPaths.AppInstall);
-                ctx.Status("Publishing Updater...");
-                await PublishComponent(repoRoot, "updater", CopilotNexusPaths.AppInstall);
+                ctx.Status("Installing component shims...");
+                await PublishAndInstallShimsAsync(repoRoot, versionPlan.PublishVersion);
+
+                ctx.Status("Publishing CLI payload...");
+                await PublishComponent(repoRoot, "cli", cliOutput, versionPlan.PublishVersion);
+                ctx.Status("Publishing Service payload...");
+                await PublishComponent(repoRoot, "service", serviceOutput, versionPlan.PublishVersion);
+                ctx.Status("Publishing Win App payload...");
+                await PublishComponent(repoRoot, "app", appOutput, versionPlan.PublishVersion);
+                ctx.Status("Publishing Updater payload...");
+                await PublishComponent(repoRoot, "updater", appOutput, versionPlan.PublishVersion);
             });
+
+        if (Environment.ExitCode == 0)
+            SavePublishVersionState(versionPlan);
 
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("[green]✓ Installation complete.[/]");
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine("Set up the [blue]nexus[/] alias for easy access:");
         AnsiConsole.MarkupLine($"  [dim]Set-Alias nexus \"{Markup.Escape(CopilotNexusPaths.CliExe)}\"[/]");
-    }
-
-    // --- update ---
-    internal static async Task RunUpdateAsync(string component)
-    {
-        var normalizedComponent = component.Trim().ToLowerInvariant();
-        if (normalizedComponent is not ("nexus" or "app" or "cli" or "both"))
-        {
-            AnsiConsole.MarkupLine("[red]Invalid component.[/] Use [blue]nexus[/], [blue]app[/], [blue]cli[/], or [blue]both[/].");
-            Environment.ExitCode = 1;
-            return;
-        }
-
-        var components = normalizedComponent == "both" ? new[] { "nexus", "app" } : new[] { normalizedComponent };
-
-        foreach (var comp in components)
-        {
-            if (comp == "cli")
-            {
-                await ApplyCliStagedUpdateAsync(reportIfMissing: true);
-                continue;
-            }
-
-            var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
-            var installPath = CopilotNexusPaths.GetInstallPath(comp);
-
-            if (!HasFiles(stagingPath))
-            {
-                AnsiConsole.MarkupLine($"[grey]No staged update for {comp}.[/]");
-                if (comp == "nexus")
-                    await ApplyCliStagedUpdateAsync();
-                continue;
-            }
-
-            await AnsiConsole.Status()
-                .Spinner(Spinner.Known.Dots)
-                .SpinnerStyle(Style.Parse("blue"))
-                .StartAsync($"Updating {comp}...", async ctx =>
-                {
-                    // Stop Nexus service if updating it
-                    if (comp == "nexus" && File.Exists(CopilotNexusPaths.NexusLockFile))
-                    {
-                        ctx.Status("Stopping Nexus service for update...");
-                        RunStop();
-                        await WaitForFileLockRelease(installPath, 15);
-                    }
-
-                    // Copy staging to install with retry for lingering locks.
-                    // Skip any stale CLI artifacts that may still exist in Nexus staging from older publish flows.
-                    ctx.Status($"Copying {comp} files...");
-                    await CopyDirectoryWithRetryAsync(
-                        stagingPath,
-                        installPath,
-                        shouldCopyFile: comp == "nexus" ? file => !IsCliArtifact(file) : null);
-
-                    // Clear staging
-                    ctx.Status("Clearing staging...");
-                    ClearDirectoryContents(stagingPath);
-
-                    // Restart service if we updated nexus
-                    if (comp == "nexus")
-                    {
-                        ctx.Status("Restarting Nexus service...");
-                        var serviceExe = FindServiceExecutable();
-                        if (serviceExe != null)
-                        {
-                            var psi = new ProcessStartInfo
-                            {
-                                FileName = serviceExe,
-                                Arguments = "--urls http://localhost:5280",
-                                UseShellExecute = false,
-                                CreateNoWindow = true,
-                            };
-                            Process.Start(psi);
-                        }
-                    }
-                });
-
-            AnsiConsole.MarkupLine($"[green]✓[/] {comp} updated successfully.");
-
-            if (comp == "nexus")
-                await ApplyCliStagedUpdateAsync();
-        }
     }
 
     // --- publish ---
@@ -441,15 +372,15 @@ internal static class CliCommands
             return;
         }
 
-        var nexusInstalled = File.Exists(CopilotNexusPaths.CliExe) || File.Exists(CopilotNexusPaths.ServiceExe);
-        var appInstalled = File.Exists(CopilotNexusPaths.AppExe);
-
-        if (!nexusInstalled && !appInstalled)
+        var shimsInstalled = File.Exists(CopilotNexusPaths.CliExe)
+            && File.Exists(CopilotNexusPaths.ServiceExe)
+            && File.Exists(CopilotNexusPaths.AppExe);
+        if (!shimsInstalled)
         {
-            AnsiConsole.MarkupLine("[red]CopilotNexus is not installed.[/]");
-            AnsiConsole.MarkupLine($"  Expected install at: [dim]{Markup.Escape(CopilotNexusPaths.Root)}[/]");
+            AnsiConsole.MarkupLine("[red]Component shims are not installed.[/]");
+            AnsiConsole.MarkupLine($"  Expected shims under: [dim]{Markup.Escape(CopilotNexusPaths.AppRoot)}[/]");
             AnsiConsole.WriteLine();
-            AnsiConsole.MarkupLine("Run [blue]nexus install[/] first to perform the initial installation.");
+            AnsiConsole.MarkupLine("Run [blue]nexus install[/] first.");
             Environment.ExitCode = 1;
             return;
         }
@@ -464,77 +395,68 @@ internal static class CliCommands
 
         CopilotNexusPaths.EnsureDirectories();
         var components = normalizedComponent == "both" ? new[] { "nexus", "app" } : new[] { normalizedComponent };
-        var cliPublishedToStaging = false;
-        var publishVersion = CreatePublishVersion();
-
-        AnsiConsole.MarkupLine($"[dim]Publish version: {Markup.Escape(publishVersion)}[/]");
+        var versionPlan = CreatePublishVersionPlan(repoRoot);
+        var releaseMode = versionPlan.IsReleaseMode ? "release" : "dev";
+        AnsiConsole.MarkupLine($"[dim]Publish version: {Markup.Escape(versionPlan.PublishVersion)} ({releaseMode})[/]");
+        AnsiConsole.MarkupLine($"[dim]Version bump: {versionPlan.Bump} from {versionPlan.CommitCount} commit(s)[/]");
 
         await AnsiConsole.Status()
             .Spinner(Spinner.Known.Dots)
             .SpinnerStyle(Style.Parse("blue"))
-            .StartAsync("Publishing to staging...", async ctx =>
+            .StartAsync("Publishing versioned payloads...", async ctx =>
             {
+                ctx.Status("Refreshing shims...");
+                await PublishAndInstallShimsAsync(repoRoot, versionPlan.PublishVersion);
+
                 foreach (var comp in components)
                 {
                     if (comp == "nexus")
                     {
-                        var cliOutputPath = ResolveCliPublishOutputPath();
-                        var stageCli = string.Equals(cliOutputPath, CopilotNexusPaths.CliStaging, StringComparison.OrdinalIgnoreCase);
-                        ctx.Status(stageCli ? "Publishing CLI to staging..." : "Publishing CLI to install...");
-                        await PublishComponent(repoRoot, "cli", cliOutputPath, publishVersion);
-                        cliPublishedToStaging |= stageCli;
-
-                        var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
-                        ctx.Status("Publishing Service to staging...");
-                        await PublishComponent(repoRoot, "service", stagingPath, publishVersion);
+                        var cliOutput = CopilotNexusPaths.GetVersionedInstallPath("cli", versionPlan.PublishVersion);
+                        var serviceOutput = CopilotNexusPaths.GetVersionedInstallPath("nexus", versionPlan.PublishVersion);
+                        ctx.Status("Publishing CLI payload...");
+                        await PublishComponent(repoRoot, "cli", cliOutput, versionPlan.PublishVersion);
+                        ctx.Status("Publishing Service payload...");
+                        await PublishComponent(repoRoot, "service", serviceOutput, versionPlan.PublishVersion);
                     }
                     else if (comp == "cli")
                     {
-                        var cliOutputPath = ResolveCliPublishOutputPath();
-                        var stageCli = string.Equals(cliOutputPath, CopilotNexusPaths.CliStaging, StringComparison.OrdinalIgnoreCase);
-                        ctx.Status(stageCli ? "Publishing CLI to staging..." : "Publishing CLI to install...");
-                        await PublishComponent(repoRoot, "cli", cliOutputPath, publishVersion);
-                        cliPublishedToStaging |= stageCli;
+                        var cliOutput = CopilotNexusPaths.GetVersionedInstallPath("cli", versionPlan.PublishVersion);
+                        ctx.Status("Publishing CLI payload...");
+                        await PublishComponent(repoRoot, "cli", cliOutput, versionPlan.PublishVersion);
                     }
                     else
                     {
-                        var stagingPath = CopilotNexusPaths.GetStagingPath(comp);
+                        var appOutput = CopilotNexusPaths.GetVersionedInstallPath("app", versionPlan.PublishVersion);
                         if (comp == "app")
                         {
-                            ctx.Status("Publishing App to staging...");
-                            await PublishComponent(repoRoot, "app", stagingPath, publishVersion);
-                            ctx.Status("Publishing Updater to staging...");
-                            await PublishComponent(repoRoot, "updater", stagingPath, publishVersion);
+                            ctx.Status("Publishing Win App payload...");
+                            await PublishComponent(repoRoot, "app", appOutput, versionPlan.PublishVersion);
+                            ctx.Status("Publishing Updater payload...");
+                            await PublishComponent(repoRoot, "updater", appOutput, versionPlan.PublishVersion);
                         }
                         else
                         {
-                            ctx.Status($"Publishing {comp} to staging...");
-                            await PublishComponent(repoRoot, comp, stagingPath, publishVersion);
+                            var output = CopilotNexusPaths.GetVersionedInstallPath(comp, versionPlan.PublishVersion);
+                            ctx.Status($"Publishing {comp} payload...");
+                            await PublishComponent(repoRoot, comp, output, versionPlan.PublishVersion);
                         }
                     }
                 }
             });
 
+        if (Environment.ExitCode == 0)
+            SavePublishVersionState(versionPlan);
         AnsiConsole.WriteLine();
-        AnsiConsole.MarkupLine("[green]✓ Staged updates ready.[/]");
-        if (cliPublishedToStaging)
-        {
-            AnsiConsole.MarkupLine(
-                $"[yellow]CLI binaries were staged to {Markup.Escape(CopilotNexusPaths.CliStaging)} to avoid self-overwrite locks.[/]");
-            AnsiConsole.MarkupLine("[dim]Run [blue]nexus update --component cli[/] (or [blue]nexus update[/]) to apply the staged CLI update.[/]");
-        }
-        else
-        {
-            AnsiConsole.MarkupLine($"[dim]CLI binaries are published directly to {Markup.Escape(CopilotNexusPaths.CliInstall)}.[/]");
-        }
+        AnsiConsole.MarkupLine("[green]✓ Versioned publish complete.[/]");
+        AnsiConsole.MarkupLine("[dim]No update-copy step is required. Launch via shims to pick up newest version.[/]");
         AnsiConsole.WriteLine();
 
         var panel = new Panel(
-            "  [blue]nexus update[/]                      apply all staged updates\n" +
-            "  [blue]nexus update --component nexus[/]    apply Nexus update only\n" +
-            "  [blue]nexus update --component cli[/]      apply CLI update only\n" +
-            "  [blue]nexus update --component app[/]      apply App update only\n\n" +
-            "  [dim]The desktop app also detects staged app updates automatically.[/]")
+            "  [blue]nexus stop && nexus start[/]         restart service on newest published version\n" +
+            "  [blue]nexus winapp start[/]                launch desktop app shim (latest by default)\n" +
+            "  [blue]nexus version[/]                     inspect installed shim and payload versions\n\n" +
+            "  [dim]Use shim flags directly for rollback/retention: --previous, --cleanup <N>.[/]")
             .Header("[bold]Next steps[/]")
             .Border(BoxBorder.Rounded)
             .Padding(1, 0);
@@ -577,9 +499,22 @@ internal static class CliCommands
 
     private static string? FindServiceExecutable()
     {
+        if (File.Exists(CopilotNexusPaths.ServiceExe))
+            return CopilotNexusPaths.ServiceExe;
+
+        try
+        {
+            return VersionedExecutableResolver
+                .ResolveExecutable(CopilotNexusPaths.NexusInstall, "CopilotNexus.Service.exe")
+                .ExecutablePath;
+        }
+        catch (InvalidOperationException)
+        {
+            // Fall back to source build paths for developer workflows.
+        }
+
         string[] searchPaths =
         [
-            CopilotNexusPaths.ServiceExe,
             Path.Combine(AppContext.BaseDirectory, "CopilotNexus.Service.exe"),
         ];
 
@@ -599,9 +534,22 @@ internal static class CliCommands
 
     private static string? FindAppExecutable()
     {
+        if (File.Exists(CopilotNexusPaths.AppExe))
+            return CopilotNexusPaths.AppExe;
+
+        try
+        {
+            return VersionedExecutableResolver
+                .ResolveExecutable(CopilotNexusPaths.AppInstall, "CopilotNexus.App.exe")
+                .ExecutablePath;
+        }
+        catch (InvalidOperationException)
+        {
+            // Fall back to source build paths for developer workflows.
+        }
+
         string[] searchPaths =
         [
-            CopilotNexusPaths.AppExe,
             Path.Combine(AppContext.BaseDirectory, "CopilotNexus.App.exe"),
         ];
 
@@ -858,145 +806,370 @@ internal static class CliCommands
         return text[^maxLength..];
     }
 
-    private static async Task ApplyCliStagedUpdateAsync(bool reportIfMissing = false)
+    private static ServiceLockInfo? ReadServiceLockInfo()
     {
-        var stagingPath = CopilotNexusPaths.CliStaging;
-        if (!HasFiles(stagingPath))
+        if (!File.Exists(CopilotNexusPaths.NexusLockFile))
+            return null;
+
+        try
         {
-            if (reportIfMissing)
-                AnsiConsole.MarkupLine("[grey]No staged update for cli.[/]");
-            return;
+            var content = File.ReadAllText(CopilotNexusPaths.NexusLockFile).Trim();
+            if (int.TryParse(content, out var legacyPid))
+            {
+                return new ServiceLockInfo(
+                    legacyPid,
+                    null,
+                    null,
+                    null,
+                    File.GetLastWriteTimeUtc(CopilotNexusPaths.NexusLockFile));
+            }
+
+            var parsed = JsonSerializer.Deserialize<ServiceLockInfo>(content);
+            return parsed?.Pid > 0 ? parsed : null;
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static void WriteServiceLockInfo(ServiceLockInfo lockInfo)
+    {
+        var json = JsonSerializer.Serialize(lockInfo, new JsonSerializerOptions { WriteIndented = true });
+        File.WriteAllText(CopilotNexusPaths.NexusLockFile, json);
+    }
+
+    private static void TryDeleteLockFile()
+    {
+        try
+        {
+            if (File.Exists(CopilotNexusPaths.NexusLockFile))
+                File.Delete(CopilotNexusPaths.NexusLockFile);
+        }
+        catch (IOException)
+        {
+            // Best effort cleanup.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Best effort cleanup.
+        }
+    }
+
+    private static string? TryExtractVersionFromExecutablePath(string executablePath)
+    {
+        var directory = Path.GetDirectoryName(executablePath);
+        if (!string.IsNullOrWhiteSpace(directory) &&
+            SemanticVersion.TryParse(Path.GetFileName(directory), out var folderVersion) &&
+            folderVersion != null)
+        {
+            return folderVersion.ToString();
         }
 
-        if (IsRunningFromCliInstall())
+        if (string.Equals(
+                Path.GetFullPath(executablePath),
+                Path.GetFullPath(CopilotNexusPaths.ServiceExe),
+                StringComparison.OrdinalIgnoreCase))
         {
-            ScheduleCliSelfUpdateWorker(stagingPath, CopilotNexusPaths.CliInstall, Environment.ProcessId);
-            AnsiConsole.MarkupLine("[yellow]CLI update scheduled. It will be applied after this command exits.[/]");
-            return;
+            try
+            {
+                return VersionedExecutableResolver
+                    .ResolveExecutable(CopilotNexusPaths.NexusInstall, "CopilotNexus.Service.exe")
+                    .Version
+                    .ToString();
+            }
+            catch (InvalidOperationException)
+            {
+                // Fall through to file version metadata.
+            }
         }
 
-        await CopyDirectoryWithRetryAsync(stagingPath, CopilotNexusPaths.CliInstall);
-        ClearDirectoryContents(stagingPath);
-        WriteCliLog("cli update applied from staging");
-        AnsiConsole.MarkupLine("[green]✓[/] cli updated successfully.");
+        return GetExecutableVersion(executablePath);
     }
 
-    private static string ResolveCliPublishOutputPath()
+    private static async Task PublishAndInstallShimsAsync(string repoRoot, string version)
     {
-        var outputPath = IsRunningFromCliInstall()
-            ? CopilotNexusPaths.CliStaging
-            : CopilotNexusPaths.CliInstall;
-
-        WriteCliLog($"cli publish target resolved to {outputPath}");
-        return outputPath;
+        await PublishShimExecutableAsync(repoRoot, CopilotNexusPaths.CliInstall, "CopilotNexus.Cli", version, "CLI shim");
+        await PublishShimExecutableAsync(repoRoot, CopilotNexusPaths.NexusInstall, "CopilotNexus.Service", version, "Service shim");
+        await PublishShimExecutableAsync(repoRoot, CopilotNexusPaths.AppInstall, "CopilotNexus.App", version, "App shim");
     }
 
-    private static bool IsRunningFromCliInstall()
+    private static async Task PublishShimExecutableAsync(
+        string repoRoot,
+        string outputPath,
+        string assemblyName,
+        string version,
+        string label)
     {
-        var cliInstallDir = Path.GetFullPath(CopilotNexusPaths.CliInstall)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var appBaseDir = Path.GetFullPath(AppContext.BaseDirectory)
-            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var projectPath = Path.Combine(repoRoot, "src", "CopilotNexus.Shim", "CopilotNexus.Shim.csproj");
+        if (!File.Exists(projectPath))
+            throw new FileNotFoundException("Shim project was not found.", projectPath);
 
-        if (string.Equals(cliInstallDir, appBaseDir, StringComparison.OrdinalIgnoreCase))
-            return true;
-
-        if (string.IsNullOrWhiteSpace(Environment.ProcessPath))
-            return false;
-
-        var currentProcessPath = Path.GetFullPath(Environment.ProcessPath);
-        var installedCliPath = Path.GetFullPath(CopilotNexusPaths.CliExe);
-        return string.Equals(currentProcessPath, installedCliPath, StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static void ScheduleCliSelfUpdateWorker(string stagingPath, string installPath, int parentPid)
-    {
-        var logPath = Path.Combine(CopilotNexusPaths.Logs, $"cli-{DateTime.UtcNow:yyyyMMdd}.log");
-        var script = BuildCliSelfUpdateScript(parentPid, stagingPath, installPath, logPath);
-        var encodedScript = Convert.ToBase64String(Encoding.Unicode.GetBytes(script));
-
+        Directory.CreateDirectory(outputPath);
         var psi = new ProcessStartInfo
         {
-            FileName = "powershell",
-            Arguments = $"-NoProfile -ExecutionPolicy Bypass -EncodedCommand {encodedScript}",
+            FileName = "dotnet",
+            Arguments =
+                $"publish \"{projectPath}\" -c Release -o \"{outputPath}\" --self-contained false --nologo -v q " +
+                $"-p:AssemblyName={assemblyName} -p:Version={version} -p:InformationalVersion={version}",
             UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
             CreateNoWindow = true,
         };
 
-        var worker = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to launch CLI self-update worker.");
-
-        WriteCliLog($"scheduled cli self-update worker pid={worker.Id} for parentPid={parentPid}");
+        WriteCliLog($"publish start [{label}] (version={version}): {psi.FileName} {psi.Arguments}");
+        var result = await RunProcessWithCapturedOutputAsync(psi);
+        if (result.ExitCode != 0)
+        {
+            WriteCliLog($"publish failed [{label}] stdout tail:\n{Tail(result.StandardOutput)}");
+            WriteCliLog($"publish failed [{label}] stderr tail:\n{Tail(result.StandardError)}");
+            throw new InvalidOperationException($"Failed to publish {label}. {Tail(result.StandardError)}");
+        }
     }
 
-    private static string BuildCliSelfUpdateScript(int parentPid, string stagingPath, string installPath, string logPath)
+    private static PublishVersionPlan CreatePublishVersionPlan(string repoRoot)
     {
-        var escapedStagingPath = EscapePowerShellSingleQuoted(stagingPath);
-        var escapedInstallPath = EscapePowerShellSingleQuoted(installPath);
-        var escapedLogPath = EscapePowerShellSingleQuoted(logPath);
-
-        return $$"""
-$ErrorActionPreference = 'Stop'
-$parentPid = {{parentPid}}
-$source = '{{escapedStagingPath}}'
-$destination = '{{escapedInstallPath}}'
-$logPath = '{{escapedLogPath}}'
-
-function Write-Log([string]$message) {
-    Add-Content -Path $logPath -Value ("{0} {1}" -f (Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff zzz'), $message)
-}
-
-Write-Log "cli-self-update worker started (parentPid=$parentPid)"
-
-for ($i = 0; $i -lt 120; $i++) {
-    if (-not (Get-Process -Id $parentPid -ErrorAction SilentlyContinue)) {
-        break
-    }
-    Start-Sleep -Milliseconds 500
-}
-
-for ($attempt = 1; $attempt -le 20; $attempt++) {
-    try {
-        if (-not (Test-Path $source)) {
-            Write-Log "cli-self-update source missing; nothing to apply"
-            exit 0
+        var headCommitSha = GetHeadCommitSha(repoRoot);
+        if (TryGetReleaseVersion(out var releaseVersion))
+        {
+            return new PublishVersionPlan(
+                releaseVersion!,
+                releaseVersion!.ToString(),
+                true,
+                headCommitSha,
+                VersionBump.None,
+                0);
         }
 
-        New-Item -ItemType Directory -Path $destination -Force | Out-Null
-        $copy = Start-Process -FilePath "robocopy.exe" -ArgumentList @($source, $destination, "/MIR", "/R:5", "/W:1", "/NFL", "/NDL", "/NJH", "/NJS", "/NP") -Wait -PassThru -NoNewWindow
-        if ($copy.ExitCode -gt 7) {
-            throw "robocopy exit code $($copy.ExitCode)"
+        var previousState = TryReadPublishVersionState();
+        var currentBase = TryParseBaseVersion(previousState?.BaseVersion) ?? SemanticVersion.Parse(InitialPublishBaseVersion);
+        var commits = GetCommitMessagesSince(repoRoot, previousState?.LastCommitSha);
+        var bump = InferVersionBump(commits);
+        var nextBase = ApplyVersionBump(currentBase, bump);
+        var publishVersion = $"{nextBase}-dev.{DateTime.UtcNow:yyyyMMddHHmmss}";
+
+        return new PublishVersionPlan(nextBase, publishVersion, false, headCommitSha, bump, commits.Count);
+    }
+
+    private static PublishVersionState? TryReadPublishVersionState()
+    {
+        if (!File.Exists(CopilotNexusPaths.PublishVersionStateFile))
+            return null;
+
+        try
+        {
+            var json = File.ReadAllText(CopilotNexusPaths.PublishVersionStateFile);
+            return JsonSerializer.Deserialize<PublishVersionState>(json);
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static void SavePublishVersionState(PublishVersionPlan plan)
+    {
+        var state = new PublishVersionState(
+            plan.NextBaseVersion.ToString(),
+            plan.HeadCommitSha);
+        var json = JsonSerializer.Serialize(state, new JsonSerializerOptions { WriteIndented = true });
+        Directory.CreateDirectory(Path.GetDirectoryName(CopilotNexusPaths.PublishVersionStateFile)!);
+        File.WriteAllText(CopilotNexusPaths.PublishVersionStateFile, json);
+    }
+
+    private static SemanticVersion? TryParseBaseVersion(string? value)
+    {
+        return SemanticVersion.TryParse(value, out var parsed) ? parsed : null;
+    }
+
+    private static string? GetHeadCommitSha(string repoRoot)
+    {
+        return TryRunGit(repoRoot, "rev-parse HEAD");
+    }
+
+    private static IReadOnlyList<string> GetCommitMessagesSince(string repoRoot, string? fromCommitExclusive)
+    {
+        var logArgs = string.IsNullOrWhiteSpace(fromCommitExclusive)
+            ? "log -n 1 --pretty=format:%s%n%b%x1e HEAD"
+            : $"log --pretty=format:%s%n%b%x1e {fromCommitExclusive}..HEAD";
+        var output = TryRunGit(repoRoot, logArgs);
+        if (string.IsNullOrWhiteSpace(output))
+            return [];
+
+        return output
+            .Split('\x1e', StringSplitOptions.RemoveEmptyEntries)
+            .Select(entry => entry.Trim())
+            .Where(entry => !string.IsNullOrWhiteSpace(entry))
+            .ToList();
+    }
+
+    private static VersionBump InferVersionBump(IReadOnlyList<string> commitMessages)
+    {
+        if (commitMessages.Count == 0)
+            return VersionBump.None;
+
+        var highest = VersionBump.Patch;
+        foreach (var message in commitMessages)
+        {
+            var parsed = ParseCommitBump(message);
+            if (parsed > highest)
+                highest = parsed;
+            if (highest == VersionBump.Major)
+                break;
         }
 
-        Remove-Item -Path $source -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Log "cli-self-update applied successfully on attempt $attempt (robocopyExit=$($copy.ExitCode))"
-        exit 0
+        return highest;
     }
-    catch {
-        if ($attempt -eq 20) {
-            Write-Log ("cli-self-update failed: " + $_.Exception.Message)
-            exit 1
+
+    private static VersionBump ParseCommitBump(string message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+            return VersionBump.None;
+
+        var lines = message
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Trim())
+            .ToArray();
+
+        var header = lines.FirstOrDefault() ?? string.Empty;
+        if (message.Contains("BREAKING CHANGE", StringComparison.OrdinalIgnoreCase))
+            return VersionBump.Major;
+
+        if (header.Contains("!:", StringComparison.Ordinal))
+            return VersionBump.Major;
+
+        if (header.StartsWith("feat(", StringComparison.OrdinalIgnoreCase) ||
+            header.StartsWith("feat:", StringComparison.OrdinalIgnoreCase))
+            return VersionBump.Minor;
+
+        return VersionBump.Patch;
+    }
+
+    private static SemanticVersion ApplyVersionBump(SemanticVersion baseVersion, VersionBump bump)
+    {
+        return bump switch
+        {
+            VersionBump.Major => baseVersion.NextMajor(),
+            VersionBump.Minor => baseVersion.NextMinor(),
+            VersionBump.Patch => baseVersion.NextPatch(),
+            _ => baseVersion,
+        };
+    }
+
+    private static bool TryGetReleaseVersion(out SemanticVersion? releaseVersion)
+    {
+        if (TryParseReleaseVersion(Environment.GetEnvironmentVariable("NEXUS_RELEASE_VERSION"), out releaseVersion))
+            return true;
+
+        var refType = Environment.GetEnvironmentVariable("GITHUB_REF_TYPE");
+        var refName = Environment.GetEnvironmentVariable("GITHUB_REF_NAME");
+        if (string.Equals(refType, "tag", StringComparison.OrdinalIgnoreCase) &&
+            TryParseReleaseVersion(refName, out releaseVersion))
+        {
+            return true;
         }
 
-        Start-Sleep -Seconds 1
-    }
-}
-""";
+        releaseVersion = null;
+        return false;
     }
 
-    private static string EscapePowerShellSingleQuoted(string value)
+    private static bool TryParseReleaseVersion(string? value, out SemanticVersion? releaseVersion)
     {
-        return value.Replace("'", "''");
+        releaseVersion = null;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        var normalized = value.Trim();
+        if (normalized.StartsWith("refs/tags/", StringComparison.OrdinalIgnoreCase))
+            normalized = normalized["refs/tags/".Length..];
+        if (normalized.StartsWith("v", StringComparison.OrdinalIgnoreCase))
+            normalized = normalized[1..];
+
+        if (!SemanticVersion.TryParse(normalized, out var parsed) || parsed == null)
+            return false;
+
+        releaseVersion = parsed;
+        return true;
     }
 
-    private static bool HasFiles(string path)
+    private static string? TryRunGit(string repoRoot, string arguments)
     {
-        return Directory.Exists(path) && Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories).Any();
+        var psi = new ProcessStartInfo
+        {
+            FileName = "git",
+            Arguments = $"-C \"{repoRoot}\" --no-pager {arguments}",
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true,
+        };
+
+        try
+        {
+            using var process = Process.Start(psi);
+            if (process == null)
+                return null;
+
+            var stdout = process.StandardOutput.ReadToEnd();
+            var stderr = process.StandardError.ReadToEnd();
+            process.WaitForExit();
+
+            if (process.ExitCode != 0)
+            {
+                WriteCliLog($"git command failed: git {psi.Arguments}\n{Tail(stderr)}");
+                return null;
+            }
+
+            return stdout.Trim();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            WriteCliLog($"git command failed: git {psi.Arguments}. {ex.Message}");
+            return null;
+        }
     }
 
-    private static string CreatePublishVersion()
+    private static string GetComponentVersionDisplay(string shimExePath, string componentRoot, string executableName)
     {
-        return $"{PublishVersionBase}-{PublishVersionChannel}.{DateTime.UtcNow:yyyyMMddHHmmss}";
+        var shimVersion = GetExecutableVersion(shimExePath);
+        string? payloadVersion = null;
+        try
+        {
+            payloadVersion = VersionedExecutableResolver
+                .ResolveExecutable(componentRoot, executableName)
+                .Version
+                .ToString();
+        }
+        catch (InvalidOperationException)
+        {
+            // No versioned payloads available yet.
+        }
+
+        if (shimVersion == null && payloadVersion == null)
+            return "not installed";
+        if (shimVersion == null)
+            return $"payload {payloadVersion}";
+        if (payloadVersion == null)
+            return $"shim {shimVersion}";
+
+        return $"shim {shimVersion}, payload {payloadVersion}";
     }
 
     private static string? GetExecutableVersion(string exePath)
@@ -1012,88 +1185,10 @@ for ($attempt = 1; $attempt -le 20; $attempt++) {
         return string.IsNullOrWhiteSpace(assemblyVersion) ? null : assemblyVersion;
     }
 
-    private static void ClearDirectoryContents(string path)
-    {
-        if (!Directory.Exists(path))
-            return;
-
-        foreach (var file in Directory.GetFiles(path, "*", SearchOption.AllDirectories))
-            File.Delete(file);
-
-        foreach (var dir in Directory.GetDirectories(path, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
-            Directory.Delete(dir, true);
-    }
-
     private static void WriteCliLog(string message)
     {
         var logPath = Path.Combine(CopilotNexusPaths.Logs, $"cli-{DateTime.UtcNow:yyyyMMdd}.log");
         var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} {message}";
         File.AppendAllText(logPath, line + Environment.NewLine);
-    }
-
-    private static bool IsCliArtifact(string filePath)
-    {
-        var fileName = Path.GetFileName(filePath);
-        return fileName.Equals("CopilotNexus.Cli.exe", StringComparison.OrdinalIgnoreCase)
-            || fileName.StartsWith("CopilotNexus.Cli.", StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static void CopyDirectory(string source, string destination, Func<string, bool>? shouldCopyFile = null)
-    {
-        Directory.CreateDirectory(destination);
-        foreach (var file in Directory.GetFiles(source))
-        {
-            if (shouldCopyFile != null && !shouldCopyFile(file))
-                continue;
-
-            var destFile = Path.Combine(destination, Path.GetFileName(file));
-            File.Copy(file, destFile, overwrite: true);
-        }
-        foreach (var dir in Directory.GetDirectories(source))
-        {
-            var destDir = Path.Combine(destination, Path.GetFileName(dir));
-            CopyDirectory(dir, destDir, shouldCopyFile);
-        }
-    }
-
-    private static async Task CopyDirectoryWithRetryAsync(
-        string source,
-        string destination,
-        int maxRetries = 10,
-        Func<string, bool>? shouldCopyFile = null)
-    {
-        for (int attempt = 1; attempt <= maxRetries; attempt++)
-        {
-            try
-            {
-                CopyDirectory(source, destination, shouldCopyFile);
-                return;
-            }
-            catch (IOException) when (attempt < maxRetries)
-            {
-                await Task.Delay(1000);
-            }
-        }
-        CopyDirectory(source, destination, shouldCopyFile);
-    }
-
-    private static async Task WaitForFileLockRelease(string directory, int timeoutSeconds)
-    {
-        if (!Directory.Exists(directory)) return;
-        var testFile = Directory.GetFiles(directory, "*.dll", SearchOption.TopDirectoryOnly).FirstOrDefault();
-        if (testFile == null) return;
-
-        for (int i = 0; i < timeoutSeconds; i++)
-        {
-            try
-            {
-                using var fs = File.Open(testFile, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-                return;
-            }
-            catch (IOException)
-            {
-                await Task.Delay(1000);
-            }
-        }
     }
 }

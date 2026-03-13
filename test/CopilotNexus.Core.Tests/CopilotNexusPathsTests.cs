@@ -21,37 +21,25 @@ public class CopilotNexusPathsTests
     [Fact]
     public void NexusInstall_IsUnderRoot()
     {
-        Assert.Equal(Path.Combine(ExpectedRoot, "nexus"), CopilotNexusPaths.NexusInstall);
+        Assert.Equal(Path.Combine(ExpectedRoot, "app", "service"), CopilotNexusPaths.NexusInstall);
     }
 
     [Fact]
     public void CliInstall_IsUnderRoot()
     {
-        Assert.Equal(Path.Combine(ExpectedRoot, "cli"), CopilotNexusPaths.CliInstall);
+        Assert.Equal(Path.Combine(ExpectedRoot, "app", "cli"), CopilotNexusPaths.CliInstall);
     }
 
     [Fact]
     public void AppInstall_IsUnderRoot()
     {
-        Assert.Equal(Path.Combine(ExpectedRoot, "app"), CopilotNexusPaths.AppInstall);
+        Assert.Equal(Path.Combine(ExpectedRoot, "app", "winapp"), CopilotNexusPaths.AppInstall);
     }
 
     [Fact]
-    public void StagingRoot_IsUnderRoot()
+    public void AppRoot_IsUnderRoot()
     {
-        Assert.Equal(Path.Combine(ExpectedRoot, "staging"), CopilotNexusPaths.StagingRoot);
-    }
-
-    [Fact]
-    public void NexusStaging_IsUnderStagingRoot()
-    {
-        Assert.Equal(Path.Combine(ExpectedRoot, "staging", "nexus"), CopilotNexusPaths.NexusStaging);
-    }
-
-    [Fact]
-    public void AppStaging_IsUnderStagingRoot()
-    {
-        Assert.Equal(Path.Combine(ExpectedRoot, "staging", "app"), CopilotNexusPaths.AppStaging);
+        Assert.Equal(Path.Combine(ExpectedRoot, "app"), CopilotNexusPaths.AppRoot);
     }
 
     [Fact]
@@ -64,6 +52,14 @@ public class CopilotNexusPathsTests
     public void NexusLockFile_IsUnderRoot()
     {
         Assert.Equal(Path.Combine(ExpectedRoot, "nexus.lock"), CopilotNexusPaths.NexusLockFile);
+    }
+
+    [Fact]
+    public void StateFiles_AreUnderStateRoot()
+    {
+        Assert.Equal(Path.Combine(ExpectedRoot, "state", "session-state.json"), CopilotNexusPaths.NexusAppStateFile);
+        Assert.Equal(Path.Combine(ExpectedRoot, "state", "session-profiles.json"), CopilotNexusPaths.NexusSessionProfilesFile);
+        Assert.Equal(Path.Combine(ExpectedRoot, "state", "publish-version-state.json"), CopilotNexusPaths.PublishVersionStateFile);
     }
 
     [Fact]
@@ -90,7 +86,7 @@ public class CopilotNexusPathsTests
     public void CliExe_IsInCliInstall()
     {
         Assert.Equal(
-            Path.Combine(ExpectedRoot, "cli", "CopilotNexus.Cli.exe"),
+            Path.Combine(ExpectedRoot, "app", "cli", "CopilotNexus.Cli.exe"),
             CopilotNexusPaths.CliExe);
     }
 
@@ -98,7 +94,7 @@ public class CopilotNexusPathsTests
     public void ServiceExe_IsInNexusInstall()
     {
         Assert.Equal(
-            Path.Combine(ExpectedRoot, "nexus", "CopilotNexus.Service.exe"),
+            Path.Combine(ExpectedRoot, "app", "service", "CopilotNexus.Service.exe"),
             CopilotNexusPaths.ServiceExe);
     }
 
@@ -106,32 +102,23 @@ public class CopilotNexusPathsTests
     public void AppExe_IsInAppInstall()
     {
         Assert.Equal(
-            Path.Combine(ExpectedRoot, "app", "CopilotNexus.App.exe"),
+            Path.Combine(ExpectedRoot, "app", "winapp", "CopilotNexus.App.exe"),
             CopilotNexusPaths.AppExe);
     }
 
     [Theory]
     [InlineData("nexus")]
-    [InlineData("app")]
-    public void GetStagingPath_ReturnsCorrectPath(string component)
-    {
-        var expected = Path.Combine(ExpectedRoot, "staging", component);
-        Assert.Equal(expected, CopilotNexusPaths.GetStagingPath(component));
-    }
-
-    [Theory]
-    [InlineData("nexus")]
+    [InlineData("cli")]
     [InlineData("app")]
     public void GetInstallPath_ReturnsCorrectPath(string component)
     {
-        var expected = Path.Combine(ExpectedRoot, component);
+        var expected = component switch
+        {
+            "nexus" => Path.Combine(ExpectedRoot, "app", "service"),
+            "cli" => Path.Combine(ExpectedRoot, "app", "cli"),
+            _ => Path.Combine(ExpectedRoot, "app", "winapp"),
+        };
         Assert.Equal(expected, CopilotNexusPaths.GetInstallPath(component));
-    }
-
-    [Fact]
-    public void GetStagingPath_ThrowsForUnknownComponent()
-    {
-        Assert.Throws<ArgumentException>(() => CopilotNexusPaths.GetStagingPath("unknown"));
     }
 
     [Fact]
@@ -143,46 +130,36 @@ public class CopilotNexusPathsTests
     [Theory]
     [InlineData("NEXUS")]
     [InlineData("Nexus")]
+    [InlineData("CLI")]
+    [InlineData("Cli")]
     [InlineData("APP")]
     [InlineData("App")]
-    public void GetPaths_AreCaseInsensitive(string component)
+    public void GetInstallPath_IsCaseInsensitive(string component)
     {
-        // Should not throw
-        var staging = CopilotNexusPaths.GetStagingPath(component);
         var install = CopilotNexusPaths.GetInstallPath(component);
-
-        Assert.NotNull(staging);
         Assert.NotNull(install);
     }
 
     [Fact]
-    public void EnsureDirectories_CreatesAllDirectories()
+    public void GetVersionedInstallPath_AppendsVersionFolder()
     {
-        // This actually creates directories on disk — it's safe because
-        // they go to %LOCALAPPDATA% which is per-user
-        CopilotNexusPaths.EnsureDirectories();
-
-        Assert.True(Directory.Exists(CopilotNexusPaths.Root));
-        Assert.True(Directory.Exists(CopilotNexusPaths.NexusInstall));
-        Assert.True(Directory.Exists(CopilotNexusPaths.CliInstall));
-        Assert.True(Directory.Exists(CopilotNexusPaths.AppInstall));
-        Assert.True(Directory.Exists(CopilotNexusPaths.StagingRoot));
-        Assert.True(Directory.Exists(CopilotNexusPaths.NexusStaging));
-        Assert.True(Directory.Exists(CopilotNexusPaths.AppStaging));
-        Assert.True(Directory.Exists(CopilotNexusPaths.Logs));
-        Assert.True(Directory.Exists(CopilotNexusPaths.UserConfigRoot));
+        var version = "1.2.3-dev.20260101010101";
+        Assert.Equal(
+            Path.Combine(ExpectedRoot, "app", "service", version),
+            CopilotNexusPaths.GetVersionedInstallPath("nexus", version));
     }
 
     [Fact]
-    public void StagingPaths_AreNotInsideInstallPaths()
+    public void EnsureDirectories_CreatesExpectedDirectories()
     {
-        // Key requirement: staging is NOT inside install dirs
-        Assert.DoesNotContain(CopilotNexusPaths.NexusInstall, CopilotNexusPaths.NexusStaging.AsSpan());
-        Assert.DoesNotContain(CopilotNexusPaths.CliInstall, CopilotNexusPaths.NexusStaging.AsSpan());
-        Assert.DoesNotContain(CopilotNexusPaths.AppInstall, CopilotNexusPaths.AppStaging.AsSpan());
-
-        // Staging IS under the shared staging root
-        Assert.StartsWith(CopilotNexusPaths.StagingRoot, CopilotNexusPaths.NexusStaging);
-        Assert.StartsWith(CopilotNexusPaths.StagingRoot, CopilotNexusPaths.AppStaging);
+        CopilotNexusPaths.EnsureDirectories();
+        Assert.True(Directory.Exists(CopilotNexusPaths.Root));
+        Assert.True(Directory.Exists(CopilotNexusPaths.AppRoot));
+        Assert.True(Directory.Exists(CopilotNexusPaths.NexusInstall));
+        Assert.True(Directory.Exists(CopilotNexusPaths.CliInstall));
+        Assert.True(Directory.Exists(CopilotNexusPaths.AppInstall));
+        Assert.True(Directory.Exists(CopilotNexusPaths.Logs));
+        Assert.True(Directory.Exists(CopilotNexusPaths.StateRoot));
+        Assert.True(Directory.Exists(CopilotNexusPaths.UserConfigRoot));
     }
 }

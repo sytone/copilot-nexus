@@ -95,7 +95,7 @@ $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptRoot
 $slnFile = Join-Path $projectRoot 'CopilotNexus.slnx'
 $cliProject = Join-Path $projectRoot 'src/CopilotNexus.Cli/CopilotNexus.Cli.csproj'
-$nexusCliExe = Join-Path $env:LOCALAPPDATA 'CopilotNexus\cli\CopilotNexus.Cli.exe'
+$nexusCliExe = Join-Path $env:LOCALAPPDATA 'CopilotNexus\app\cli\CopilotNexus.Cli.exe'
 
 Write-Host 'Copilot Nexus Installer' -ForegroundColor Cyan
 Write-Host "Project root: $projectRoot" -ForegroundColor DarkGray

@@ -1,72 +1,41 @@
 # Copilot Nexus
 
-A Windows desktop application (Avalonia 11 / .NET 8) with a backend service for
-managing multiple agent runtime sessions simultaneously.
-
-## Why?
-
-Running multiple Copilot CLI sessions in separate terminal windows is hard to manage.
-Copilot Nexus gives you a single window with tabs — each tab is an independent
-Pi runtime session with real-time streaming output, powered by
-[Pi coding agent](https://pi.dev/).
+Copilot Nexus is a Windows desktop app (Avalonia/.NET 8) plus a backend Nexus service for managing multiple Pi runtime sessions with real-time streaming output.
 
 ## Architecture
 
-The application is split into two processes:
+- `CopilotNexus.Service` (ASP.NET Core): session orchestration, REST, SignalR
+- `CopilotNexus.App` (Avalonia): tabbed desktop client
+- `CopilotNexus.Cli` (`nexus`): install/publish/start/stop/status tooling
+- `CopilotNexus.Shim`: generic version-resolving launcher used by CLI/Service/App
 
-- **Nexus** — ASP.NET Core backend service that owns all runtime sessions,
-  exposed via SignalR (real-time streaming) and REST API
-- **App** — Avalonia desktop application (thin SignalR client) that renders session
-  output in a tabbed interface
+## Key capabilities
 
-```
-┌─────────────────────────┐     ┌────────────────────────────────┐
-│  Desktop App (Avalonia)  │◄──►│  Nexus (ASP.NET Core)          │
-│  SignalR client          │    │  SignalR hub + REST API         │
-│  Renders session tabs    │    │  Manages Pi runtime sessions    │
-└─────────────────────────┘     │  Webhook support               │
-                                └────────────────────────────────┘
-```
+- Multi-session tabbed workflow
+- Pi RPC runtime integration (`pi --mode rpc`)
+- Session history/state persistence via Nexus-owned state
+- Session profiles and rename support
+- Versioned side-by-side publishes with shim-based latest selection
 
-## Features
-
-- **Tabbed interface** — Create, switch between, and close Copilot sessions
-- **Pi runtime integration** — Uses Pi RPC (`pi --mode rpc`) for session execution
-- **Real-time streaming** — Responses stream word-by-word as they're generated
-- **Model selection** — Change AI model per session from the UI
-- **Agent profile selection** — Apply reusable model/agent/MCP profile settings per session
-- **Dark terminal theme** — Comfortable for extended use
-- **Session persistence** — Resume sessions after restart
-- **Auto-update detection** — Staged updates with in-app notification
-- **CLI management** — Install, start, stop, update via `nexus` commands
-
-## Prerequisites
-
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) or later
-- Windows 10/11
-- [GitHub Copilot CLI](https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli) installed and authenticated
-
-## Quick Start
+## Quick start
 
 ```powershell
-# Build
 dotnet build CopilotNexus.slnx
-
-# Install to %LOCALAPPDATA%\CopilotNexus\
-dotnet run --project src/CopilotNexus.Service -- install
-
-# Start the Nexus service
-dotnet run --project src/CopilotNexus.Service -- start
-
-# In a second terminal — launch the desktop app
-dotnet run --project src/CopilotNexus.App
-
-# Or use the Nexus CLI to launch it
-dotnet run --project src/CopilotNexus.Service -- winapp start
+dotnet run --project src/CopilotNexus.Cli -- install
+Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\app\cli\CopilotNexus.Cli.exe"
+nexus start
+nexus winapp start
 ```
 
-See [Installation & Operations Guide](docs/installation-and-operations.md) for full
-setup, update, and troubleshooting instructions.
+## Publish flow
+
+```powershell
+nexus publish                  # publish nexus + app payloads
+nexus publish --component cli # publish only CLI payload
+```
+
+Publish is side-by-side under `%LOCALAPPDATA%\CopilotNexus\app\<component>\<version>\...`.
+No separate `nexus update` copy step is used.
 
 ## Testing
 
@@ -74,27 +43,10 @@ setup, update, and troubleshooting instructions.
 dotnet test CopilotNexus.slnx
 ```
 
-## Solution Structure
+## Docs
 
-```
-src/
-├── CopilotNexus.Core/       Core business logic, runtime abstractions, shared contracts
-├── CopilotNexus.App/        Avalonia desktop application (MVVM, thin SignalR client)
-└── CopilotNexus.Service/      ASP.NET Core backend — SignalR hub, REST API, CLI commands
-
-test/
-├── CopilotNexus.Core.Tests/    Unit tests for Core (xUnit + Moq)
-├── CopilotNexus.App.Tests/     ViewModel and converter tests (xUnit + Moq)
-├── CopilotNexus.Service.Tests/   Integration tests for Nexus (WebApplicationFactory)
-└── CopilotNexus.UI.Tests/      Headless UI tests (Avalonia.Headless.XUnit)
-
-docs/                             Project documentation
-```
-
-## Documentation
-
-- [Installation & Operations Guide](docs/installation-and-operations.md) — Install, run, update, troubleshoot
-- [Architecture Overview](docs/architecture-overview.md) — Detailed design and patterns
-- [API Contracts](docs/api-contracts.md) — REST/SignalR DTOs and endpoint behavior
-- [Testing Guide](docs/testing-guide.md) — Test structure and conventions
-- [Configuration Management](docs/configuration-management.md) — Runtime args, persisted state, and user-local paths
+- [Installation & Operations](docs/installation-and-operations.md)
+- [Architecture Overview](docs/architecture-overview.md)
+- [API Contracts](docs/api-contracts.md)
+- [Testing Guide](docs/testing-guide.md)
+- [Configuration Management](docs/configuration-management.md)
