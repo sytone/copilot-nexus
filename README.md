@@ -1,6 +1,6 @@
 # Copilot Nexus
 
-Copilot Nexus is a Windows desktop app (Avalonia/.NET 8) plus a backend Nexus service for managing multiple Pi runtime sessions with real-time streaming output.
+Copilot Nexus is a Windows desktop app (Avalonia/.NET 8) plus a backend Nexus service for managing multiple agent-runtime sessions with real-time streaming output.
 
 ## Architecture
 
@@ -12,7 +12,7 @@ Copilot Nexus is a Windows desktop app (Avalonia/.NET 8) plus a backend Nexus se
 ## Key capabilities
 
 - Multi-session tabbed workflow
-- Pi RPC runtime integration (`pi --mode rpc`)
+- Dual runtime support: Pi RPC (`pi --mode rpc`) and GitHub Copilot SDK
 - Session history/state persistence via Nexus-owned state
 - Session profiles and rename support
 - Versioned side-by-side publishes with shim-based latest selection
@@ -25,6 +25,13 @@ dotnet run --project src/CopilotNexus.Cli -- install
 Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\app\cli\CopilotNexus.Cli.exe"
 nexus start
 nexus winapp start
+```
+
+To choose the backend runtime explicitly:
+
+```powershell
+nexus start --agent pi
+nexus start --agent copilot-sdk
 ```
 
 ## Publish flow

@@ -3,14 +3,19 @@ using System.CommandLine;
 // The Service (ASP.NET Core) is a separate executable; this CLI starts/stops it.
 
 var urlOption = new Option<string>("--url") { Description = "URL for the service to listen on", DefaultValueFactory = _ => "http://localhost:5280" };
+var agentOption = new Option<string?>("--agent")
+{
+    Description = "Runtime agent to use (pi or copilot-sdk). If omitted, uses persisted selection (default: pi).",
+};
 
 // --- nexus start ---
-var startCommand = new Command("start", "Start the Nexus service as a background process") { urlOption };
+var startCommand = new Command("start", "Start the Nexus service as a background process") { urlOption, agentOption };
 startCommand.SetAction(async (parseResult, _) =>
 {
     var url = parseResult.GetValue(urlOption)!;
+    var agent = parseResult.GetValue(agentOption);
     await Task.CompletedTask;
-    CliCommands.RunStart(url);
+    CliCommands.RunStart(url, agent);
 });
 
 // --- nexus stop ---

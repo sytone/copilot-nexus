@@ -99,7 +99,7 @@ Shim flags are supported by all shims:
 
 ```powershell
 # run previous CLI payload for this invocation
-nexus --previous version
+nexus --previous
 
 # keep latest 5 CLI payload versions, delete older ones
 nexus --cleanup 5
@@ -116,7 +116,7 @@ Service and app shims can be invoked directly:
 
 | Command | Description |
 |---|---|
-| `nexus start [--url URL]` | Start Nexus service |
+| `nexus start [--url URL] [--agent pi\|copilot-sdk]` | Start Nexus service |
 | `nexus stop` | Stop Nexus service |
 | `nexus status [--url URL]` | Show service/runtime status |
 | `nexus version` | Show shim and latest payload versions |
@@ -136,12 +136,22 @@ Get-Content "$env:LOCALAPPDATA\CopilotNexus\nexus.lock"
 
 Check logs in `%LOCALAPPDATA%\CopilotNexus\logs\`.
 
-### Validate Pi runtime
+### Select runtime adapter
+
+```powershell
+nexus start --agent pi
+nexus start --agent copilot-sdk
+```
+
+### Validate runtime prerequisites
 
 ```powershell
 pi --version
 $env:NEXUS_PI_EXECUTABLE = "C:\path\to\pi.cmd"
-nexus start
+nexus start --agent pi
+
+# Copilot SDK runtime (requires GitHub Copilot auth in your environment)
+nexus start --agent copilot-sdk
 ```
 
 ### Review only new warnings/errors since last checkpoint

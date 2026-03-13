@@ -2,7 +2,9 @@
 
 This document describes the public Nexus service contracts used by the desktop app and future clients.
 
-Nexus is Pi-based by default and uses Pi coding agent RPC (`pi --mode rpc`) as its runtime interface.
+Nexus supports multiple runtime adapters behind the same API surface.
+The active runtime is selected operationally (for example, `nexus start --agent pi|copilot-sdk`)
+and is intentionally not part of public session payload contracts.
 
 ## REST API
 
@@ -43,7 +45,7 @@ Common action flows:
 
 ### Models
 
-- `GET /api/models` — list available Pi runtime models discovered from Pi RPC `get_available_models`.
+- `GET /api/models` — list available models from the currently active runtime adapter.
 
 ### Session profiles
 

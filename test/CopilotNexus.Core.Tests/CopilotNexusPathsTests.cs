@@ -60,6 +60,7 @@ public class CopilotNexusPathsTests
         Assert.Equal(Path.Combine(ExpectedRoot, "state", "session-state.json"), CopilotNexusPaths.NexusAppStateFile);
         Assert.Equal(Path.Combine(ExpectedRoot, "state", "session-profiles.json"), CopilotNexusPaths.NexusSessionProfilesFile);
         Assert.Equal(Path.Combine(ExpectedRoot, "state", "publish-version-state.json"), CopilotNexusPaths.PublishVersionStateFile);
+        Assert.Equal(Path.Combine(ExpectedRoot, "state", "runtime-config.json"), CopilotNexusPaths.RuntimeAgentConfigFile);
     }
 
     [Fact]

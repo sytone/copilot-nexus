@@ -1,21 +1,22 @@
-# Feature: Pi model and agent-profile selection
+# Feature: Runtime model and agent-profile selection
 
 Users can choose both runtime model and reusable agent configuration (session profile) from the Nexus-backed desktop UI.
 
 ## Background
 
-Nexus runs Pi in RPC mode and exposes model/profile controls through its REST contracts:
+Nexus runs a selected runtime adapter (Pi RPC or Copilot SDK) and exposes
+model/profile controls through its REST contracts:
 
-- `GET /api/models` for runtime-discoverable Pi models.
+- `GET /api/models` for runtime-discoverable models from the active runtime.
 - `GET /api/session-profiles` for reusable profile defaults.
 - `PUT /api/sessions/{id}/configure` for applying model/profile-derived configuration to active sessions.
 
-## Scenario: Models are discovered from Pi runtime
+## Scenario: Models are discovered from active runtime
 
 ```gherkin
-Given Nexus can start the Pi executable
+Given Nexus can start the selected runtime adapter
 When a client requests GET /api/models
-Then Nexus queries Pi RPC get_available_models
+Then Nexus queries the active runtime model catalog
 And returns model IDs that can be used directly for session create/configure
 And each model entry includes user-visible name and capabilities metadata
 ```

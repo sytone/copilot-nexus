@@ -41,8 +41,8 @@ share the same backend without duplicating SDK integration logic.
 │  Webhook (WebhookController)           │
 │  ModelsController                      │
 │                                        │
-│  SessionManager ◄── PiRpcClientService │
-│  (Pi coding agent RPC runtime)         │
+│  SessionManager ◄── IAgentClientService│
+│  (Pi RPC or Copilot SDK runtime)       │
 └──────────────────┬─────────────────────┘
                    ▲
 ┌──────────────────┘
@@ -69,9 +69,13 @@ share the same backend without duplicating SDK integration logic.
 
 ### Runtime integration
 
-Nexus uses Pi coding agent RPC (`pi --mode rpc`) as the runtime interface.
-`PiRpcClientService` hosts the process and `PiRpcSessionWrapper` maps Pi events to
-`SessionOutputEventArgs` for the app/service contracts.
+Nexus supports two runtime adapters behind the same service contracts:
+
+- Pi RPC (`pi --mode rpc`) via `PiRpcClientService`
+- GitHub Copilot SDK via `CopilotClientService`
+
+`SessionManager` depends on `IAgentClientService`, so clients remain runtime-agnostic.
+Runtime selection is configured operationally (for example, `nexus start --agent pi|copilot-sdk`).
 
 The Avalonia app remains runtime-agnostic and interacts only through Nexus APIs.
 
@@ -98,7 +102,10 @@ contract types used by both App and Nexus.
 | Component                       | Responsibility                                                                    |
 | ------------------------------- | --------------------------------------------------------------------------------- |
 | `IAgentClientService`           | Runtime client contract — create, resume, delete sessions                         |
-| `PiRpcClientService`            | Implementation — hosts Pi coding agent in RPC mode                                |
+| `PiRpcClientService`            | Runtime implementation — hosts Pi coding agent in RPC mode                        |
+| `CopilotClientService`          | Runtime implementation — wraps GitHub Copilot SDK sessions                        |
+| `IRuntimeAgentConfigService`    | Persisted runtime adapter selection (`pi` / `copilot-sdk`)                        |
+| `JsonRuntimeAgentConfigService` | JSON persistence for runtime selection in Nexus state                              |
 | `MockCopilotClientService`      | Test implementation — simulates connection for UI testing                         |
 | `ICopilotSessionWrapper`        | Wraps one `CopilotSession` with typed output events                               |
 | `CopilotSessionWrapper`         | Implementation — subscribes to SDK events, translates to `SessionOutputEventArgs` |
@@ -164,8 +171,8 @@ in `CopilotNexus.Cli`. Any client (desktop, web, CLI, automation) connects here.
 | `SessionProfilesController` | REST API for profile CRUD (`/api/session-profiles`)                              |
 | `ModelsController`     | REST API for listing available models                                               |
 | `WebhookController`    | Automation endpoint — accepts callback URLs for async session interaction (`POST /api/webhooks/sessions/{id}/message`) |
-| `SessionManager`       | Reuses `SessionManager` from Core to manage SDK session lifecycle                     |
-| `PiRpcClientService`   | Reuses `PiRpcClientService` from Core for Pi RPC runtime management                 |
+| `SessionManager`       | Reuses `SessionManager` from Core to manage runtime session lifecycle                  |
+| `IAgentClientService`  | Runtime adapter selected at startup (`PiRpcClientService` or `CopilotClientService`) |
 
 ## Session Persistence
 
@@ -221,9 +228,9 @@ When a user sends a prompt, the following sequence occurs:
 
 1. `SessionTabViewModel.SendCommand` → adds `User` message to `Messages`
 2. Calls `NexusSessionProxy.SendAsync(prompt)` which invokes `SessionHub.SendInput` via SignalR
-3. Nexus dispatches the prompt to the Pi RPC session wrapper
-4. Pi runtime emits streaming events during generation
-5. `PiRpcSessionWrapper` translates runtime events to `SessionOutputEventArgs`
+3. Nexus dispatches the prompt to the active runtime session wrapper
+4. Active runtime emits streaming events during generation
+5. Runtime wrapper translates events to `SessionOutputEventArgs`
 6. Nexus broadcasts delta events to connected clients via SignalR hub
 7. `NexusSessionProxy` receives SignalR delta, raises `OutputReceived` event
 8. `SessionTabViewModel.HandleOutput` receives delta via `IUiDispatcher.BeginInvoke`:

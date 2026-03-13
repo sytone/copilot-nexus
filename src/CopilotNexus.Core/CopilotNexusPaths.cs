@@ -63,6 +63,9 @@ public static class CopilotNexusPaths
     /// <summary>CLI publish version tracking state.</summary>
     public static string PublishVersionStateFile { get; } = Path.Combine(StateRoot, "publish-version-state.json");
 
+    /// <summary>Service runtime agent selection state.</summary>
+    public static string RuntimeAgentConfigFile { get; } = Path.Combine(StateRoot, "runtime-config.json");
+
     /// <summary>CLI executable — the 'nexus' command users interact with.</summary>
     public static string CliExe { get; } = Path.Combine(CliInstall, "CopilotNexus.Cli.exe");
 

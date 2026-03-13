@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Reflection;
 using System.Text.Json;
 using CopilotNexus.Core;
+using CopilotNexus.Core.Models;
 using CopilotNexus.Core.Versioning;
 using Spectre.Console;
 
@@ -25,7 +26,13 @@ internal static class CliCommands
     ];
     private sealed record ProcessExecutionResult(int ExitCode, string StandardOutput, string StandardError, TimeSpan Elapsed);
     private sealed record StartValidationResult(bool IsReady, string Message);
-    private sealed record ServiceLockInfo(int Pid, string? ExecutablePath, string? Version, string? Url, DateTimeOffset StartedAtUtc);
+    private sealed record ServiceLockInfo(
+        int Pid,
+        string? ExecutablePath,
+        string? Version,
+        string? Url,
+        DateTimeOffset StartedAtUtc,
+        string? Agent = null);
     private sealed record PublishVersionState(string BaseVersion, string? LastCommitSha);
     private sealed record PublishVersionPlan(
         SemanticVersion NextBaseVersion,
@@ -73,8 +80,22 @@ internal static class CliCommands
     }
 
     // --- start ---
-    internal static void RunStart(string url)
+    internal static void RunStart(string url, string? agent = null)
     {
+        RuntimeAgentType? runtimeOverride = null;
+        if (!string.IsNullOrWhiteSpace(agent))
+        {
+            if (!RuntimeAgentTypeExtensions.TryParse(agent, out var parsed))
+            {
+                AnsiConsole.MarkupLine(
+                    $"[red]Invalid runtime agent '{Markup.Escape(agent)}'.[/] Supported values: [dim]{Markup.Escape(RuntimeAgentTypeExtensions.SupportedValuesHint())}[/]");
+                Environment.ExitCode = 1;
+                return;
+            }
+
+            runtimeOverride = parsed;
+        }
+
         // Check if already running
         var lockInfo = ReadServiceLockInfo();
         if (lockInfo != null)
@@ -104,10 +125,13 @@ internal static class CliCommands
         }
 
         var resolvedVersion = TryExtractVersionFromExecutablePath(serviceExe);
+        var runtimeArgument = runtimeOverride.HasValue
+            ? $" --agent {runtimeOverride.Value.ToConfigValue()}"
+            : string.Empty;
         var psi = new ProcessStartInfo
         {
             FileName = serviceExe,
-            Arguments = $"--urls {url}",
+            Arguments = $"--urls {url}{runtimeArgument}",
             UseShellExecute = false,
             CreateNoWindow = true,
         };
@@ -125,7 +149,8 @@ internal static class CliCommands
             serviceExe,
             resolvedVersion,
             url,
-            DateTimeOffset.UtcNow));
+            DateTimeOffset.UtcNow,
+            runtimeOverride?.ToConfigValue()));
 
         var validation = ValidateStartedServiceAsync(url, proc).GetAwaiter().GetResult();
         if (!validation.IsReady)
@@ -140,6 +165,8 @@ internal static class CliCommands
 
         AnsiConsole.MarkupLine($"[green]✓[/] Nexus service started (PID [bold]{proc.Id}[/])");
         AnsiConsole.MarkupLine($"  URL: [link]{url}[/]");
+        if (runtimeOverride.HasValue)
+            AnsiConsole.MarkupLine($"  Runtime: [dim]{Markup.Escape(runtimeOverride.Value.ToConfigValue())}[/]");
         AnsiConsole.MarkupLine("  Use [blue]nexus status[/] to check · [blue]nexus stop[/] to stop");
     }
 
@@ -232,6 +259,7 @@ internal static class CliCommands
         table.AddRow("Process", processStatus);
         table.AddRow("PID", pidDisplay);
         table.AddRow("URL", Markup.Escape(baseUrl));
+        table.AddRow("Runtime agent", Markup.Escape(lockInfo?.Agent ?? "configured default"));
         table.AddRow("Health", serviceStatus);
         table.AddRow("Sessions", sessions);
         table.AddRow("Models", models);

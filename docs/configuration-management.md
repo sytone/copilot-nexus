@@ -33,6 +33,7 @@ Supported app arguments:
 Examples:
 
 - `nexus start --url <url>`
+- `nexus start --url <url> --agent <pi|copilot-sdk>`
 - `nexus status --url <url>`
 - `nexus build -c <Debug|Release>`
 - `nexus publish --component <nexus|app|cli|both>`
@@ -57,6 +58,7 @@ Primary paths are centralized in `src/CopilotNexus.Core/CopilotNexusPaths.cs`:
 - `Logs`: `%LOCALAPPDATA%\CopilotNexus\logs`
 - `NexusLockFile`: `%LOCALAPPDATA%\CopilotNexus\nexus.lock`
 - `PublishVersionStateFile`: `%LOCALAPPDATA%\CopilotNexus\state\publish-version-state.json`
+- `RuntimeAgentConfigFile`: `%LOCALAPPDATA%\CopilotNexus\state\runtime-config.json`
 
 ## Session Information Persistence
 
@@ -103,6 +105,7 @@ In practice, user-specific behavior is represented by:
 
 - Startup flags (for example `--test-mode`, `--nexus-url`)
 - Nexus-managed persisted `session-state.json` metadata
+- Nexus-managed persisted `runtime-config.json` runtime adapter selection
 - Install/versioned-publish layout and lock/log files under `%LOCALAPPDATA%\CopilotNexus`
 
 ## Environment Variables

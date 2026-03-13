@@ -2,6 +2,7 @@ namespace CopilotNexus.Service;
 
 using CopilotNexus.Core;
 using CopilotNexus.Core.Interfaces;
+using CopilotNexus.Core.Models;
 using CopilotNexus.Core.Services;
 using CopilotNexus.Service.Hubs;
 using Serilog;
@@ -16,6 +17,12 @@ public static class NexusHostBuilder
     /// Creates a fully configured WebApplicationBuilder with all Nexus services registered.
     /// </summary>
     public static WebApplicationBuilder CreateBuilder(string[]? args = null)
+        => CreateBuilder(RuntimeAgentType.Pi, args);
+
+    /// <summary>
+    /// Creates a fully configured WebApplicationBuilder with all Nexus services registered.
+    /// </summary>
+    public static WebApplicationBuilder CreateBuilder(RuntimeAgentType runtimeAgent, string[]? args = null)
     {
         var builder = WebApplication.CreateBuilder(args ?? []);
 
@@ -37,10 +44,22 @@ public static class NexusHostBuilder
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();
 
+        builder.Services.AddSingleton<IRuntimeAgentConfigService>(sp =>
+        {
+            var logger = sp.GetRequiredService<ILogger<JsonRuntimeAgentConfigService>>();
+            return new JsonRuntimeAgentConfigService(logger, GetRuntimeConfigPath());
+        });
+
         builder.Services.AddSingleton<IAgentClientService>(sp =>
         {
-            var logger = sp.GetRequiredService<ILogger<PiRpcClientService>>();
-            return new PiRpcClientService(logger);
+            return runtimeAgent switch
+            {
+                RuntimeAgentType.Pi => new PiRpcClientService(
+                    sp.GetRequiredService<ILogger<PiRpcClientService>>()),
+                RuntimeAgentType.CopilotSdk => new CopilotClientService(
+                    sp.GetRequiredService<ILogger<CopilotClientService>>()),
+                _ => throw new InvalidOperationException($"Unsupported runtime agent '{runtimeAgent}'."),
+            };
         });
 
         builder.Services.AddSingleton<ISessionManager>(sp =>
@@ -99,6 +118,19 @@ public static class NexusHostBuilder
         }
 
         return CopilotNexusPaths.NexusSessionProfilesFile;
+    }
+
+    private static string GetRuntimeConfigPath()
+    {
+        var isTestMode = Environment.GetEnvironmentVariable("NEXUS_TEST_MODE") == "1";
+        if (isTestMode)
+        {
+            var testStateRoot = Path.Combine(Path.GetTempPath(), "CopilotNexus", "test-state");
+            Directory.CreateDirectory(testStateRoot);
+            return Path.Combine(testStateRoot, $"runtime-config-{Environment.ProcessId}.json");
+        }
+
+        return CopilotNexusPaths.RuntimeAgentConfigFile;
     }
 
     /// <summary>
