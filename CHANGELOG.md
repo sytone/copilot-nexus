@@ -30,6 +30,7 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - User-specific session state moved from `%LOCALAPPDATA%\CopilotNexus\...` to `%USERPROFILE%\.copilot-nexus\session-state.json`; install/runtime binaries remain under `%LOCALAPPDATA%\CopilotNexus\`
 - Install/publish flow now writes versioned payload directories under `%LOCALAPPDATA%\CopilotNexus\app\{cli|service|winapp}\<version>\...`.
 - Session send paths (`SessionHub` + `SessionsController`) now dispatch long-running sends in background and return acceptance immediately.
+- `scripts/Update-Nexus.ps1` now reconciles the `nexus` alias, removes legacy install artifacts, and performs shim-based stop/restart when legacy paths are detected.
 
 ### Fixed
 

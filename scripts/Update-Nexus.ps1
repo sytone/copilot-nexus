@@ -8,7 +8,9 @@
     This script follows the shim-first deployment flow:
     1) Build the solution with `nexus build` (unless -SkipBuild is used)
     2) Publish a new versioned payload with `nexus publish`
-    3) Optionally restart Nexus service so the shim launches the newest version
+    3) Reconcile the `nexus` alias to the installed CLI shim path
+    4) If legacy install artifacts are detected, stop Nexus processes, clean the artifacts, and restart via shim
+    5) Optionally restart Nexus service so the shim launches the newest version
 
 .PARAMETER Configuration
     Build configuration: Debug or Release. Defaults to Release.
@@ -45,7 +47,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Invoke-NexusOrThrow {
+function Invoke-SourceCliOrThrow {
     param(
         [Parameter(Mandatory = $true)]
         [string[]]$Arguments,
@@ -59,9 +61,168 @@ function Invoke-NexusOrThrow {
     }
 }
 
+function Invoke-InstalledCliOrThrow {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$Arguments,
+        [Parameter(Mandatory = $true)]
+        [string]$FailureMessage
+    )
+
+    if (-not (Test-Path -LiteralPath $nexusCliExe)) {
+        throw "Installed CLI shim not found: $nexusCliExe"
+    }
+
+    & $nexusCliExe @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "$FailureMessage (exit code $LASTEXITCODE)"
+    }
+}
+
+function Ensure-NexusAlias {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$AliasTarget
+    )
+
+    if (-not (Test-Path -LiteralPath $AliasTarget)) {
+        throw "Cannot set nexus alias. Target does not exist: $AliasTarget"
+    }
+
+    $resolvedTarget = (Resolve-Path -LiteralPath $AliasTarget).Path
+    $alias = Get-Alias -Name nexus -ErrorAction SilentlyContinue
+    $resolvedCurrent = $null
+
+    if ($null -ne $alias) {
+        try {
+            $resolvedCurrent = (Resolve-Path -LiteralPath $alias.Definition -ErrorAction Stop).Path
+        }
+        catch {
+            $resolvedCurrent = $alias.Definition
+        }
+    }
+
+    if ($null -eq $alias) {
+        Set-Alias -Name nexus -Value $AliasTarget -Scope Global
+        Write-Host "Set nexus alias to installed shim: $AliasTarget" -ForegroundColor Green
+        return
+    }
+
+    if (-not [string]::Equals($resolvedCurrent, $resolvedTarget, [System.StringComparison]::OrdinalIgnoreCase)) {
+        Set-Alias -Name nexus -Value $AliasTarget -Scope Global
+        Write-Host "Updated nexus alias to installed shim: $AliasTarget" -ForegroundColor Green
+        return
+    }
+
+    Write-Host "nexus alias already points to installed shim: $AliasTarget" -ForegroundColor DarkGray
+}
+
+function Get-LegacyInstallArtifacts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$InstallRoot
+    )
+
+    $artifacts = New-Object System.Collections.Generic.List[string]
+    $legacyFolders = @(
+        (Join-Path $InstallRoot 'cli'),
+        (Join-Path $InstallRoot 'service'),
+        (Join-Path $InstallRoot 'winapp'),
+        (Join-Path $InstallRoot 'nexus')
+    )
+
+    foreach ($folder in $legacyFolders) {
+        if (Test-Path -LiteralPath $folder -PathType Container) {
+            $artifacts.Add((Resolve-Path -LiteralPath $folder).Path)
+        }
+    }
+
+    $legacyRootFiles = Get-ChildItem -Path $InstallRoot -File -Filter 'CopilotNexus.*' -ErrorAction SilentlyContinue
+    foreach ($file in $legacyRootFiles) {
+        if ($file.Name -ne 'nexus.lock') {
+            $artifacts.Add($file.FullName)
+        }
+    }
+
+    return $artifacts | Sort-Object -Unique
+}
+
+function Stop-LegacyProcesses {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$LegacyArtifactPaths
+    )
+
+    $legacyRoots = @()
+    foreach ($artifact in $LegacyArtifactPaths) {
+        if (Test-Path -LiteralPath $artifact -PathType Container) {
+            $legacyRoots += (Resolve-Path -LiteralPath $artifact).Path.TrimEnd('\')
+        }
+        else {
+            $legacyRoots += (Split-Path -Path $artifact -Parent)
+        }
+    }
+
+    $legacyRoots = $legacyRoots | Sort-Object -Unique
+    if ($legacyRoots.Count -eq 0) {
+        return
+    }
+
+    foreach ($process in Get-Process -ErrorAction SilentlyContinue) {
+        $processPath = $null
+        try {
+            $processPath = $process.Path
+        }
+        catch {
+            continue
+        }
+
+        if ([string]::IsNullOrWhiteSpace($processPath)) {
+            continue
+        }
+
+        foreach ($root in $legacyRoots) {
+            if ($processPath.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) {
+                Write-Host "Stopping legacy process $($process.ProcessName) (PID $($process.Id)) from $processPath" -ForegroundColor Yellow
+                Stop-Process -Id $process.Id -Force
+                break
+            }
+        }
+    }
+}
+
+function Remove-LegacyArtifacts {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string[]]$LegacyArtifactPaths
+    )
+
+    foreach ($artifact in $LegacyArtifactPaths) {
+        if (-not (Test-Path -LiteralPath $artifact)) {
+            continue
+        }
+
+        Write-Host "Removing legacy artifact: $artifact" -ForegroundColor Yellow
+        Remove-Item -LiteralPath $artifact -Recurse -Force
+    }
+}
+
+function Try-StopServiceForCleanup {
+    if (Test-Path -LiteralPath $nexusCliExe) {
+        & $nexusCliExe stop | Out-Null
+    }
+    else {
+        & dotnet run --project $cliProject -- stop | Out-Null
+    }
+}
+
 $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $projectRoot = Split-Path -Parent $scriptRoot
 $cliProject = Join-Path $projectRoot 'src/CopilotNexus.Cli/CopilotNexus.Cli.csproj'
+$installRoot = Join-Path $env:LOCALAPPDATA 'CopilotNexus'
+$nexusCliExe = Join-Path $installRoot 'app\cli\CopilotNexus.Cli.exe'
+$legacyArtifacts = @()
+$legacyCleanupRequired = $false
 
 Write-Host 'Copilot Nexus Publish Script' -ForegroundColor Cyan
 Write-Host "Project root: $projectRoot" -ForegroundColor DarkGray
@@ -74,24 +235,54 @@ if (-not (Test-Path $cliProject)) {
     throw "CLI project not found: $cliProject"
 }
 
+$legacyArtifacts = Get-LegacyInstallArtifacts -InstallRoot $installRoot
+$legacyCleanupRequired = $legacyArtifacts.Count -gt 0
+
+if ($legacyCleanupRequired) {
+    Write-Host "`nLegacy install artifacts detected. Entering cleanup flow." -ForegroundColor Yellow
+    $legacyArtifacts | ForEach-Object { Write-Host "  - $_" -ForegroundColor DarkGray }
+}
+else {
+    Write-Host "`nNo legacy install artifacts detected. Running standard publish flow." -ForegroundColor DarkGray
+}
+
 Push-Location $projectRoot
 try {
     if (-not $SkipBuild) {
         Write-Host "`nBuilding solution ($Configuration)..." -ForegroundColor Yellow
-        Invoke-NexusOrThrow -Arguments @('build', '-c', $Configuration) -FailureMessage 'Build failed'
+        Invoke-SourceCliOrThrow -Arguments @('build', '-c', $Configuration) -FailureMessage 'Build failed'
         Write-Host 'Build succeeded' -ForegroundColor Green
     }
     else {
         Write-Host "`nSkipping build as requested." -ForegroundColor Yellow
     }
 
-    Write-Host "`nPublishing component: $Component" -ForegroundColor Yellow
-    Invoke-NexusOrThrow -Arguments @('publish', '--component', $Component) -FailureMessage 'Publish failed'
+    if ($legacyCleanupRequired) {
+        Write-Host "`nStopping Nexus processes before legacy cleanup..." -ForegroundColor Yellow
+        Try-StopServiceForCleanup
+        Stop-LegacyProcesses -LegacyArtifactPaths $legacyArtifacts
+    }
 
-    if ($RestartService -and ($Component -eq 'nexus' -or $Component -eq 'both')) {
+    Write-Host "`nPublishing component: $Component" -ForegroundColor Yellow
+    Invoke-SourceCliOrThrow -Arguments @('publish', '--component', $Component) -FailureMessage 'Publish failed'
+
+    if ($legacyCleanupRequired) {
+        Write-Host "`nCleaning legacy install artifacts..." -ForegroundColor Yellow
+        Remove-LegacyArtifacts -LegacyArtifactPaths $legacyArtifacts
+    }
+
+    Ensure-NexusAlias -AliasTarget $nexusCliExe
+
+    $restartForComponent = $RestartService -and ($Component -eq 'nexus' -or $Component -eq 'both')
+    if ($legacyCleanupRequired) {
+        Write-Host "`nRestarting Nexus service via installed shim after legacy cleanup..." -ForegroundColor Yellow
+        Invoke-InstalledCliOrThrow -Arguments @('start') -FailureMessage 'Service restart via shim failed'
+        Write-Host 'Service restarted via shim' -ForegroundColor Green
+    }
+    elseif ($restartForComponent) {
         Write-Host "`nRestarting Nexus service to load latest version..." -ForegroundColor Yellow
         & dotnet run --project $cliProject -- stop | Out-Null
-        Invoke-NexusOrThrow -Arguments @('start') -FailureMessage 'Service restart failed'
+        Invoke-SourceCliOrThrow -Arguments @('start') -FailureMessage 'Service restart failed'
         Write-Host 'Service restarted' -ForegroundColor Green
     }
 }
