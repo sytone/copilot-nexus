@@ -1,5 +1,6 @@
 namespace CopilotNexus.Core.Tests;
 
+using System.IO;
 using CopilotNexus.Core.Interfaces;
 using CopilotNexus.Core.Models;
 using CopilotNexus.Core.Services;
@@ -116,6 +117,29 @@ public class SessionManagerTests
             c => c.ResumeSessionAsync(
                 "my-sdk-id",
                 It.IsAny<SessionConfiguration?>(),
+                It.IsAny<Func<ToolPermissionRequest, Task<PermissionDecision>>?>(),
+                It.IsAny<Func<AgentUserInputRequest, Task<AgentUserInputResponse>>?>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ResumeSessionAsync_FallsBackToCreate_WhenSessionNotFound()
+    {
+        _mockClientService
+            .Setup(c => c.ResumeSessionAsync(
+                "missing-sdk-id",
+                It.IsAny<SessionConfiguration?>(),
+                It.IsAny<Func<ToolPermissionRequest, Task<PermissionDecision>>?>(),
+                It.IsAny<Func<AgentUserInputRequest, Task<AgentUserInputResponse>>?>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("Request session.resume failed with message: Session not found: missing-sdk-id"));
+
+        await _manager.ResumeSessionAsync("Recovered Session", "missing-sdk-id");
+
+        _mockClientService.Verify(c => c.CreateSessionAsync(
+                "missing-sdk-id",
+                It.Is<SessionConfiguration>(cfg => cfg.Model == "gpt-4.1"),
                 It.IsAny<Func<ToolPermissionRequest, Task<PermissionDecision>>?>(),
                 It.IsAny<Func<AgentUserInputRequest, Task<AgentUserInputResponse>>?>(),
                 It.IsAny<CancellationToken>()),

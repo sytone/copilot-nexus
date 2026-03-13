@@ -2,7 +2,6 @@ namespace CopilotNexus.Service.Controllers;
 
 using CopilotNexus.Core.Contracts;
 using CopilotNexus.Core.Interfaces;
-using CopilotNexus.Core.Models;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
@@ -10,19 +9,17 @@ using Microsoft.AspNetCore.Mvc;
 public class ModelsController : ControllerBase
 {
     private readonly ISessionManager _sessionManager;
-
-    public ModelsController(ISessionManager sessionManager)
-    {
-        _sessionManager = sessionManager;
-    }
+    public ModelsController(ISessionManager sessionManager) => _sessionManager = sessionManager;
 
     /// <summary>List all available models.</summary>
     [HttpGet]
     public ActionResult<List<ModelInfoDto>> ListModels()
     {
-        var models = _sessionManager.AvailableModels
+        var models = _sessionManager.AvailableModels;
+
+        var output = models
             .Select(ModelInfoDto.FromModelInfo)
             .ToList();
-        return Ok(models);
+        return Ok(output);
     }
 }

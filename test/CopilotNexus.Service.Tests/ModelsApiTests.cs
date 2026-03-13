@@ -1,6 +1,5 @@
 namespace CopilotNexus.Service.Tests;
 
-using System.Net;
 using System.Net.Http.Json;
 using CopilotNexus.Core.Contracts;
 using Xunit;
@@ -38,4 +37,5 @@ public class ModelsApiTests : IClassFixture<NexusTestFactory>
         Assert.NotEmpty(first.ModelId);
         Assert.NotEmpty(first.Name);
     }
+
 }

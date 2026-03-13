@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 public class SessionManager : ISessionManager
 {
     private const string FallbackModelId = "gpt-4.1";
-    private readonly ICopilotClientService _clientService;
+    private readonly IAgentClientService _clientService;
     private readonly ILogger<SessionManager> _logger;
     private readonly ConcurrentDictionary<string, SessionInfo> _sessions = new();
     private readonly ConcurrentDictionary<string, ICopilotSessionWrapper> _wrappers = new();
@@ -21,18 +21,37 @@ public class SessionManager : ISessionManager
     public event EventHandler<SessionInfo>? SessionAdded;
     public event EventHandler<SessionInfo>? SessionRemoved;
 
-    public SessionManager(ICopilotClientService clientService, ILogger<SessionManager> logger)
+    public SessionManager(IAgentClientService clientService, ILogger<SessionManager> logger)
     {
         _clientService = clientService;
         _logger = logger;
     }
 
+    /// <summary>
+    /// Backward-compatible constructor used by tests and legacy call sites.
+    /// If multiple services are supplied, the first service is used.
+    /// </summary>
+    public SessionManager(IEnumerable<IAgentClientService> clientServices, ILogger<SessionManager> logger)
+        : this(
+            clientServices.FirstOrDefault()
+                ?? throw new InvalidOperationException("At least one agent client service must be registered."),
+            logger)
+    {
+    }
+
+    /// <summary>
+    /// Backward-compatible constructor used by existing tests and call sites.
+    /// </summary>
+    public SessionManager(ICopilotClientService clientService, ILogger<SessionManager> logger)
+        : this((IAgentClientService)clientService, logger)
+    {
+    }
+
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Initializing session manager...");
-        await _clientService.StartAsync(cancellationToken);
 
-        // Cache available models
+        await _clientService.StartAsync(cancellationToken);
         try
         {
             var models = await _clientService.ListModelsAsync(cancellationToken);
@@ -41,7 +60,8 @@ public class SessionManager : ISessionManager
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Failed to list models during initialization");
+            _logger.LogWarning(ex, "Failed to list available models during initialization");
+            _availableModels = new List<ModelInfo>();
         }
 
         _logger.LogInformation("Session manager initialized");
@@ -69,13 +89,23 @@ public class SessionManager : ISessionManager
             SkillDirectories = (config.SkillDirectories ?? []).ToList(),
         };
 
-        // Generate a structured SDK session ID for persistence
+        // Generate a structured SDK session ID for persistence.
         var sdkSessionId = $"copilot-nexus-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}-{Guid.NewGuid().ToString("N")[..6]}";
 
-        _logger.LogInformation("Creating session '{Name}' with model {Model}, autopilot={Autopilot}, workDir={WorkDir}, SDK ID {SdkId}",
-            name, resolvedModel, effectiveConfig.IsAutopilot, effectiveConfig.WorkingDirectory ?? "(default)", sdkSessionId);
+        _logger.LogInformation(
+            "Creating session '{Name}' with model {Model}, autopilot={Autopilot}, workDir={WorkDir}, SDK ID {SdkId}",
+            name,
+            resolvedModel,
+            effectiveConfig.IsAutopilot,
+            effectiveConfig.WorkingDirectory ?? "(default)",
+            sdkSessionId);
 
-        var wrapper = await _clientService.CreateSessionAsync(sdkSessionId, effectiveConfig, permissionHandler, userInputHandler, cancellationToken);
+        var wrapper = await _clientService.CreateSessionAsync(
+            sdkSessionId,
+            effectiveConfig,
+            permissionHandler,
+            userInputHandler,
+            cancellationToken);
         var info = new SessionInfo(name, resolvedModel, wrapper.SessionId)
         {
             State = SessionState.Running,
@@ -92,7 +122,11 @@ public class SessionManager : ISessionManager
         _sessions[info.Id] = info;
         _wrappers[info.Id] = wrapper;
 
-        _logger.LogInformation("Session '{Name}' created with ID {SessionId}, SDK ID {SdkId}", name, info.Id, wrapper.SessionId);
+        _logger.LogInformation(
+            "Session '{Name}' created with ID {SessionId}, SDK ID {SdkId}",
+            name,
+            info.Id,
+            wrapper.SessionId);
         SessionAdded?.Invoke(this, info);
         return info;
     }
@@ -106,14 +140,10 @@ public class SessionManager : ISessionManager
         CancellationToken cancellationToken = default)
     {
         config ??= new SessionConfiguration();
-
-        _logger.LogInformation("Resuming session '{Name}' with SDK ID {SdkId}, model={Model}, autopilot={Autopilot}",
-            name, sdkSessionId, config.Model ?? "(unchanged)", config.IsAutopilot);
-
-        var wrapper = await _clientService.ResumeSessionAsync(sdkSessionId, config, permissionHandler, userInputHandler, cancellationToken);
-        var info = new SessionInfo(name, config.Model, wrapper.SessionId)
+        var resolvedModel = ResolveModel(config.Model);
+        var effectiveConfig = new SessionConfiguration
         {
-            State = SessionState.Running,
+            Model = resolvedModel,
             WorkingDirectory = config.WorkingDirectory,
             IsAutopilot = config.IsAutopilot,
             ProfileId = config.ProfileId,
@@ -124,10 +154,58 @@ public class SessionManager : ISessionManager
             SkillDirectories = (config.SkillDirectories ?? []).ToList(),
         };
 
+        _logger.LogInformation(
+            "Resuming session '{Name}' with SDK ID {SdkId}, model={Model}, autopilot={Autopilot}",
+            name,
+            sdkSessionId,
+            resolvedModel,
+            effectiveConfig.IsAutopilot);
+
+        ICopilotSessionWrapper wrapper;
+        try
+        {
+            wrapper = await _clientService.ResumeSessionAsync(
+                sdkSessionId,
+                effectiveConfig,
+                permissionHandler,
+                userInputHandler,
+                cancellationToken);
+        }
+        catch (Exception ex) when (IsSessionNotFoundException(ex))
+        {
+            _logger.LogWarning(
+                ex,
+                "Session {SdkSessionId} was not found. Creating a fresh session with the same SDK ID.",
+                sdkSessionId);
+            wrapper = await _clientService.CreateSessionAsync(
+                sdkSessionId,
+                effectiveConfig,
+                permissionHandler,
+                userInputHandler,
+                cancellationToken);
+        }
+
+        var info = new SessionInfo(name, resolvedModel, wrapper.SessionId)
+        {
+            State = SessionState.Running,
+            WorkingDirectory = effectiveConfig.WorkingDirectory,
+            IsAutopilot = effectiveConfig.IsAutopilot,
+            ProfileId = effectiveConfig.ProfileId,
+            AgentFilePath = effectiveConfig.AgentFilePath,
+            IncludeWellKnownMcpConfigs = effectiveConfig.IncludeWellKnownMcpConfigs,
+            AdditionalMcpConfigPaths = effectiveConfig.AdditionalMcpConfigPaths.ToList(),
+            EnabledMcpServers = effectiveConfig.EnabledMcpServers.ToList(),
+            SkillDirectories = effectiveConfig.SkillDirectories.ToList(),
+        };
+
         _sessions[info.Id] = info;
         _wrappers[info.Id] = wrapper;
 
-        _logger.LogInformation("Session '{Name}' resumed with ID {SessionId}, SDK ID {SdkId}", name, info.Id, wrapper.SessionId);
+        _logger.LogInformation(
+            "Session '{Name}' resumed with ID {SessionId}, SDK ID {SdkId}",
+            name,
+            info.Id,
+            wrapper.SessionId);
         SessionAdded?.Invoke(this, info);
         return info;
     }
@@ -145,11 +223,11 @@ public class SessionManager : ISessionManager
         _logger.LogInformation("Reconfiguring session '{Name}' — disconnect + resume with new config", existingInfo.Name);
         var resolvedModel = config.Model ?? existingInfo.Model ?? ResolveModel(null);
 
-        // Get the SDK session ID before disposing
+        // Get the SDK session ID before disposing.
         var sdkSessionId = existingInfo.SdkSessionId;
         var name = existingInfo.Name;
 
-        // Disconnect the existing session (preserves state on disk)
+        // Disconnect the existing session (preserves state on disk).
         if (_wrappers.TryRemove(sessionId, out var existingWrapper))
         {
             try
@@ -164,7 +242,7 @@ public class SessionManager : ISessionManager
 
         _sessions.TryRemove(sessionId, out _);
 
-        // Resume with new configuration
+        // Resume with new configuration.
         var wrapper = await _clientService.ResumeSessionAsync(sdkSessionId, config, permissionHandler, userInputHandler, cancellationToken);
         var newInfo = SessionInfo.FromRemote(
             sessionId,
@@ -260,11 +338,29 @@ public class SessionManager : ISessionManager
         return wrapper;
     }
 
+    private static bool IsSessionNotFoundException(Exception exception)
+    {
+        Exception? current = exception;
+        while (current is not null)
+        {
+            if (!string.IsNullOrWhiteSpace(current.Message)
+                && current.Message.Contains("Session not found", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            current = current.InnerException;
+        }
+
+        return false;
+    }
+
     public async ValueTask DisposeAsync()
     {
-        if (_disposed) return;
-        _disposed = true;
+        if (_disposed)
+            return;
 
+        _disposed = true;
         _logger.LogInformation("Disposing session manager ({Count} sessions)", _wrappers.Count);
 
         foreach (var (id, wrapper) in _wrappers)
@@ -281,6 +377,15 @@ public class SessionManager : ISessionManager
 
         _wrappers.Clear();
         _sessions.Clear();
+
+        try
+        {
+            await _clientService.StopAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error stopping runtime service during shutdown");
+        }
 
         GC.SuppressFinalize(this);
     }

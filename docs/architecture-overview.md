@@ -3,15 +3,15 @@
 ## High-Level Design
 
 Copilot Nexus is a cross-platform desktop application (Avalonia 11.3.12 / .NET 8) that
-manages multiple GitHub Copilot SDK sessions in a tabbed interface. It uses the
+manages multiple agent-runtime sessions in a tabbed interface. It uses the
 **MVVM pattern** with interface-based abstractions for testability.
 
 The application follows a **client–service split architecture**. The Avalonia desktop app
 is a thin client that communicates with **CopilotNexus.Service**, an ASP.NET Core backend
-service that owns all SDK interactions. **CopilotNexus.Cli** is a separate console
+service that owns all runtime interactions. **CopilotNexus.Cli** is a separate console
 application that provides the `nexus` command-line interface for managing the service,
 publishing updates, and launching the desktop app. The app has no direct dependency on the
-Copilot SDK — all session management, streaming, and model queries flow through the Nexus
+runtime process — all session management, streaming, and model queries flow through the Nexus
 service via **SignalR** (real-time events) and **REST** (CRUD operations).
 
 This split enables multiple future clients (web UI, CLI, webhook-driven automation) to
@@ -41,8 +41,8 @@ share the same backend without duplicating SDK integration logic.
 │  Webhook (WebhookController)           │
 │  ModelsController                      │
 │                                        │
-│  SessionManager ◄── SDK                │
-│  CopilotClientService                  │
+│  SessionManager ◄── PiRpcClientService │
+│  (Pi coding agent RPC runtime)         │
 └──────────────────┬─────────────────────┘
                    ▲
 ┌──────────────────┘
@@ -67,13 +67,13 @@ share the same backend without duplicating SDK integration logic.
 └────────────────────────────┘
 ```
 
-### SDK Integration
+### Runtime integration
 
-The [GitHub Copilot SDK](https://github.com/github/copilot-sdk) (`GitHub.Copilot.SDK`
-NuGet package) communicates with the locally installed Copilot CLI over **JSON-RPC**. This
-is not a process wrapper — the SDK manages the connection lifecycle and provides typed
-events for streaming responses. In the Nexus architecture, only the Nexus service
-references the SDK directly; the Avalonia app interacts exclusively through Nexus APIs.
+Nexus uses Pi coding agent RPC (`pi --mode rpc`) as the runtime interface.
+`PiRpcClientService` hosts the process and `PiRpcSessionWrapper` maps Pi events to
+`SessionOutputEventArgs` for the app/service contracts.
+
+The Avalonia app remains runtime-agnostic and interacts only through Nexus APIs.
 
 ## Solution Projects
 
@@ -97,8 +97,8 @@ contract types used by both App and Nexus.
 
 | Component                       | Responsibility                                                                    |
 | ------------------------------- | --------------------------------------------------------------------------------- |
-| `ICopilotClientService`         | Manages the single `CopilotClient` — create, resume, delete sessions              |
-| `CopilotClientService`          | Implementation — creates client, starts connection, creates/resumes sessions      |
+| `IAgentClientService`           | Runtime client contract — create, resume, delete sessions                         |
+| `PiRpcClientService`            | Implementation — hosts Pi coding agent in RPC mode                                |
 | `MockCopilotClientService`      | Test implementation — simulates connection for UI testing                         |
 | `ICopilotSessionWrapper`        | Wraps one `CopilotSession` with typed output events                               |
 | `CopilotSessionWrapper`         | Implementation — subscribes to SDK events, translates to `SessionOutputEventArgs` |
@@ -114,7 +114,7 @@ contract types used by both App and Nexus.
 | `IUiDispatcher`                 | Abstracts UI thread marshalling for testability                                   |
 | `SessionMessage`                | Chat message model with `INotifyPropertyChanged` for streaming                    |
 | `SessionInfo`                   | Session metadata (id, name, model, state, SDK session ID); includes `FromRemote()` static factory for reconstructing from DTOs |
-| `SessionOutputEventArgs`        | Carries output data with `OutputKind` (Delta, Message, Idle)                      |
+| `SessionOutputEventArgs`        | Carries output data with `OutputKind` (Delta, Message, Reasoning, Activity, Idle) |
 | `AppState` / `TabState`         | Serialization models for lightweight state persistence                            |
 | `Contracts/Dtos.cs`             | Shared DTOs: `SessionInfoDto`, `SessionOutputDto`, `ModelInfoDto`, `CreateSessionRequest`, etc. |
 | `Contracts/ISessionHubClient.cs`| SignalR client interface — defines methods the hub can invoke on connected clients |
@@ -162,32 +162,18 @@ in `CopilotNexus.Cli`. Any client (desktop, web, CLI, automation) connects here.
 | `SessionHub` (SignalR) | Real-time session operations: `JoinSession`, `LeaveSession`, `SendInput`, `AbortSession` |
 | `SessionsController`   | REST API for session CRUD — create, list, get, configure, send input, delete          |
 | `SessionProfilesController` | REST API for profile CRUD (`/api/session-profiles`)                              |
-| `ModelsController`     | REST API for listing available Copilot models                                         |
+| `ModelsController`     | REST API for listing available models                                               |
 | `WebhookController`    | Automation endpoint — accepts callback URLs for async session interaction (`POST /api/webhooks/sessions/{id}/message`) |
 | `SessionManager`       | Reuses `SessionManager` from Core to manage SDK session lifecycle                     |
-| `CopilotClientService` | Reuses `CopilotClientService` from Core for SDK client management                    |
+| `PiRpcClientService`   | Reuses `PiRpcClientService` from Core for Pi RPC runtime management                 |
 
-## Session Persistence (SDK Native)
+## Session Persistence
 
-The app leverages the Copilot SDK's built-in session persistence (managed by Nexus in
-production, or locally in test mode):
+Nexus stores lightweight tab metadata in `%LOCALAPPDATA%\\CopilotNexus\\state\\session-state.json`
+and uses runtime session IDs to reconnect sessions.
 
-1. **Structured session IDs** — generated as `copilot-nexus-{timestamp}-{guid}` and
-   passed to `SessionConfig.SessionId`. The SDK stores all conversation history, tool
-   call results, and planning state at `~/.copilot/session-state/{sessionId}/`.
-
-2. **Disconnect on exit** — when sessions are disconnected (not disposed)
-   via `session.Disconnect()`, in-memory resources are released but data is preserved on disk.
-
-3. **Resume on startup** — `client.ResumeSessionAsync(sessionId, config)` restores a
-   previous session. If resume fails (session expired/deleted), a fresh session is created.
-
-4. **Delete on tab close** — `client.DeleteSessionAsync(sessionId)` permanently removes
-   session data when the user explicitly closes a tab.
-
-5. **Nexus-owned app state** — lightweight tab metadata is persisted by the service:
-   `%LOCALAPPDATA%\\CopilotNexus\\state\\session-state.json` stores tab names, models, and SDK
-   session IDs. The desktop app loads/saves via `/api/app-state`; the SDK handles conversation history.
+If a requested session cannot be resumed (for example, `Session not found`), Nexus creates a
+fresh session using the same persisted session ID and continues.
 
 ## Distribution and Hot Restart
 
@@ -239,15 +225,15 @@ When a user sends a prompt, the following sequence occurs:
 
 1. `SessionTabViewModel.SendCommand` → adds `User` message to `Messages`
 2. Calls `NexusSessionProxy.SendAsync(prompt)` which invokes `SessionHub.SendInput` via SignalR
-3. Nexus dispatches the prompt to the SDK session via `CopilotSessionWrapper.SendAndWaitAsync`
-4. SDK fires `AssistantMessageDeltaEvent` events during generation
-5. `CopilotSessionWrapper` translates to `SessionOutputEventArgs(OutputKind.Delta)`
+3. Nexus dispatches the prompt to the Pi RPC session wrapper
+4. Pi runtime emits streaming events during generation
+5. `PiRpcSessionWrapper` translates runtime events to `SessionOutputEventArgs`
 6. Nexus broadcasts delta events to connected clients via SignalR hub
 7. `NexusSessionProxy` receives SignalR delta, raises `OutputReceived` event
 8. `SessionTabViewModel.HandleOutput` receives delta via `IUiDispatcher.BeginInvoke`:
    - First delta → creates new `SessionMessage(isStreaming: true)`, adds to collection
    - Subsequent deltas → calls `AppendContent()` on the same message
-9. SDK fires `SessionIdleEvent` when response is complete
+9. Runtime emits completion/idle signal when response is complete
 10. Nexus broadcasts idle event via SignalR; `HandleOutput` calls `CompleteStreaming()`
 11. `IsProcessing` set to false, send button re-enabled
 
@@ -264,7 +250,7 @@ All SDK and UI dependencies are behind interfaces, enabling pure unit tests:
 
 - **`SynchronousUiDispatcher`** — test helper that executes dispatched actions inline
 - **`Mock<ICopilotSessionWrapper>`** — mocks SDK session for ViewModel tests
-- **`Mock<ICopilotClientService>`** — mocks client for SessionManager tests
+- **`Mock<IAgentClientService>`** — mocks runtime client for SessionManager tests
 - **`Mock<ISessionManager>`** — mocks manager for MainWindowViewModel tests
 - **`NullLogger<T>`** — from `Microsoft.Extensions.Logging.Abstractions` for test logging
 

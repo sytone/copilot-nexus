@@ -178,7 +178,7 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
     public async Task InitializeAsync()
     {
         _logger.LogInformation("Initializing application...");
-        StatusText = "Connecting to Copilot CLI…";
+        StatusText = "Connecting to agent runtime…";
         await _sessionManager.InitializeAsync();
 
         // Populate available models

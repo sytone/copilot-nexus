@@ -14,7 +14,9 @@ public class SessionHub : Hub<ISessionHubClient>
     private readonly ISessionManager _sessionManager;
     private readonly ILogger<SessionHub> _logger;
 
-    public SessionHub(ISessionManager sessionManager, ILogger<SessionHub> logger)
+    public SessionHub(
+        ISessionManager sessionManager,
+        ILogger<SessionHub> logger)
     {
         _sessionManager = sessionManager;
         _logger = logger;

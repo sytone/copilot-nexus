@@ -22,25 +22,28 @@ public class NexusTestFactory : WebApplicationFactory<Program>
     {
         builder.ConfigureServices(services =>
         {
-            // Remove the real SDK client registration
-            var clientDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ICopilotClientService));
-            if (clientDescriptor != null) services.Remove(clientDescriptor);
+            // Remove registered runtime adapters.
+            var adapterDescriptors = services
+                .Where(descriptor => descriptor.ServiceType == typeof(IAgentClientService))
+                .ToList();
+            foreach (var descriptor in adapterDescriptors)
+                services.Remove(descriptor);
 
             // Remove real session manager
             var managerDescriptor = services.FirstOrDefault(d => d.ServiceType == typeof(ISessionManager));
             if (managerDescriptor != null) services.Remove(managerDescriptor);
 
-            // Register mock client
-            services.AddSingleton<ICopilotClientService>(sp =>
+            // Register mock runtime adapter.
+            services.AddSingleton<IAgentClientService>(sp =>
             {
                 var logger = sp.GetRequiredService<ILogger<MockCopilotClientService>>();
                 return new MockCopilotClientService(logger);
             });
 
-            // Register session manager with mock client
+            // Register session manager with mock runtime
             services.AddSingleton<ISessionManager>(sp =>
             {
-                var client = sp.GetRequiredService<ICopilotClientService>();
+                var client = sp.GetRequiredService<IAgentClientService>();
                 var logger = sp.GetRequiredService<ILogger<SessionManager>>();
                 return new SessionManager(client, logger);
             });

@@ -9,6 +9,7 @@ public class SessionProfile
     public string Id { get; set; } = Guid.NewGuid().ToString("N")[..8];
     public string Name { get; set; } = "Default";
     public string? Description { get; set; }
+
     public string? Model { get; set; }
     public bool IsAutopilot { get; set; } = true;
     public string? WorkingDirectory { get; set; }

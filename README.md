@@ -1,20 +1,20 @@
 # Copilot Nexus
 
 A Windows desktop application (Avalonia 11 / .NET 8) with a backend service for
-managing multiple GitHub Copilot SDK sessions simultaneously.
+managing multiple agent runtime sessions simultaneously.
 
 ## Why?
 
 Running multiple Copilot CLI sessions in separate terminal windows is hard to manage.
 Copilot Nexus gives you a single window with tabs — each tab is an independent
-Copilot SDK session with real-time streaming output, powered by the
-[GitHub Copilot SDK](https://github.com/github/copilot-sdk).
+Pi runtime session with real-time streaming output, powered by
+[Pi coding agent](https://pi.dev/).
 
 ## Architecture
 
 The application is split into two processes:
 
-- **Nexus** — ASP.NET Core backend service that owns all Copilot SDK sessions,
+- **Nexus** — ASP.NET Core backend service that owns all runtime sessions,
   exposed via SignalR (real-time streaming) and REST API
 - **App** — Avalonia desktop application (thin SignalR client) that renders session
   output in a tabbed interface
@@ -23,7 +23,7 @@ The application is split into two processes:
 ┌─────────────────────────┐     ┌────────────────────────────────┐
 │  Desktop App (Avalonia)  │◄──►│  Nexus (ASP.NET Core)          │
 │  SignalR client          │    │  SignalR hub + REST API         │
-│  Renders session tabs    │    │  Manages SDK sessions           │
+│  Renders session tabs    │    │  Manages Pi runtime sessions    │
 └─────────────────────────┘     │  Webhook support               │
                                 └────────────────────────────────┘
 ```
@@ -31,7 +31,7 @@ The application is split into two processes:
 ## Features
 
 - **Tabbed interface** — Create, switch between, and close Copilot sessions
-- **Direct SDK integration** — Uses `GitHub.Copilot.SDK` via JSON-RPC
+- **Pi runtime integration** — Uses Pi RPC (`pi --mode rpc`) for session execution
 - **Real-time streaming** — Responses stream word-by-word as they're generated
 - **Model selection** — Change AI model per session from the UI
 - **Dark terminal theme** — Comfortable for extended use
@@ -77,7 +77,7 @@ dotnet test CopilotNexus.slnx
 
 ```
 src/
-├── CopilotNexus.Core/       Core business logic, SDK abstractions, shared contracts
+├── CopilotNexus.Core/       Core business logic, runtime abstractions, shared contracts
 ├── CopilotNexus.App/        Avalonia desktop application (MVVM, thin SignalR client)
 └── CopilotNexus.Service/      ASP.NET Core backend — SignalR hub, REST API, CLI commands
 
@@ -94,5 +94,6 @@ docs/                             Project documentation
 
 - [Installation & Operations Guide](docs/installation-and-operations.md) — Install, run, update, troubleshoot
 - [Architecture Overview](docs/architecture-overview.md) — Detailed design and patterns
+- [API Contracts](docs/api-contracts.md) — REST/SignalR DTOs and endpoint behavior
 - [Testing Guide](docs/testing-guide.md) — Test structure and conventions
 - [Configuration Management](docs/configuration-management.md) — Runtime args, persisted state, and user-local paths

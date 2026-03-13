@@ -78,10 +78,18 @@ Stored schema (`src/CopilotNexus.Core/Models/AppState.cs`):
   - `SdkSessionId`
   - `WorkingDirectory`
   - `IsAutopilot`
+  - `SessionMode`
+  - `ProfileId`
+  - `AgentFilePath`
+  - `IncludeWellKnownMcpConfigs`
+  - `AdditionalMcpConfigPaths[]`
+  - `EnabledMcpServers[]`
+  - `SkillDirectories[]`
+  - `NexusSystemMessages[]`
 
 Important notes:
 
-- Conversation history is not persisted by this file; SDK-managed session data is used
+- Conversation history is not persisted by this file; runtime-managed session data is used
   when restoring via `SdkSessionId`.
 - Corrupt JSON is backed up to `session-state.json.bak` and then reset.
 - Orphaned temporary writes (`.tmp`) are recovered on next load.

@@ -37,15 +37,15 @@ public static class NexusHostBuilder
         builder.Services.AddControllers();
         builder.Services.AddEndpointsApiExplorer();
 
-        builder.Services.AddSingleton<ICopilotClientService>(sp =>
+        builder.Services.AddSingleton<IAgentClientService>(sp =>
         {
-            var logger = sp.GetRequiredService<ILogger<CopilotClientService>>();
-            return new CopilotClientService(logger);
+            var logger = sp.GetRequiredService<ILogger<PiRpcClientService>>();
+            return new PiRpcClientService(logger);
         });
 
         builder.Services.AddSingleton<ISessionManager>(sp =>
         {
-            var client = sp.GetRequiredService<ICopilotClientService>();
+            var client = sp.GetRequiredService<IAgentClientService>();
             var logger = sp.GetRequiredService<ILogger<SessionManager>>();
             return new SessionManager(client, logger);
         });

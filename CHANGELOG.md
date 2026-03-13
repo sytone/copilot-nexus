@@ -9,15 +9,26 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Added
 
+- Pi-only runtime contracts and services (`IAgentClientService`, `PiRpcClientService`, `PiRpcSessionWrapper`) for Nexus session execution over Pi RPC.
+- Opt-in E2E test project (`test/CopilotNexus.E2E.Tests`) for running-server API smoke checks and CLI lifecycle validation.
+- Repository-managed git hook setup (`.githooks/pre-push`, `scripts/Enable-GitHooks.ps1`) to block pushes with uncommitted changes.
 - **CopilotNexus.Cli** — standalone CLI console app (`src/CopilotNexus.Cli/`) providing the `nexus` command interface (start, stop, status, build, install, publish, update, winapp)
 - `CopilotNexusPaths.CliExe` and `CopilotNexusPaths.ServiceExe` path constants replacing the former `NexusExe`
 
 ### Changed
 
+- Nexus now runs Pi by default with simplified Pi-only API/model/session contracts (adapter-type payloads removed).
+- `nexus start` now performs startup validation (`/health`, `/api/models`, session create/delete probe) and returns a non-zero exit code on validation failure.
+- Session output view auto-scroll now pauses on manual scroll while active and resumes after inactivity.
 - **CLI/Service split** — `CopilotNexus.Service` is now a pure ASP.NET Core web host (~40 lines) with no CLI commands, no Spectre.Console, and no System.CommandLine; all CLI functionality moved to `CopilotNexus.Cli`
 - `nexus` alias now points to `CopilotNexus.Cli.exe` instead of `CopilotNexus.Service.exe`
 - `CopilotNexusPaths.NexusExe` replaced by `CliExe` (CLI entry point) and `ServiceExe` (web server)
 - User-specific session state moved from `%LOCALAPPDATA%\CopilotNexus\...` to `%USERPROFILE%\.copilot-nexus\session-state.json`; install/runtime binaries remain under `%LOCALAPPDATA%\CopilotNexus\`
+
+### Fixed
+
+- Webhook background-send cancellation now logs as informational cancellation (with optional canceled callback status) instead of error-level failure noise.
+- Pi runtime executable detection on Windows now defaults to `pi.cmd`, avoiding false "pi not found" failures when npm shims are installed.
 
 ### Added (prior)
 

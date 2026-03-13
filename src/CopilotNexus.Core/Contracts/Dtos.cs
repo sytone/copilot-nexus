@@ -126,3 +126,4 @@ public record WebhookMessageRequest
     /// <summary>Optional callback URL to POST results to when complete.</summary>
     public string? CallbackUrl { get; init; }
 }
+
