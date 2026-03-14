@@ -79,6 +79,7 @@ Release-mode publishes (tag/release env) use plain `X.Y.Z`.
 
 ```powershell
 nexus start --url http://localhost:5280
+nexus restart --url http://localhost:5280
 nexus status
 nexus stop
 ```
@@ -117,6 +118,7 @@ Service and app shims can be invoked directly:
 | Command | Description |
 |---|---|
 | `nexus start [--url URL] [--agent pi\|copilot-sdk]` | Start Nexus service |
+| `nexus restart [--url URL] [--agent pi\|copilot-sdk]` | Restart Nexus service |
 | `nexus stop` | Stop Nexus service |
 | `nexus status [--url URL]` | Show service/runtime status |
 | `nexus version` | Show shim and latest payload versions |

@@ -197,6 +197,25 @@ internal static class CliCommands
         TryDeleteLockFile();
     }
 
+    // --- restart ---
+    internal static void RunRestart(string url, string? agent = null)
+    {
+        var hasLock = ReadServiceLockInfo() != null;
+        if (hasLock)
+        {
+            AnsiConsole.MarkupLine("[blue]Restarting Nexus service...[/]");
+            RunStop();
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("[yellow]Nexus is not running[/] (no lock file found). Starting service.");
+        }
+
+        // Reset any non-fatal status from stop (for example, stale/missing lock races) and run start flow.
+        Environment.ExitCode = 0;
+        RunStart(url, agent);
+    }
+
     // --- status ---
     internal static async Task RunStatusAsync(string url)
     {

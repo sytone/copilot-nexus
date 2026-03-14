@@ -9,8 +9,9 @@
     1) Build the solution with `nexus build` (unless -SkipBuild is used)
     2) Publish a new versioned payload with `nexus publish`
     3) Reconcile the `nexus` alias to the installed CLI shim path
-    4) If legacy install artifacts are detected, stop Nexus processes, clean the artifacts, and restart via shim
-    5) Optionally restart Nexus service so the shim launches the newest version
+    4) Stop Nexus service before publish when service lifecycle is affected
+    5) If legacy install artifacts are detected, stop legacy processes and clean old artifacts
+    6) Start Nexus service via installed shim after publish when service lifecycle is affected
 
 .PARAMETER Configuration
     Build configuration: Debug or Release. Defaults to Release.
@@ -22,7 +23,7 @@
     Skip build and only run publish.
 
 .PARAMETER RestartService
-    Restart Nexus service after publish so it runs the newest version immediately.
+    Force service stop/start for app/cli-only publishes. For nexus/both publishes, service stop/start is automatic.
 
 .EXAMPLE
     .\Update-Nexus.ps1
@@ -207,7 +208,7 @@ function Remove-LegacyArtifacts {
     }
 }
 
-function Try-StopServiceForCleanup {
+function Try-StopService {
     if (Test-Path -LiteralPath $nexusCliExe) {
         & $nexusCliExe stop | Out-Null
     }
@@ -257,9 +258,15 @@ try {
         Write-Host "`nSkipping build as requested." -ForegroundColor Yellow
     }
 
+    $serviceLifecycleRequired = ($Component -eq 'nexus' -or $Component -eq 'both') -or $RestartService
+
+    if ($serviceLifecycleRequired -or $legacyCleanupRequired) {
+        Write-Host "`nStopping Nexus service before publish..." -ForegroundColor Yellow
+        Try-StopService
+    }
+
     if ($legacyCleanupRequired) {
-        Write-Host "`nStopping Nexus processes before legacy cleanup..." -ForegroundColor Yellow
-        Try-StopServiceForCleanup
+        Write-Host "Stopping legacy processes before cleanup..." -ForegroundColor Yellow
         Stop-LegacyProcesses -LegacyArtifactPaths $legacyArtifacts
     }
 
@@ -273,17 +280,10 @@ try {
 
     Ensure-NexusAlias -AliasTarget $nexusCliExe
 
-    $restartForComponent = $RestartService -and ($Component -eq 'nexus' -or $Component -eq 'both')
-    if ($legacyCleanupRequired) {
-        Write-Host "`nRestarting Nexus service via installed shim after legacy cleanup..." -ForegroundColor Yellow
-        Invoke-InstalledCliOrThrow -Arguments @('start') -FailureMessage 'Service restart via shim failed'
-        Write-Host 'Service restarted via shim' -ForegroundColor Green
-    }
-    elseif ($restartForComponent) {
-        Write-Host "`nRestarting Nexus service to load latest version..." -ForegroundColor Yellow
-        & dotnet run --project $cliProject -- stop | Out-Null
-        Invoke-SourceCliOrThrow -Arguments @('start') -FailureMessage 'Service restart failed'
-        Write-Host 'Service restarted' -ForegroundColor Green
+    if ($serviceLifecycleRequired -or $legacyCleanupRequired) {
+        Write-Host "`nStarting Nexus service via installed shim..." -ForegroundColor Yellow
+        Invoke-InstalledCliOrThrow -Arguments @('start') -FailureMessage 'Service start via shim failed'
+        Write-Host 'Service started via shim' -ForegroundColor Green
     }
 }
 finally {

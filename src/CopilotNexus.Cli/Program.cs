@@ -22,6 +22,25 @@ startCommand.SetAction(async (parseResult, _) =>
 var stopCommand = new Command("stop", "Stop a running Nexus service");
 stopCommand.SetAction((_, _) => { CliCommands.RunStop(); return Task.CompletedTask; });
 
+// --- nexus restart ---
+var restartUrlOption = new Option<string>("--url")
+{
+    Description = "URL for the service to listen on",
+    DefaultValueFactory = _ => "http://localhost:5280",
+};
+var restartAgentOption = new Option<string?>("--agent")
+{
+    Description = "Runtime agent to use (pi or copilot-sdk). If omitted, uses persisted selection (default: pi).",
+};
+var restartCommand = new Command("restart", "Restart the Nexus service") { restartUrlOption, restartAgentOption };
+restartCommand.SetAction(async (parseResult, _) =>
+{
+    var url = parseResult.GetValue(restartUrlOption)!;
+    var agent = parseResult.GetValue(restartAgentOption);
+    await Task.CompletedTask;
+    CliCommands.RunRestart(url, agent);
+});
+
 // --- nexus status ---
 var statusUrlOption = new Option<string>("--url") { Description = "Nexus URL to query", DefaultValueFactory = _ => "http://localhost:5280" };
 var statusCommand = new Command("status", "Check the status of a running Nexus service") { statusUrlOption };
@@ -84,6 +103,7 @@ winappCommand.Subcommands.Add(winappStartCommand);
 var rootCommand = new RootCommand("CopilotNexus — Copilot session management CLI");
 rootCommand.Subcommands.Add(startCommand);
 rootCommand.Subcommands.Add(stopCommand);
+rootCommand.Subcommands.Add(restartCommand);
 rootCommand.Subcommands.Add(statusCommand);
 rootCommand.Subcommands.Add(buildCommand);
 rootCommand.Subcommands.Add(installCommand);

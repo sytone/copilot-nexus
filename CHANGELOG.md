@@ -18,6 +18,7 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - Versioned launcher shim project (`CopilotNexus.Shim`) plus SemVer resolver utilities for side-by-side payload execution.
 - Send-timeout hardening coverage: new BDD spec (`docs/bdd/send-input-timeout-flow.md`) plus hub/API/app/core regression tests.
 - Runtime selection persistence (`RuntimeAgentType`, `RuntimeAgentConfig`, `IRuntimeAgentConfigService`, `JsonRuntimeAgentConfigService`) for choosing `pi` or `copilot-sdk`.
+- `nexus restart` command with `--url` and `--agent` options to stop and start the service in one operation.
 
 ### Changed
 
@@ -33,6 +34,7 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - Session send paths (`SessionHub` + `SessionsController`) now dispatch long-running sends in background and return acceptance immediately.
 - `scripts/Update-Nexus.ps1` now reconciles the `nexus` alias, removes legacy install artifacts, and performs shim-based stop/restart when legacy paths are detected.
 - `nexus start` now accepts `--agent pi|copilot-sdk`, and service startup selects/runtime-persists the active `IAgentClientService` adapter without changing public API contracts.
+- `scripts/Update-Nexus.ps1` now stops Nexus before publish and starts it afterward whenever the service lifecycle is affected (nexus/both component updates by default).
 
 ### Fixed
 

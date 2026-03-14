@@ -24,6 +24,7 @@ dotnet build CopilotNexus.slnx
 dotnet run --project src/CopilotNexus.Cli -- install
 Set-Alias nexus "$env:LOCALAPPDATA\CopilotNexus\app\cli\CopilotNexus.Cli.exe"
 nexus start
+nexus restart --agent pi
 nexus winapp start
 ```
 

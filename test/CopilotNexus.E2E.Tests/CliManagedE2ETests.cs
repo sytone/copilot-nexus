@@ -24,6 +24,10 @@ public class CliManagedE2ETests
             statusText.Contains("running", StringComparison.OrdinalIgnoreCase),
             $"Expected status output to indicate running/responding. Output: {statusText}");
 
+        var restart = await RunCliAsync($"restart --url {E2ETestSettings.ManagedServiceUrl}");
+        Assert.Equal(0, restart.ExitCode);
+        await WaitForHealthAsync(E2ETestSettings.ManagedServiceUrl, TimeSpan.FromSeconds(30));
+
         var stop = await RunCliAsync("stop");
         Assert.Equal(0, stop.ExitCode);
     }
@@ -35,6 +39,7 @@ public class CliManagedE2ETests
         Assert.Equal(0, help.ExitCode);
         var output = help.StandardOutput + help.StandardError;
         Assert.DoesNotContain("\n  update", output, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\n  restart", output, StringComparison.OrdinalIgnoreCase);
     }
 
     private static async Task WaitForHealthAsync(string baseUrl, TimeSpan timeout)
