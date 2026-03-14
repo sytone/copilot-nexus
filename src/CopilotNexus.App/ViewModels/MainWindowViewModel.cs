@@ -7,6 +7,7 @@ using CopilotNexus.App.Utilities;
 using CopilotNexus.Core.Events;
 using CopilotNexus.Core.Interfaces;
 using CopilotNexus.Core.Models;
+using CopilotNexus.Core.Versioning;
 using Microsoft.Extensions.Logging;
 
 public class MainWindowViewModel : ViewModelBase, IDisposable
@@ -137,11 +138,35 @@ public class MainWindowViewModel : ViewModelBase, IDisposable
 
     public void ShowUpdateNotification(string? currentVersion = null, string? availableVersion = null)
     {
+        if (!ShouldShowUpdateNotification(currentVersion, availableVersion))
+        {
+            _logger.LogInformation(
+                "Ignoring update notification because available version is not newer (current={CurrentVersion}, available={AvailableVersion})",
+                currentVersion,
+                availableVersion);
+            return;
+        }
+
         _dispatcher.BeginInvoke(() =>
         {
             UpdateNotificationText = BuildUpdateNotificationText(currentVersion, availableVersion);
             IsUpdateAvailable = true;
         });
+    }
+
+    internal static bool ShouldShowUpdateNotification(string? currentVersion, string? availableVersion)
+    {
+        var hasCurrent = !string.IsNullOrWhiteSpace(currentVersion);
+        var hasAvailable = !string.IsNullOrWhiteSpace(availableVersion);
+        if (!hasCurrent || !hasAvailable)
+            return true;
+
+        if (!SemanticVersion.TryParse(currentVersion, out var current) || current is null)
+            return true;
+        if (!SemanticVersion.TryParse(availableVersion, out var available) || available is null)
+            return true;
+
+        return available.CompareTo(current) > 0;
     }
 
     private static string BuildUpdateNotificationText(string? currentVersion, string? availableVersion)

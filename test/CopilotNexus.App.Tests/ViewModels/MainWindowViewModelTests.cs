@@ -177,6 +177,26 @@ public class MainWindowViewModelTests : IDisposable
     }
 
     [Fact]
+    public void ShowUpdateNotification_WhenAvailableVersionIsOlder_DoesNotShowBanner()
+    {
+        _viewModel.ShowUpdateNotification(
+            "0.2.0-dev.20260314001703+32ecec47067e1bc65c4305abca9b652bc06ca37a",
+            "0.1.0-dev.20260313191813+939bf147c25b311d65a6168f270dca0e08540e66");
+
+        Assert.False(_viewModel.IsUpdateAvailable);
+        Assert.Equal("A new version is available.", _viewModel.UpdateNotificationText);
+    }
+
+    [Fact]
+    public void ShowUpdateNotification_WhenAvailableVersionEqualsCurrent_DoesNotShowBanner()
+    {
+        _viewModel.ShowUpdateNotification("1.1.0", "1.1.0");
+
+        Assert.False(_viewModel.IsUpdateAvailable);
+        Assert.Equal("A new version is available.", _viewModel.UpdateNotificationText);
+    }
+
+    [Fact]
     public void ShowUpdateNotification_WithoutVersions_UsesDefaultText()
     {
         _viewModel.ShowUpdateNotification();
