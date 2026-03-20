@@ -14,10 +14,14 @@ using Microsoft.Extensions.Logging;
 public sealed class PiRpcClientService : IAgentClientService
 {
     private const string ModelDiscoveryRequestId = "nexus-model-discovery";
+    private static readonly TimeSpan ModelCacheTtl = TimeSpan.FromSeconds(30);
     private readonly ILogger<PiRpcClientService> _logger;
     private readonly string _piExecutablePath;
     private readonly string _piSessionRoot;
     private readonly ConcurrentDictionary<string, PiRpcSessionWrapper> _sessions = new();
+    private readonly SemaphoreSlim _modelCacheLock = new(1, 1);
+    private IReadOnlyList<ModelInfo> _cachedModels = [];
+    private DateTimeOffset _cachedModelsExpiresUtc = DateTimeOffset.MinValue;
     private bool _started;
     private bool _disposed;
 
@@ -58,6 +62,8 @@ public sealed class PiRpcClientService : IAgentClientService
         }
 
         _sessions.Clear();
+        _cachedModels = [];
+        _cachedModelsExpiresUtc = DateTimeOffset.MinValue;
         _started = false;
         _logger.LogInformation("Pi RPC client stopped");
     }
@@ -149,23 +155,39 @@ public sealed class PiRpcClientService : IAgentClientService
         ThrowIfDisposed();
         await EnsureStartedAsync(cancellationToken);
 
+        if (TryGetCachedModels(out var cached))
+            return cached;
+
+        await _modelCacheLock.WaitAsync(cancellationToken);
         try
         {
+            if (TryGetCachedModels(out cached))
+                return cached;
+
+            IReadOnlyList<ModelInfo> resolvedModels;
             var models = await QueryModelsViaRpcAsync(cancellationToken);
             if (models.Count > 0)
             {
                 _logger.LogInformation("Loaded {Count} Pi runtime models", models.Count);
-                return models;
+                resolvedModels = models;
+            }
+            else
+            {
+                _logger.LogWarning("Pi runtime returned no models; falling back to default model catalog.");
+                resolvedModels = GetFallbackModels();
             }
 
-            _logger.LogWarning("Pi runtime returned no models; falling back to default model catalog.");
+            return UpdateModelCache(resolvedModels);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to query Pi model catalog via RPC. Falling back to default model catalog.");
+            return UpdateModelCache(GetFallbackModels());
         }
-
-        return GetFallbackModels();
+        finally
+        {
+            _modelCacheLock.Release();
+        }
     }
 
     private async Task<IReadOnlyList<ModelInfo>> QueryModelsViaRpcAsync(CancellationToken cancellationToken)
@@ -448,6 +470,25 @@ public sealed class PiRpcClientService : IAgentClientService
         => new(
             $"Failed to start Pi executable '{_piExecutablePath}'. Set NEXUS_PI_EXECUTABLE if pi is not in PATH.",
             innerException);
+
+    private bool TryGetCachedModels(out IReadOnlyList<ModelInfo> models)
+    {
+        if (_cachedModels.Count > 0 && DateTimeOffset.UtcNow < _cachedModelsExpiresUtc)
+        {
+            models = _cachedModels;
+            return true;
+        }
+
+        models = [];
+        return false;
+    }
+
+    private IReadOnlyList<ModelInfo> UpdateModelCache(IReadOnlyList<ModelInfo> models)
+    {
+        _cachedModels = models.ToList().AsReadOnly();
+        _cachedModelsExpiresUtc = DateTimeOffset.UtcNow + ModelCacheTtl;
+        return _cachedModels;
+    }
 
     private void ThrowIfDisposed()
     {
