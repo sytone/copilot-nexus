@@ -90,7 +90,8 @@ function Invoke-ExternalCommand {
         [Parameter(Mandatory = $true)][string]$FilePath,
         [Parameter(Mandatory = $true)][string[]]$Arguments,
         [Parameter(Mandatory = $true)][string]$StepName,
-        [int[]]$AllowedExitCodes = @(0)
+        [int[]]$AllowedExitCodes = @(0),
+        [switch]$CaptureOutput
     )
 
     $commandLine = "$FilePath $($Arguments -join ' ')"
@@ -98,14 +99,24 @@ function Invoke-ExternalCommand {
     Write-Host "   $commandLine" -ForegroundColor DarkGray
     Add-Content -Path $runLogPath -Value ("[{0:u}] {1}`n{2}" -f [DateTime]::UtcNow, $StepName, $commandLine)
 
-    $outputLines = & $FilePath @Arguments 2>&1
-    $exitCode = $LASTEXITCODE
-    if ($null -eq $exitCode) { $exitCode = 0 }
-    $script:lastExitCode = $exitCode
+    if ($CaptureOutput) {
+        $outputLines = & $FilePath @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+        if ($null -eq $exitCode) { $exitCode = 0 }
+        $script:lastExitCode = $exitCode
 
-    if ($outputLines) {
-        $outputLines | ForEach-Object { Write-Host $_ }
-        Add-Content -Path $runLogPath -Value ($outputLines -join [Environment]::NewLine)
+        if ($outputLines) {
+            $outputLines | ForEach-Object { Write-Host $_ }
+            Add-Content -Path $runLogPath -Value ($outputLines -join [Environment]::NewLine)
+        }
+    }
+    else {
+        # Do not capture output for commands that spawn long-running children.
+        # Capturing can block when child processes inherit stdout handles.
+        & $FilePath @Arguments
+        $exitCode = $LASTEXITCODE
+        if ($null -eq $exitCode) { $exitCode = 0 }
+        $script:lastExitCode = $exitCode
     }
 
     Add-Content -Path $runLogPath -Value ("[exit={0}]" -f $exitCode)
@@ -196,31 +207,33 @@ function Invoke-NexusFromSource {
     param(
         [Parameter(Mandatory = $true)][string[]]$NexusArguments,
         [Parameter(Mandatory = $true)][string]$StepName,
-        [int[]]$AllowedExitCodes = @(0)
+        [int[]]$AllowedExitCodes = @(0),
+        [switch]$CaptureOutput
     )
 
     $args = @('run', '--project', $cliProjectPath, '--') + $NexusArguments
-    Invoke-ExternalCommand -FilePath 'dotnet' -Arguments $args -StepName $StepName -AllowedExitCodes $AllowedExitCodes
+    Invoke-ExternalCommand -FilePath 'dotnet' -Arguments $args -StepName $StepName -AllowedExitCodes $AllowedExitCodes -CaptureOutput:$CaptureOutput
 }
 
 function Invoke-NexusFromShim {
     param(
         [Parameter(Mandatory = $true)][string[]]$NexusArguments,
         [Parameter(Mandatory = $true)][string]$StepName,
-        [int[]]$AllowedExitCodes = @(0)
+        [int[]]$AllowedExitCodes = @(0),
+        [switch]$CaptureOutput
     )
 
     if (-not (Test-Path -LiteralPath $cliShimPath)) {
         throw "CLI shim not found: $cliShimPath"
     }
 
-    Invoke-ExternalCommand -FilePath $cliShimPath -Arguments $NexusArguments -StepName $StepName -AllowedExitCodes $AllowedExitCodes
+    Invoke-ExternalCommand -FilePath $cliShimPath -Arguments $NexusArguments -StepName $StepName -AllowedExitCodes $AllowedExitCodes -CaptureOutput:$CaptureOutput
 }
 
 function Start-AppViaShim {
     param([Parameter(Mandatory = $true)][string]$Reason)
 
-    Invoke-NexusFromShim -NexusArguments @('winapp', 'start', '--nexus-url', $ServiceUrl) -StepName "Start app ($Reason)"
+    Invoke-NexusFromShim -NexusArguments @('winapp', 'start', '--nexus-url', $ServiceUrl) -StepName "Start app ($Reason)" -CaptureOutput:$false
     Start-Sleep -Milliseconds 1200
 
     $running = Get-ProcessesUnderPath -PathPrefix $appRoot -ProcessNames @('CopilotNexus.App')
@@ -240,7 +253,7 @@ function Restart-ServiceAndApp {
     param([Parameter(Mandatory = $true)][string]$Reason)
 
     Stop-ProcessesByPath -PathPrefix $appRoot -ProcessNames @('CopilotNexus.App', 'CopilotNexus.Updater')
-    Invoke-NexusFromShim -NexusArguments @('restart', '--url', $ServiceUrl) -StepName "Restart service ($Reason)"
+    Invoke-NexusFromShim -NexusArguments @('restart', '--url', $ServiceUrl) -StepName "Restart service ($Reason)" -CaptureOutput:$false
     Wait-ForServiceHealth -Url $ServiceUrl -TimeoutSeconds 30
     Start-AppViaShim -Reason $Reason
 }
@@ -299,8 +312,12 @@ Write-Host "Service URL: $ServiceUrl" -ForegroundColor DarkGray
 Write-Host "Iterations: $Iterations" -ForegroundColor DarkGray
 
 $previousRootOverride = [Environment]::GetEnvironmentVariable($rootOverrideVar, 'Process')
+$pushedProjectRoot = $false
 
 try {
+    Push-Location $projectRoot
+    $pushedProjectRoot = $true
+
     if (Test-Path -LiteralPath $TestRoot) {
         Stop-ProcessesByPath -PathPrefix $TestRoot
         Remove-Item -LiteralPath $TestRoot -Recurse -Force
@@ -320,7 +337,7 @@ try {
     }
 
     Write-Section 'Install via source CLI'
-    Invoke-NexusFromSource -NexusArguments @('install') -StepName 'Install'
+        Invoke-NexusFromSource -NexusArguments @('install') -StepName 'Install' -CaptureOutput:$true
 
     if (-not (Test-Path -LiteralPath $cliShimPath)) {
         throw "Install did not produce CLI shim at $cliShimPath"
@@ -329,18 +346,18 @@ try {
     for ($iteration = 1; $iteration -le $Iterations; $iteration++) {
         Write-Section "Iteration $iteration of $Iterations"
 
-        Invoke-NexusFromShim -NexusArguments @('stop') -StepName 'Best-effort stop before iteration' -AllowedExitCodes @(0, 1)
+        Invoke-NexusFromShim -NexusArguments @('stop') -StepName 'Best-effort stop before iteration' -AllowedExitCodes @(0, 1) -CaptureOutput:$false
         Stop-ProcessesByPath -PathPrefix $appRoot -ProcessNames @('CopilotNexus.App', 'CopilotNexus.Updater')
 
-        Invoke-NexusFromShim -NexusArguments @('publish', '--component', 'both') -StepName 'Publish #1'
-        Invoke-NexusFromShim -NexusArguments @('start', '--url', $ServiceUrl) -StepName 'Start service'
+        Invoke-NexusFromShim -NexusArguments @('publish', '--component', 'both') -StepName 'Publish #1' -CaptureOutput:$true
+        Invoke-NexusFromShim -NexusArguments @('start', '--url', $ServiceUrl) -StepName 'Start service' -CaptureOutput:$false
         Wait-ForServiceHealth -Url $ServiceUrl -TimeoutSeconds 30
         Start-AppViaShim -Reason 'after publish #1'
 
-        Invoke-NexusFromShim -NexusArguments @('publish', '--component', 'both') -StepName 'Publish #2'
+        Invoke-NexusFromShim -NexusArguments @('publish', '--component', 'both') -StepName 'Publish #2' -CaptureOutput:$true
         Restart-ServiceAndApp -Reason 'after publish #2'
 
-        Invoke-NexusFromShim -NexusArguments @('publish', '--component', 'both') -StepName 'Publish #3'
+        Invoke-NexusFromShim -NexusArguments @('publish', '--component', 'both') -StepName 'Publish #3' -CaptureOutput:$true
         Restart-ServiceAndApp -Reason 'after publish #3'
 
         Assert-NoLifecycleErrors -Context "iteration $iteration"
@@ -349,7 +366,7 @@ try {
 
     Write-Section 'Final cleanup'
     Stop-ProcessesByPath -PathPrefix $appRoot -ProcessNames @('CopilotNexus.App', 'CopilotNexus.Updater')
-    Invoke-NexusFromShim -NexusArguments @('stop') -StepName 'Stop service' -AllowedExitCodes @(0, 1)
+    Invoke-NexusFromShim -NexusArguments @('stop') -StepName 'Stop service' -AllowedExitCodes @(0, 1) -CaptureOutput:$false
 
     Write-Host "`nLifecycle loop completed successfully." -ForegroundColor Green
     Write-Host "Run log: $runLogPath" -ForegroundColor DarkGray
@@ -357,6 +374,10 @@ try {
     $completedSuccessfully = $true
 }
 finally {
+    if ($pushedProjectRoot) {
+        Pop-Location
+    }
+
     [Environment]::SetEnvironmentVariable($rootOverrideVar, $previousRootOverride, 'Process')
 
     if (-not $KeepTestRoot -and $completedSuccessfully) {
