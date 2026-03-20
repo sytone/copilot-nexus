@@ -962,23 +962,22 @@ internal static class CliCommands
 
     private static async Task PublishAndInstallShimsAsync(string repoRoot, string version)
     {
-        await PublishShimExecutableAsync(repoRoot, CopilotNexusPaths.CliInstall, "CopilotNexus.Cli", version, "CLI shim");
-        await PublishShimExecutableAsync(repoRoot, CopilotNexusPaths.NexusInstall, "CopilotNexus.Service", version, "Service shim");
-        await PublishShimExecutableAsync(repoRoot, CopilotNexusPaths.AppInstall, "CopilotNexus.App", version, "App shim");
+        // Publish the shim once and install to all three component directories.
+        var shimArtifactsPath = await PublishShimOnceAsync(repoRoot, version);
+        if (shimArtifactsPath == null) return; // error already reported
+
+        InstallShimArtifacts(shimArtifactsPath, CopilotNexusPaths.CliInstall, "CopilotNexus.Cli.exe");
+        InstallShimArtifacts(shimArtifactsPath, CopilotNexusPaths.NexusInstall, "CopilotNexus.Service.exe");
+        InstallShimArtifacts(shimArtifactsPath, CopilotNexusPaths.AppInstall, "CopilotNexus.App.exe");
+        TryDeleteDirectory(shimArtifactsPath);
     }
 
-    private static async Task PublishShimExecutableAsync(
-        string repoRoot,
-        string outputPath,
-        string assemblyName,
-        string version,
-        string label)
+    private static async Task<string?> PublishShimOnceAsync(string repoRoot, string version)
     {
         var projectPath = Path.Combine(repoRoot, "src", "CopilotNexus.Shim", "CopilotNexus.Shim.csproj");
         if (!File.Exists(projectPath))
             throw new FileNotFoundException("Shim project was not found.", projectPath);
 
-        Directory.CreateDirectory(outputPath);
         var baseArguments =
             $"publish \"{projectPath}\" -c Release --self-contained true --use-current-runtime --nologo -v q " +
             $"-p:Version={version} -p:InformationalVersion={version} " +
@@ -1009,7 +1008,7 @@ internal static class CliCommands
                 CreateNoWindow = true,
             };
 
-            WriteCliLog($"publish start [{label}/{attempt.Name}] (version={version}): {psi.FileName} {psi.Arguments}");
+            WriteCliLog($"publish start [shim/{attempt.Name}] (version={version}): {psi.FileName} {psi.Arguments}");
             ProcessExecutionResult result;
             try
             {
@@ -1023,17 +1022,16 @@ internal static class CliCommands
 
             if (result.ExitCode == 0)
             {
-                InstallShimArtifacts(tempPublishPath, outputPath, $"{assemblyName}.exe");
-                TryDeleteDirectory(tempPublishPath);
                 if (attempt.Name != "single-file")
                 {
-                    AnsiConsole.MarkupLine($"  [yellow]![/] {label} published self-contained + trimmed without single-file fallback.");
+                    AnsiConsole.MarkupLine("  [yellow]![/] Shim published self-contained + trimmed without single-file fallback.");
                 }
-                return;
+
+                return tempPublishPath;
             }
 
-            WriteCliLog($"publish failed [{label}/{attempt.Name}] stdout tail:\n{Tail(result.StandardOutput)}");
-            WriteCliLog($"publish failed [{label}/{attempt.Name}] stderr tail:\n{Tail(result.StandardError)}");
+            WriteCliLog($"publish failed [shim/{attempt.Name}] stdout tail:\n{Tail(result.StandardOutput)}");
+            WriteCliLog($"publish failed [shim/{attempt.Name}] stderr tail:\n{Tail(result.StandardError)}");
             lastFailure = result;
             TryDeleteDirectory(tempPublishPath);
         }
@@ -1041,11 +1039,13 @@ internal static class CliCommands
         var failureOutput = !string.IsNullOrWhiteSpace(lastFailure?.StandardError)
             ? lastFailure!.StandardError
             : lastFailure?.StandardOutput ?? string.Empty;
-        throw new InvalidOperationException($"Failed to publish {label}. {Tail(failureOutput)}");
+        throw new InvalidOperationException($"Failed to publish shim. {Tail(failureOutput)}");
     }
 
     private static void InstallShimArtifacts(string sourcePath, string destinationPath, string shimExecutableName)
     {
+        Directory.CreateDirectory(destinationPath);
+
         var currentProcessPath = string.IsNullOrWhiteSpace(Environment.ProcessPath)
             ? null
             : NormalizePath(Environment.ProcessPath);
@@ -1059,7 +1059,10 @@ internal static class CliCommands
                 continue;
             }
 
-            File.Delete(file);
+            if (!TryDeleteFile(file))
+            {
+                AnsiConsole.MarkupLine($"  [yellow]![/] Skipping locked file: [dim]{Markup.Escape(file)}[/]");
+            }
         }
 
         foreach (var sourceFile in Directory.EnumerateFiles(sourcePath))
@@ -1082,20 +1085,28 @@ internal static class CliCommands
                 continue;
             }
 
-            File.Copy(sourceFile, targetPath, overwrite: true);
+            try
+            {
+                File.Copy(sourceFile, targetPath, overwrite: true);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                AnsiConsole.MarkupLine($"  [yellow]![/] Skipping locked shim file: [dim]{Markup.Escape(targetPath)}[/]");
+            }
+            catch (IOException)
+            {
+                AnsiConsole.MarkupLine($"  [yellow]![/] Skipping locked shim file: [dim]{Markup.Escape(targetPath)}[/]");
+            }
         }
     }
 
-    private static bool IsInUseShimFile(string normalizedPath, string? currentProcessPath, string? activeShimPath)
+    private static bool IsInUseShimFile(string normalizedPath, string? currentProcessPath, string? _)
     {
+        // Only skip the currently running executable (the versioned CLI payload).
+        // The shim sets COPILOT_NEXUS_SHIM_PATH but exits immediately after launch,
+        // so the shim file is never locked and can always be overwritten.
         if (currentProcessPath != null &&
             string.Equals(normalizedPath, currentProcessPath, StringComparison.OrdinalIgnoreCase))
-        {
-            return true;
-        }
-
-        if (activeShimPath != null &&
-            string.Equals(normalizedPath, activeShimPath, StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
@@ -1117,6 +1128,23 @@ internal static class CliCommands
         catch (UnauthorizedAccessException)
         {
             // Best effort cleanup.
+        }
+    }
+
+    private static bool TryDeleteFile(string path)
+    {
+        try
+        {
+            File.Delete(path);
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
         }
     }
 

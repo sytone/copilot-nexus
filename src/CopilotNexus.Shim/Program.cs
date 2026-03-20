@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using CopilotNexus.Core.Versioning;
+using CopilotNexus.Shim.Versioning;
 
 var parseResult = ParseArgs(args);
 if (parseResult.ShowHelp)
@@ -85,8 +85,9 @@ try
         return 1;
     }
 
-    await child.WaitForExitAsync();
-    return child.ExitCode;
+    // Shim exits immediately — child inherits the console and runs independently.
+    // This ensures the shim executable is never locked during the child's lifetime.
+    return 0;
 }
 catch (Exception ex)
 {

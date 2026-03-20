@@ -40,8 +40,15 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 - `nexus start` now accepts `--agent pi|copilot-sdk`, and service startup selects/runtime-persists the active `IAgentClientService` adapter without changing public API contracts.
 - `scripts/Update-Nexus.ps1` now stops Nexus before publish and starts it afterward whenever the service lifecycle is affected (nexus/both component updates by default).
 
+### Changed
+
+- Shim project (`CopilotNexus.Shim`) no longer depends on `CopilotNexus.Core`; `SemanticVersion` and `VersionedExecutableResolver` are inlined, eliminating the Copilot SDK from the shim dependency graph and dramatically reducing publish time.
+- Shim is now published once and installed to all three component directories (CLI, Service, App) instead of being published three separate times.
+
 ### Fixed
 
+- All shims now exit immediately after launching the versioned payload instead of waiting for the child process, preventing file locks that blocked `nexus publish`.
+- Shim publish (`InstallShimArtifacts`) now gracefully skips locked shim files with a warning instead of crashing with `UnauthorizedAccessException` when another shim process holds a file lock.
 - Webhook background-send cancellation now logs as informational cancellation (with optional canceled callback status) instead of error-level failure noise.
 - Pi runtime executable detection on Windows now defaults to `pi.cmd`, avoiding false "pi not found" failures when npm shims are installed.
 - Removed `nexus update` command from CLI and switched publish to shim-resolved side-by-side versions (no staged copy-over step).

@@ -9,8 +9,5 @@
     <AssemblyName>CopilotNexus.Shim</AssemblyName>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\CopilotNexus.Core\CopilotNexus.Core.csproj" />
-  </ItemGroup>
 
 </Project>
