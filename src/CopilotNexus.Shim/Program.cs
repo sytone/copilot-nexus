@@ -85,8 +85,17 @@ try
         return 1;
     }
 
-    // Shim exits immediately — child inherits the console and runs independently.
-    // This ensures the shim executable is never locked during the child's lifetime.
+    var waitForChildExit = string.Equals(executableName, "CopilotNexus.Cli.exe", StringComparison.OrdinalIgnoreCase);
+    if (waitForChildExit)
+    {
+        // For CLI commands, wait and return the real command exit code so callers can
+        // fail fast on publish/start/install errors.
+        child.WaitForExit();
+        return child.ExitCode;
+    }
+
+    // Service and app shims exit immediately — child inherits the console and runs independently.
+    // This keeps launcher files free for overwrite while long-lived component processes run.
     return 0;
 }
 catch (Exception ex)

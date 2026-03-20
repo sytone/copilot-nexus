@@ -124,6 +124,10 @@ internal static class CliCommands
             return;
         }
 
+        var launchedViaShim = string.Equals(
+            NormalizePath(serviceExe),
+            NormalizePath(CopilotNexusPaths.ServiceExe),
+            StringComparison.OrdinalIgnoreCase);
         var resolvedVersion = TryExtractVersionFromExecutablePath(serviceExe);
         var runtimeArgument = runtimeOverride.HasValue
             ? $" --agent {runtimeOverride.Value.ToConfigValue()}"
@@ -136,26 +140,53 @@ internal static class CliCommands
             CreateNoWindow = true,
         };
 
-        var proc = Process.Start(psi);
-        if (proc == null)
+        var launcherProcess = Process.Start(psi);
+        if (launcherProcess == null)
         {
             AnsiConsole.MarkupLine("[red]Failed to start Nexus service.[/]");
             Environment.ExitCode = 1;
             return;
         }
 
-        WriteServiceLockInfo(new ServiceLockInfo(
-            proc.Id,
-            serviceExe,
-            resolvedVersion,
-            url,
-            DateTimeOffset.UtcNow,
-            runtimeOverride?.ToConfigValue()));
+        if (launchedViaShim)
+        {
+            launcherProcess.WaitForExit(5000);
+            if (launcherProcess.HasExited && launcherProcess.ExitCode != 0)
+            {
+                TryDeleteLockFile();
+                AnsiConsole.MarkupLine("[red]Nexus shim failed to launch service payload.[/]");
+                AnsiConsole.MarkupLine($"  Exit code: [bold]{launcherProcess.ExitCode}[/]");
+                Environment.ExitCode = 1;
+                return;
+            }
+        }
+        else
+        {
+            WriteServiceLockInfo(new ServiceLockInfo(
+                launcherProcess.Id,
+                serviceExe,
+                resolvedVersion,
+                url,
+                DateTimeOffset.UtcNow,
+                runtimeOverride?.ToConfigValue()));
+        }
 
-        var validation = ValidateStartedServiceAsync(url, proc).GetAwaiter().GetResult();
+        var validation = ValidateStartedServiceAsync(url, launchedViaShim ? null : launcherProcess).GetAwaiter().GetResult();
         if (!validation.IsReady)
         {
-            TryStopProcess(proc);
+            if (launchedViaShim)
+            {
+                var lockInfoForStop = ReadServiceLockInfo();
+                if (lockInfoForStop != null)
+                {
+                    TryStopProcessById(lockInfoForStop.Pid);
+                }
+            }
+            else
+            {
+                TryStopProcess(launcherProcess);
+            }
+
             TryDeleteLockFile();
             AnsiConsole.MarkupLine("[red]Nexus failed start validation.[/]");
             AnsiConsole.MarkupLine($"  {Markup.Escape(validation.Message)}");
@@ -163,7 +194,29 @@ internal static class CliCommands
             return;
         }
 
-        AnsiConsole.MarkupLine($"[green]✓[/] Nexus service started (PID [bold]{proc.Id}[/])");
+        var resolvedPid = launcherProcess.Id;
+        var resolvedExecutablePath = serviceExe;
+        if (launchedViaShim)
+        {
+            var startedLockInfo = WaitForServiceLockInfoAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
+            if (startedLockInfo?.Pid > 0)
+            {
+                resolvedPid = startedLockInfo.Pid;
+                resolvedExecutablePath = startedLockInfo.ExecutablePath
+                    ?? TryGetProcessPath(startedLockInfo.Pid)
+                    ?? serviceExe;
+            }
+        }
+
+        WriteServiceLockInfo(new ServiceLockInfo(
+            resolvedPid,
+            resolvedExecutablePath,
+            resolvedVersion,
+            url,
+            DateTimeOffset.UtcNow,
+            runtimeOverride?.ToConfigValue()));
+
+        AnsiConsole.MarkupLine($"[green]✓[/] Nexus service started (PID [bold]{resolvedPid}[/])");
         AnsiConsole.MarkupLine($"  URL: [link]{url}[/]");
         if (runtimeOverride.HasValue)
             AnsiConsole.MarkupLine($"  Runtime: [dim]{Markup.Escape(runtimeOverride.Value.ToConfigValue())}[/]");
@@ -637,16 +690,17 @@ internal static class CliCommands
         return FindRepoRootFrom(AppContext.BaseDirectory) ?? FindRepoRootFrom(Environment.CurrentDirectory);
     }
 
-    private static async Task<StartValidationResult> ValidateStartedServiceAsync(string url, Process process)
+    private static async Task<StartValidationResult> ValidateStartedServiceAsync(string url, Process? process = null)
     {
+        const int startupValidationTimeoutSeconds = 30;
         var baseUrl = url.TrimEnd('/');
         using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-        var timeout = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(15);
+        var timeout = DateTimeOffset.UtcNow + TimeSpan.FromSeconds(startupValidationTimeoutSeconds);
         Exception? lastProbeError = null;
 
         while (DateTimeOffset.UtcNow < timeout)
         {
-            if (process.HasExited)
+            if (process != null && process.HasExited)
             {
                 var logError = TryGetLatestServiceErrorLine();
                 var message = $"Service process exited early (PID {process.Id}, code {process.ExitCode}).";
@@ -688,7 +742,7 @@ internal static class CliCommands
             await Task.Delay(300);
         }
 
-        var timeoutMessage = $"Service did not become healthy at {baseUrl} within 15 seconds.";
+        var timeoutMessage = $"Service did not become healthy at {baseUrl} within {startupValidationTimeoutSeconds} seconds.";
         if (lastProbeError != null)
             timeoutMessage += $" Last probe error: {lastProbeError.Message}";
 
@@ -697,6 +751,36 @@ internal static class CliCommands
             timeoutMessage += $" Latest error: {latestError}";
 
         return new StartValidationResult(false, timeoutMessage);
+    }
+
+    private static async Task<ServiceLockInfo?> WaitForServiceLockInfoAsync(TimeSpan timeout)
+    {
+        var deadline = DateTimeOffset.UtcNow + timeout;
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            var lockInfo = ReadServiceLockInfo();
+            if (lockInfo != null && lockInfo.Pid > 0)
+            {
+                try
+                {
+                    var process = Process.GetProcessById(lockInfo.Pid);
+                    if (!process.HasExited)
+                        return lockInfo;
+                }
+                catch (ArgumentException)
+                {
+                    // Process is not running yet, continue polling.
+                }
+                catch (InvalidOperationException)
+                {
+                    // Process is terminating, continue polling.
+                }
+            }
+
+            await Task.Delay(200);
+        }
+
+        return null;
     }
 
     private static async Task<string?> ProbeSessionCreateDeleteAsync(HttpClient http, string baseUrl)
@@ -746,6 +830,44 @@ internal static class CliCommands
 
         process.Kill(entireProcessTree: true);
         process.WaitForExit(5000);
+    }
+
+    private static void TryStopProcessById(int pid)
+    {
+        try
+        {
+            var process = Process.GetProcessById(pid);
+            TryStopProcess(process);
+        }
+        catch (ArgumentException)
+        {
+            // Process already exited.
+        }
+        catch (InvalidOperationException)
+        {
+            // Process already exiting.
+        }
+    }
+
+    private static string? TryGetProcessPath(int pid)
+    {
+        try
+        {
+            var process = Process.GetProcessById(pid);
+            return process.MainModule?.FileName;
+        }
+        catch (ArgumentException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            return null;
+        }
     }
 
     private static string? TryGetLatestServiceErrorLine()
@@ -1100,13 +1222,19 @@ internal static class CliCommands
         }
     }
 
-    private static bool IsInUseShimFile(string normalizedPath, string? currentProcessPath, string? _)
+    private static bool IsInUseShimFile(string normalizedPath, string? currentProcessPath, string? activeShimPath)
     {
-        // Only skip the currently running executable (the versioned CLI payload).
-        // The shim sets COPILOT_NEXUS_SHIM_PATH but exits immediately after launch,
-        // so the shim file is never locked and can always be overwritten.
+        // Skip the currently running payload executable.
         if (currentProcessPath != null &&
             string.Equals(normalizedPath, currentProcessPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        // When commands are launched through the shim, the active shim path is provided
+        // to avoid self-overwrite during shim refresh.
+        if (activeShimPath != null &&
+            string.Equals(normalizedPath, activeShimPath, StringComparison.OrdinalIgnoreCase))
         {
             return true;
         }
