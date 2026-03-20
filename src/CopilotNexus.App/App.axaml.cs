@@ -4,6 +4,7 @@ using System.IO;
 using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
+using CopilotNexus.Core;
 using Microsoft.Extensions.Logging;
 using Serilog;
 
@@ -13,9 +14,7 @@ public partial class App : Application
 
     public static string[] StartupArgs { get; set; } = Array.Empty<string>();
 
-    public static string LogDirectory { get; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "CopilotNexus", "logs");
+    public static string LogDirectory => CopilotNexusPaths.Logs;
 
     public static bool IsTestMode { get; internal set; }
 

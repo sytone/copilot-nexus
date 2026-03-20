@@ -31,8 +31,7 @@ public static class NexusHostBuilder
             .MinimumLevel.Debug()
             .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
             .WriteTo.File(
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "CopilotNexus", "logs", "nexus-.log"),
+                Path.Combine(CopilotNexusPaths.Logs, "nexus-.log"),
                 rollingInterval: RollingInterval.Day,
                 retainedFileCountLimit: 14)
             .CreateLogger();

@@ -8,10 +8,18 @@ namespace CopilotNexus.Core;
 /// </summary>
 public static class CopilotNexusPaths
 {
-    /// <summary>Root directory: %LOCALAPPDATA%\CopilotNexus\</summary>
-    public static string Root { get; } = Path.Combine(
+    /// <summary>
+    /// Optional environment variable that overrides the CopilotNexus install root.
+    /// Useful for isolated test runs that should not touch the default user install.
+    /// </summary>
+    public const string RootOverrideEnvironmentVariable = "COPILOT_NEXUS_ROOT";
+
+    private static string DefaultRoot { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "CopilotNexus");
+
+    /// <summary>Root directory: %LOCALAPPDATA%\CopilotNexus\</summary>
+    public static string Root { get; } = ResolveRoot();
 
     /// <summary>Versioned runtime root containing cli/service/winapp shims and payloads.</summary>
     public static string AppRoot { get; } = Path.Combine(Root, "app");
@@ -125,5 +133,14 @@ public static class CopilotNexusPaths
         if (string.IsNullOrWhiteSpace(version))
             throw new ArgumentException("Version is required.", nameof(version));
         return Path.Combine(GetInstallPath(component), version.Trim());
+    }
+
+    private static string ResolveRoot()
+    {
+        var overrideRoot = Environment.GetEnvironmentVariable(RootOverrideEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(overrideRoot))
+            return DefaultRoot;
+
+        return Path.GetFullPath(overrideRoot.Trim());
     }
 }
