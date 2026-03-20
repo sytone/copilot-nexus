@@ -6,6 +6,7 @@
     <Project Path="src/CopilotNexus.Shim/CopilotNexus.Shim.csproj" />
     <Project Path="src/CopilotNexus.Service/CopilotNexus.Service.csproj" />
     <Project Path="src/CopilotNexus.Updater/CopilotNexus.Updater.csproj" />
+    <Project Path="src/CopilotNexus.DevAssistant/CopilotNexus.DevAssistant.csproj" />
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/CopilotNexus.App.Tests/CopilotNexus.App.Tests.csproj" />

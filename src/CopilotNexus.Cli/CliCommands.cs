@@ -1444,4 +1444,115 @@ internal static class CliCommands
         var line = $"{DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss.fff zzz} {message}";
         File.AppendAllText(logPath, line + Environment.NewLine);
     }
+
+    // --- DevAssistant integration ---
+
+    private const string DevAssistantDefaultUrl = "http://localhost:5290";
+
+    internal static async Task RunDevAssistantWatchAsync(string apiUrl)
+    {
+        var devAssistantExe = FindDevAssistantExecutable();
+        if (devAssistantExe == null)
+        {
+            AnsiConsole.MarkupLine("[red]Cannot find CopilotNexus.DevAssistant executable.[/]");
+            AnsiConsole.MarkupLine("Run [blue]nexus install[/] or [blue]dotnet run --project src/CopilotNexus.DevAssistant[/] directly.");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        var psi = new ProcessStartInfo
+        {
+            FileName = devAssistantExe,
+            Arguments = $"watch --url {apiUrl}",
+            UseShellExecute = false,
+        };
+
+        WriteCliLog($"dev watch start: {psi.FileName} {psi.Arguments}");
+
+        var proc = Process.Start(psi);
+        if (proc == null)
+        {
+            AnsiConsole.MarkupLine("[red]Failed to start DevAssistant.[/]");
+            Environment.ExitCode = 1;
+            return;
+        }
+
+        await proc.WaitForExitAsync();
+    }
+
+    internal static async Task SendDevAssistantActionAsync(string action)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(5) };
+        try
+        {
+            AnsiConsole.MarkupLine($"[blue]Sending {Markup.Escape(action)} request to DevAssistant...[/]");
+            var response = await http.PostAsync($"{DevAssistantDefaultUrl}/api/actions/{action}", null);
+            var json = await response.Content.ReadAsStringAsync();
+            response.EnsureSuccessStatusCode();
+            WriteDevAssistantResult(json);
+        }
+        catch (HttpRequestException ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Failed to connect to DevAssistant at {DevAssistantDefaultUrl}.[/]");
+            AnsiConsole.MarkupLine($"  Is it running? Try [blue]nexus dev watch[/] first.");
+            AnsiConsole.MarkupLine($"  Error: {Markup.Escape(ex.Message)}");
+            Environment.ExitCode = 1;
+        }
+    }
+
+    internal static async Task SendDevAssistantGetAsync(string endpoint)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
+        try
+        {
+            var response = await http.GetAsync($"{DevAssistantDefaultUrl}/api/{endpoint}");
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync();
+            var doc = JsonDocument.Parse(json);
+            AnsiConsole.WriteLine(JsonSerializer.Serialize(doc, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (HttpRequestException ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Failed to connect to DevAssistant at {DevAssistantDefaultUrl}.[/]");
+            AnsiConsole.MarkupLine($"  Is it running? Try [blue]nexus dev watch[/] first.");
+            AnsiConsole.MarkupLine($"  Error: {Markup.Escape(ex.Message)}");
+            Environment.ExitCode = 1;
+        }
+    }
+
+    private static void WriteDevAssistantResult(string json)
+    {
+        try
+        {
+            var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            var action = root.GetProperty("action").GetString() ?? "unknown";
+            var success = root.GetProperty("success").GetBoolean();
+            var output = root.TryGetProperty("output", out var outputProp) ? outputProp.GetString() : null;
+
+            var color = success ? "green" : "red";
+            AnsiConsole.MarkupLine($"[{color}]{Markup.Escape(action)}[/]: {(success ? "Success" : "Failed")}");
+            if (!string.IsNullOrWhiteSpace(output))
+                AnsiConsole.WriteLine(output);
+        }
+        catch
+        {
+            AnsiConsole.WriteLine(json);
+        }
+    }
+
+    private static string? FindDevAssistantExecutable()
+    {
+        // Try repo-local build output first (development scenario)
+        var repoRoot = FindRepoRoot();
+        if (repoRoot != null)
+        {
+            var devBuild = Path.Combine(repoRoot, "src", "CopilotNexus.DevAssistant",
+                "bin", "Debug", "net8.0", "CopilotNexus.DevAssistant.exe");
+            if (File.Exists(devBuild))
+                return devBuild;
+        }
+
+        return null;
+    }
 }

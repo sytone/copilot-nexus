@@ -126,6 +126,51 @@ Service and app shims can be invoked directly:
 | `nexus install` | Install/refresh shims + publish payloads |
 | `nexus publish [--component C]` | Publish versioned payloads (`nexus`, `app`, `cli`, `both`) |
 | `nexus winapp start [...]` | Launch desktop app |
+| `nexus dev watch [--url URL]` | Start DevAssistant (log watcher + HTTP action server on port 5290) |
+| `nexus dev rebuild` | Trigger solution rebuild via DevAssistant |
+| `nexus dev publish` | Trigger component publish via DevAssistant |
+| `nexus dev restart` | Trigger service restart via DevAssistant |
+| `nexus dev republish` | Rebuild, publish, and restart in sequence via DevAssistant |
+| `nexus dev status` | Show DevAssistant status (uptime, open issues) |
+| `nexus dev issues` | List open issues detected by DevAssistant |
+
+## Development Assistant
+
+The DevAssistant is a long-running CLI tool that provides:
+
+1. **Log watching** — monitors `%LOCALAPPDATA%\CopilotNexus\logs\` for new errors and warnings
+2. **Issue creation** — auto-generates issue markdown files in `docs/issues/` with error details and suggested fix prompts
+3. **HTTP action API** — exposes `http://localhost:5290` for triggering build, publish, and restart actions
+
+### Quick start
+
+```powershell
+# Start the watcher (runs until Ctrl+C)
+nexus dev watch
+
+# In another terminal, trigger actions:
+nexus dev republish     # rebuild → publish → restart
+nexus dev status        # check watcher status
+nexus dev issues        # list detected issues
+```
+
+### HTTP API reference
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/status` | DevAssistant status (uptime, open issues count) |
+| `GET` | `/api/issues` | List all detected issues |
+| `POST` | `/api/issues/{fileName}/resolve` | Mark an issue as resolved |
+| `POST` | `/api/actions/rebuild` | Run `dotnet build` on the solution |
+| `POST` | `/api/actions/publish` | Publish all components |
+| `POST` | `/api/actions/restart` | Stop and restart the Nexus service |
+| `POST` | `/api/actions/republish` | Rebuild + publish + restart in sequence |
+
+### Running directly (without shim)
+
+```powershell
+dotnet run --project src/CopilotNexus.DevAssistant -- watch
+```
 
 ## Troubleshooting
 

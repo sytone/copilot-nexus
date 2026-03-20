@@ -18,6 +18,7 @@ src/CopilotNexus.Core         — Core business logic, SDK abstractions, shared 
 src/CopilotNexus.App          — Avalonia 11 desktop application (MVVM, thin SignalR client)
 src/CopilotNexus.Cli          — CLI console app — `nexus` commands (start, stop, build, publish, update)
 src/CopilotNexus.Service      — ASP.NET Core web host — SignalR hub, REST API, webhooks (~40-line Program.cs)
+src/CopilotNexus.DevAssistant — Dev assistant — log watcher, issue creator, HTTP action server (port 5290)
 test/CopilotNexus.Core.Tests  — Unit tests for Core (xUnit + Moq, 65 tests)
 test/CopilotNexus.App.Tests   — Unit tests for ViewModels and converters (xUnit + Moq, 47 tests)
 test/CopilotNexus.Service.Tests — Integration tests for Nexus (WebApplicationFactory, 20 tests)

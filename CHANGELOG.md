@@ -9,6 +9,10 @@ and this project adheres to [Conventional Commits](https://www.conventionalcommi
 
 ### Added
 
+- **CopilotNexus.DevAssistant** — development assistant CLI tool (`src/CopilotNexus.DevAssistant/`) that watches runtime logs, auto-creates issue markdown files in `docs/issues/` when errors/warnings are detected, and exposes a local HTTP API on port 5290 for triggering rebuild, publish, restart, and republish actions.
+- `nexus dev watch` command to start the DevAssistant watcher and HTTP action server.
+- `nexus dev rebuild|publish|restart|republish` CLI shorthands that call the DevAssistant HTTP API.
+- `nexus dev status` and `nexus dev issues` commands for querying DevAssistant state and open issues.
 - Pi-only runtime contracts and services (`IAgentClientService`, `PiRpcClientService`, `PiRpcSessionWrapper`) for Nexus session execution over Pi RPC.
 - Opt-in E2E test project (`test/CopilotNexus.E2E.Tests`) for running-server API smoke checks and CLI lifecycle validation.
 - Repository-managed git hook setup (`.githooks/pre-push`, `scripts/Enable-GitHooks.ps1`) to block pushes with uncommitted changes.

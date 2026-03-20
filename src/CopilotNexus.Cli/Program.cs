@@ -99,6 +99,42 @@ winappStartCommand.SetAction((parseResult, _) =>
 var winappCommand = new Command("winapp", "Manage the desktop application");
 winappCommand.Subcommands.Add(winappStartCommand);
 
+// --- nexus dev ---
+var devWatchUrlOption = new Option<string>("--url") { Description = "DevAssistant API URL", DefaultValueFactory = _ => "http://localhost:5290" };
+var devWatchCommand = new Command("watch", "Start the DevAssistant watcher and HTTP server") { devWatchUrlOption };
+devWatchCommand.SetAction(async (parseResult, _) =>
+{
+    var devUrl = parseResult.GetValue(devWatchUrlOption)!;
+    await CliCommands.RunDevAssistantWatchAsync(devUrl);
+});
+
+var devRebuildCommand = new Command("rebuild", "Trigger a solution rebuild via DevAssistant");
+devRebuildCommand.SetAction(async (_, _) => await CliCommands.SendDevAssistantActionAsync("rebuild"));
+
+var devPublishCommand = new Command("publish", "Trigger a component publish via DevAssistant");
+devPublishCommand.SetAction(async (_, _) => await CliCommands.SendDevAssistantActionAsync("publish"));
+
+var devRestartCommand = new Command("restart", "Trigger a service restart via DevAssistant");
+devRestartCommand.SetAction(async (_, _) => await CliCommands.SendDevAssistantActionAsync("restart"));
+
+var devRepublishCommand = new Command("republish", "Rebuild, publish, and restart via DevAssistant");
+devRepublishCommand.SetAction(async (_, _) => await CliCommands.SendDevAssistantActionAsync("republish"));
+
+var devStatusCommand = new Command("status", "Show DevAssistant status");
+devStatusCommand.SetAction(async (_, _) => await CliCommands.SendDevAssistantGetAsync("status"));
+
+var devIssuesCommand = new Command("issues", "List open detected issues");
+devIssuesCommand.SetAction(async (_, _) => await CliCommands.SendDevAssistantGetAsync("issues"));
+
+var devCommand = new Command("dev", "Development assistant — log watcher, issue creator, action server");
+devCommand.Subcommands.Add(devWatchCommand);
+devCommand.Subcommands.Add(devRebuildCommand);
+devCommand.Subcommands.Add(devPublishCommand);
+devCommand.Subcommands.Add(devRestartCommand);
+devCommand.Subcommands.Add(devRepublishCommand);
+devCommand.Subcommands.Add(devStatusCommand);
+devCommand.Subcommands.Add(devIssuesCommand);
+
 // --- root ---
 var rootCommand = new RootCommand("CopilotNexus — Copilot session management CLI");
 rootCommand.Subcommands.Add(startCommand);
@@ -110,6 +146,7 @@ rootCommand.Subcommands.Add(installCommand);
 rootCommand.Subcommands.Add(versionCommand);
 rootCommand.Subcommands.Add(publishCommand);
 rootCommand.Subcommands.Add(winappCommand);
+rootCommand.Subcommands.Add(devCommand);
 
 CliCommands.PrintVersionBanner();
 var commandExitCode = rootCommand.Parse(args).Invoke();
