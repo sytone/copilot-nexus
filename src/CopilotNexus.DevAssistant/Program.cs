@@ -1,5 +1,8 @@
 using System.CommandLine;
+using System.Diagnostics;
 using System.Net.Http.Json;
+using System.Text;
+using System.Text.Json;
 using CopilotNexus.Core;
 using CopilotNexus.DevAssistant;
 using Serilog;
@@ -14,6 +17,8 @@ using Spectre.Console;
 //   nexus dev republish      — trigger rebuild+publish+restart via HTTP API
 //   nexus dev status         — query DevAssistant status
 //   nexus dev issues         — list open issues
+//   nexus dev logs           — tail recent log entries
+//   nexus dev diagnostics    — show live diagnostics (processes, ports, health)
 
 const string DefaultApiUrl = "http://localhost:5290";
 
@@ -46,6 +51,14 @@ statusCmd.SetAction(async (_, _) => await SendGetAsync("status"));
 var issuesCmd = new Command("issues", "List open issues");
 issuesCmd.SetAction(async (_, _) => await SendGetAsync("issues"));
 
+var tailOption = new Option<int>("--tail") { Description = "Number of lines to show", DefaultValueFactory = _ => 100 };
+var logsCmd = new Command("logs", "Show recent log lines from all components") { tailOption };
+logsCmd.SetAction(async (parseResult, _) =>
+    await SendGetAsync($"logs/recent?tail={parseResult.GetValue(tailOption)}"));
+
+var diagCmd = new Command("diagnostics", "Show live diagnostics (service health, processes, ports)");
+diagCmd.SetAction(async (_, _) => await SendGetAsync("diagnostics"));
+
 // --- root ---
 var rootCommand = new RootCommand("CopilotNexus DevAssistant — log watcher, issue creator, action server")
 {
@@ -56,6 +69,8 @@ var rootCommand = new RootCommand("CopilotNexus DevAssistant — log watcher, is
     republishCmd,
     statusCmd,
     issuesCmd,
+    logsCmd,
+    diagCmd,
 };
 
 AnsiConsole.MarkupLine("[bold blue]Copilot Nexus DevAssistant[/]");
@@ -137,6 +152,107 @@ static async Task RunWatchAsync(string apiUrl, CancellationToken ct)
         if (issueManager.ResolveIssue(fileName))
             return Results.Ok(new { resolved = true, fileName });
         return Results.NotFound(new { resolved = false, message = "Issue not found or already resolved" });
+    });
+
+    // GET /api/logs/recent?tail=N — return last N lines from all log files
+    app.MapGet("/api/logs/recent", (int tail = 100) =>
+    {
+        var entries = new List<object>();
+        if (!Directory.Exists(logDir))
+            return Results.Ok(entries);
+
+        foreach (var file in Directory.GetFiles(logDir, "*.log").OrderByDescending(f => f))
+        {
+            try
+            {
+                using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                using var reader = new StreamReader(fs);
+                var lines = new List<string>();
+                string? line;
+                while ((line = reader.ReadLine()) != null)
+                    if (!string.IsNullOrWhiteSpace(line)) lines.Add(line);
+
+                var component = Path.GetFileName(file) switch
+                {
+                    var n when n.StartsWith("nexus-") => "Service",
+                    var n when n.StartsWith("copilot-nexus-") => "App",
+                    var n when n.StartsWith("cli-") => "Cli",
+                    var n when n.StartsWith("devassistant-") => "DevAssistant",
+                    _ => "Unknown",
+                };
+
+                foreach (var l in lines.TakeLast(tail))
+                    entries.Add(new { component, file = Path.GetFileName(file), line = l });
+            }
+            catch { /* locked or missing */ }
+        }
+
+        return Results.Ok(entries.TakeLast(tail).ToList());
+    });
+
+    // GET /api/diagnostics — live service health, processes, port status, lock file
+    app.MapGet("/api/diagnostics", async () =>
+    {
+        // Service health
+        string serviceHealth = "unknown";
+        int serviceStatusCode = 0;
+        try
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+            var r = await http.GetAsync("http://localhost:5280/health");
+            serviceHealth = r.IsSuccessStatusCode ? "healthy" : "unhealthy";
+            serviceStatusCode = (int)r.StatusCode;
+        }
+        catch (Exception ex) { serviceHealth = $"unreachable: {ex.Message}"; }
+
+        // Lock file
+        object? lockInfo = null;
+        var lockPath = CopilotNexusPaths.NexusLockFile;
+        if (File.Exists(lockPath))
+        {
+            try { lockInfo = System.Text.Json.JsonDocument.Parse(File.ReadAllText(lockPath)).RootElement; }
+            catch { lockInfo = new { raw = File.ReadAllText(lockPath) }; }
+        }
+
+        // Port 5280 listener check
+        bool port5280Open = false;
+        try
+        {
+            using var tcp = new System.Net.Sockets.TcpClient();
+            var connTask = tcp.ConnectAsync("127.0.0.1", 5280);
+            port5280Open = await Task.WhenAny(connTask, Task.Delay(500)) == connTask && tcp.Connected;
+        }
+        catch { }
+
+        // Process snapshot
+        var processes = System.Diagnostics.Process.GetProcesses()
+            .Where(p => new[] { "CopilotNexus.Service", "CopilotNexus.App", "CopilotNexus.Cli" }
+                .Contains(p.ProcessName))
+            .Select(p =>
+            {
+                try { return new { p.ProcessName, p.Id, started = p.StartTime.ToString("O") }; }
+                catch { return new { p.ProcessName, p.Id, started = "" }; }
+            })
+            .ToList();
+
+        // Recent errors (last 5 open issues)
+        var recentErrors = issueManager.ListIssues("open")
+            .OrderByDescending(i => i.Timestamp)
+            .Take(5)
+            .Select(i => new { i.Component, i.Severity, i.Title, i.Timestamp })
+            .ToList();
+
+        return Results.Ok(new
+        {
+            serviceHealth,
+            serviceStatusCode,
+            port5280Open,
+            lockFile = lockInfo,
+            processes,
+            openIssues = issueManager.ListIssues("open").Count,
+            recentErrors,
+            checkedAtUtc = DateTimeOffset.UtcNow,
+        });
     });
 
     var orchestrator = app.Services.GetRequiredService<ActionOrchestrator>();

@@ -126,6 +126,15 @@ devStatusCommand.SetAction(async (_, _) => await CliCommands.SendDevAssistantGet
 var devIssuesCommand = new Command("issues", "List open detected issues");
 devIssuesCommand.SetAction(async (_, _) => await CliCommands.SendDevAssistantGetAsync("issues"));
 
+var devLogsCommand = new Command("logs", "Show recent log lines from all components via DevAssistant");
+var devLogsTailOption = new Option<int>("--tail") { Description = "Number of lines to show", DefaultValueFactory = _ => 100 };
+devLogsCommand.Options.Add(devLogsTailOption);
+devLogsCommand.SetAction(async (parseResult, _) =>
+    await CliCommands.SendDevAssistantGetAsync($"logs/recent?tail={parseResult.GetValue(devLogsTailOption)}"));
+
+var devDiagnosticsCommand = new Command("diagnostics", "Show live diagnostics (service health, processes, ports)");
+devDiagnosticsCommand.SetAction(async (_, _) => await CliCommands.SendDevAssistantGetAsync("diagnostics"));
+
 var devCommand = new Command("dev", "Development assistant — log watcher, issue creator, action server");
 devCommand.Subcommands.Add(devWatchCommand);
 devCommand.Subcommands.Add(devRebuildCommand);
@@ -134,6 +143,8 @@ devCommand.Subcommands.Add(devRestartCommand);
 devCommand.Subcommands.Add(devRepublishCommand);
 devCommand.Subcommands.Add(devStatusCommand);
 devCommand.Subcommands.Add(devIssuesCommand);
+devCommand.Subcommands.Add(devLogsCommand);
+devCommand.Subcommands.Add(devDiagnosticsCommand);
 
 // --- root ---
 var rootCommand = new RootCommand("CopilotNexus — Copilot session management CLI");

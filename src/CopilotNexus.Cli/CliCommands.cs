@@ -1707,6 +1707,11 @@ internal static class CliCommands
                 "bin", "Debug", "net8.0", "CopilotNexus.DevAssistant.exe");
             if (File.Exists(devBuild))
                 return devBuild;
+
+            var devReleaseBuild = Path.Combine(repoRoot, "src", "CopilotNexus.DevAssistant",
+                "bin", "Release", "net8.0", "CopilotNexus.DevAssistant.exe");
+            if (File.Exists(devReleaseBuild))
+                return devReleaseBuild;
         }
 
         return null;
