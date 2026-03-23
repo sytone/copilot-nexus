@@ -18,7 +18,7 @@ public static class RuntimeAgentTypeExtensions
     {
         RuntimeAgentType.Pi => PiValue,
         RuntimeAgentType.CopilotSdk => CopilotSdkValue,
-        _ => PiValue,
+        _ => CopilotSdkValue,
     };
 
     public static bool TryParse(string? rawValue, out RuntimeAgentType runtimeAgent)
@@ -36,7 +36,7 @@ public static class RuntimeAgentTypeExtensions
             return true;
         }
 
-        runtimeAgent = RuntimeAgentType.Pi;
+        runtimeAgent = RuntimeAgentType.CopilotSdk;
         return false;
     }
 

@@ -5,5 +5,5 @@ namespace CopilotNexus.Core.Models;
 /// </summary>
 public sealed class RuntimeAgentConfig
 {
-    public string Agent { get; set; } = RuntimeAgentType.Pi.ToConfigValue();
+    public string Agent { get; set; } = RuntimeAgentType.CopilotSdk.ToConfigValue();
 }

@@ -33,7 +33,7 @@ public sealed class JsonRuntimeAgentConfigService : IRuntimeAgentConfigService
         {
             RecoverTempFileIfNeeded();
             if (!File.Exists(_filePath))
-                return RuntimeAgentType.Pi;
+                return RuntimeAgentType.CopilotSdk;
 
             var json = await File.ReadAllTextAsync(_filePath, cancellationToken);
             var config = JsonSerializer.Deserialize<RuntimeAgentConfig>(json, JsonOptions);
@@ -41,15 +41,15 @@ public sealed class JsonRuntimeAgentConfigService : IRuntimeAgentConfigService
                 return runtimeAgent;
 
             _logger.LogWarning(
-                "Invalid runtime agent value '{Agent}' in {Path}; defaulting to pi",
+                "Invalid runtime agent value '{Agent}' in {Path}; defaulting to copilot-sdk",
                 config?.Agent ?? "(null)",
                 _filePath);
-            return RuntimeAgentType.Pi;
+            return RuntimeAgentType.CopilotSdk;
         }
         catch (JsonException ex)
         {
-            _logger.LogWarning(ex, "Invalid runtime agent config JSON at {Path}; defaulting to pi", _filePath);
-            return RuntimeAgentType.Pi;
+            _logger.LogWarning(ex, "Invalid runtime agent config JSON at {Path}; defaulting to copilot-sdk", _filePath);
+            return RuntimeAgentType.CopilotSdk;
         }
         finally
         {

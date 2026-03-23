@@ -17,7 +17,7 @@ public static class NexusHostBuilder
     /// Creates a fully configured WebApplicationBuilder with all Nexus services registered.
     /// </summary>
     public static WebApplicationBuilder CreateBuilder(string[]? args = null)
-        => CreateBuilder(RuntimeAgentType.Pi, args);
+        => CreateBuilder(RuntimeAgentType.CopilotSdk, args);
 
     /// <summary>
     /// Creates a fully configured WebApplicationBuilder with all Nexus services registered.
