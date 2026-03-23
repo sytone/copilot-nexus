@@ -51,7 +51,24 @@ public class SessionManager : ISessionManager
     {
         _logger.LogInformation("Initializing session manager...");
 
-        await _clientService.StartAsync(cancellationToken);
+        try
+        {
+            await _clientService.StartAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            // Agent runtime is unavailable (e.g. pi/copilot CLI not installed or not in PATH).
+            // Log clearly and continue — the service still starts in degraded mode so the app
+            // can connect. Session creation will fail at request time with a meaningful error.
+            _logger.LogWarning(
+                ex,
+                "Agent runtime could not be started; service running in degraded mode. " +
+                "Install the agent runtime (pi/copilot CLI) and restart to enable sessions.");
+            _availableModels = new List<ModelInfo>();
+            _logger.LogInformation("Session manager initialized (degraded — no runtime)");
+            return;
+        }
+
         try
         {
             var models = await _clientService.ListModelsAsync(cancellationToken);
